@@ -24,6 +24,20 @@ resource "xcsh_securemesh_site_v2" "onprem_kvm" {
   disable_management_network = {}
 }
 
+# A KVM CE must never consume the generic tenant token. The issued JWT is
+# cryptographically bound to this exact SMSv2 site and inserted only into the
+# console-provided cloud-init template.
+resource "xcsh_token" "kvm" {
+  count = var.enable_kvm ? 1 : 0
+
+  name        = "${local.kvm_site_name}-registration"
+  namespace   = "system"
+  description = "Site-bound JWT for KVM SecureMesh site ${local.kvm_site_name}"
+  labels      = local.kvm_xc_labels
+  type        = 1
+  site_name   = xcsh_securemesh_site_v2.onprem_kvm[0].name
+}
+
 data "xcsh_site_registration" "kvm" {
   for_each = local.kvm_enabled_nodes
 
@@ -41,7 +55,7 @@ resource "xcsh_registration_approval" "kvm" {
 
   namespace    = "system"
   name         = each.value.name
-  cluster_size = 3
+  cluster_size = 1
   state        = "APPROVED"
 
   depends_on = [xcsh_securemesh_site_v2.onprem_kvm]

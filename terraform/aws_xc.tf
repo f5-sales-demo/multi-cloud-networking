@@ -187,10 +187,9 @@ resource "xcsh_securemesh_site_v2" "aws" {
   }
 }
 
-resource "xcsh_site_cloud_init" "aws" {
-  # Cloud-init records remain stable for all sites. Only the sensitive JWT
-  # issuance is staged, so a CE01 replacement cannot delete peer bootstrap
-  # records from state or the XC API.
+data "xcsh_site_cloud_init" "aws" {
+  # The console supplies a template, not a mutable cloud-init resource. The
+  # separately-issued, site-bound JWT is substituted by aws_ce.tf.
   for_each                  = local.aws_active_sites
   provider_ref              = "aws"
   site_name                 = xcsh_securemesh_site_v2.aws[each.key].name

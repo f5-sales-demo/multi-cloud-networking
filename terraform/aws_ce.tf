@@ -5,22 +5,12 @@ locals {
   aws_ssh_public_key = var.aws_ssh_public_key != "" ? var.aws_ssh_public_key : local.ssh_public_key
   aws_ce_site_cloud_init = {
     for key in keys(local.aws_active_sites) : key => replace(
-      replace(
-        replace(
-          try(xcsh_site_cloud_init.aws[key].cloud_init_config, ""),
-          "{{ .Token }}",
-          try(xcsh_token.aws[key].uid, "{{ .Token }}"),
-        ),
-        "{{ .token }}",
-        try(xcsh_token.aws[key].uid, "{{ .token }}"),
-      ),
-      "permissions: 0644",
-      "permissions: \"0644\"",
+      try(data.xcsh_site_cloud_init.aws[key].cloud_init_config, ""),
+      "{{ .token }}",
+      try(xcsh_token.aws[key].uid, "{{ .token }}"),
     )
   }
 }
-
-
 resource "aws_key_pair" "ce" {
   count      = var.enable_aws ? 1 : 0
   key_name   = "${local.aws_resource_prefix}-aws-ce-key"

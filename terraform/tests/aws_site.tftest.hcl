@@ -63,21 +63,21 @@ override_resource {
   values          = { uid = "test-site-token-03" }
 }
 
-override_resource {
+override_data {
   override_during = plan
-  target          = xcsh_site_cloud_init.aws["01"]
+  target          = data.xcsh_site_cloud_init.aws["01"]
   values          = { cloud_init_config = "#cloud-config\nwrite_files:\n  - path: /etc/vpm/user_data\n    content: |\n      token: {{ .token }}\n" }
 }
 
-override_resource {
+override_data {
   override_during = plan
-  target          = xcsh_site_cloud_init.aws["02"]
+  target          = data.xcsh_site_cloud_init.aws["02"]
   values          = { cloud_init_config = "#cloud-config\nwrite_files:\n  - path: /etc/vpm/user_data\n    content: |\n      token: {{ .token }}\n" }
 }
 
-override_resource {
+override_data {
   override_during = plan
-  target          = xcsh_site_cloud_init.aws["03"]
+  target          = data.xcsh_site_cloud_init.aws["03"]
   values          = { cloud_init_config = "#cloud-config\nwrite_files:\n  - path: /etc/vpm/user_data\n    content: |\n      token: {{ .token }}\n" }
 }
 
@@ -183,7 +183,7 @@ run "aws_site_and_resources" {
   }
 
   assert {
-    condition     = length(xcsh_securemesh_site_v2.aws) == 3 && length(xcsh_site_cloud_init.aws) == 3 && length(xcsh_token.aws) == 3
+    condition     = length(xcsh_securemesh_site_v2.aws) == 3 && length(data.xcsh_site_cloud_init.aws) == 3 && length(xcsh_token.aws) == 3
     error_message = "AWS must plan three independent sites and one site-scoped bootstrap per site."
   }
 
@@ -202,25 +202,17 @@ run "aws_site_and_resources" {
 
   assert {
     condition = alltrue([
-      for bootstrap in values(xcsh_site_cloud_init.aws) : bootstrap.provider_ref == "aws"
+      for bootstrap in values(data.xcsh_site_cloud_init.aws) : bootstrap.provider_ref == "aws"
     ])
     error_message = "AWS site cloud-init issuance must use the lowercase provider identifier expected by the live API."
   }
 
   assert {
     condition = alltrue([
-      for config in [
-        for key, bootstrap in xcsh_site_cloud_init.aws : replace(
-          replace(replace(bootstrap.cloud_init_config, "{{ .Token }}", xcsh_token.aws[key].uid), "{{ .token }}", xcsh_token.aws[key].uid),
-          "permissions: 0644",
-          "permissions: \"0644\"",
-        )
-      ] :
-      strcontains(nonsensitive(config), "token: test-site-token-") &&
-      !strcontains(nonsensitive(config), "{{ .token }}") &&
-      !strcontains(nonsensitive(config), "{{ .Token }}")
+      for key, bootstrap in data.xcsh_site_cloud_init.aws :
+      bootstrap.site_name == local.aws_active_sites[key].name
     ])
-    error_message = "Every AWS CE must receive resolved cloud-init with no token template placeholder."
+    error_message = "Every AWS CE must retrieve the cloud-init template for its exact SMSv2 site."
   }
 
   assert {

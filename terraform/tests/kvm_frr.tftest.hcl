@@ -41,15 +41,34 @@ run "kvm_frr_and_ce_identity_plan" {
   assert {
     condition = output.kvm_bgp_fabric.ce_addresses == {
       "01" = "10.100.0.11"
-      "02" = "10.100.0.12"
-      "03" = "10.100.0.13"
     }
     error_message = "KVM CE addresses must be a stable one-to-one mapping, independent of DHCP lease order."
   }
 
   assert {
-    condition     = length(libvirt_domain.ce_node) == 3
-    error_message = "The KVM showcase must create exactly three CE domains."
+    condition     = length(libvirt_domain.ce_node) == 1
+    error_message = "The KVM showcase must create exactly one production-sized CE domain."
+  }
+
+  assert {
+    condition = (
+      libvirt_domain.ce_node["01"].memory == 32768 &&
+      libvirt_domain.ce_node["01"].vcpu == 8 &&
+      libvirt_domain.ce_node["01"].cpu[0].mode == "host-passthrough" &&
+      libvirt_volume.ce_disk["01"].size == 85899345920
+    )
+    error_message = "The KVM CE must use the reviewed 32 GiB, 8-vCPU host-passthrough, 80 GiB runtime shape."
+  }
+
+  assert {
+    condition = (
+      xcsh_token.kvm[0].type == 1 &&
+      xcsh_token.kvm[0].site_name == xcsh_securemesh_site_v2.onprem_kvm[0].name &&
+      data.xcsh_site_image.kvm[0].site_name == xcsh_securemesh_site_v2.onprem_kvm[0].name &&
+      data.xcsh_site_cloud_init.kvm[0].provider_ref == "kvm" &&
+      data.xcsh_site_cloud_init.kvm[0].site_name == xcsh_securemesh_site_v2.onprem_kvm[0].name
+    )
+    error_message = "KVM must use a site-bound JWT and resolve both the image and cloud-init template by its exact SMSv2 site."
   }
 
   assert {

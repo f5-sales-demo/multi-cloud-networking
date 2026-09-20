@@ -131,14 +131,6 @@ resource "aws_security_group" "ce" {
   vpc_id      = aws_vpc.aws[0].id
 
   ingress {
-    description = "SSH access"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
     description = "Site Console Local UI"
     from_port   = 65500
     to_port     = 65500
