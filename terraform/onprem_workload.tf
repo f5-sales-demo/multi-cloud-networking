@@ -47,6 +47,17 @@ resource "libvirt_cloudinit_disk" "workload" {
   name  = "onprem-workload-${local.kvm_network_generation}-cloudinit.iso"
   pool  = libvirt_pool.kvm[0].name
 
+  network_config = <<-EOF
+    version: 2
+    ethernets:
+      workload:
+        match:
+          macaddress: "${local.kvm_workload_node.mac}"
+        set-name: eth0
+        dhcp4: true
+        dhcp6: false
+  EOF
+
   user_data = <<-EOF
     #cloud-config
     package_update: false
