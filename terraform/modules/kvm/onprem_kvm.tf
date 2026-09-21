@@ -11,7 +11,7 @@ resource "xcsh_securemesh_site_v2" "onprem_kvm" {
     not_managed {}
   }
 
-  enable_ha                  = {}
+  disable_ha                 = {}
   block_all_services         = {}
   no_network_policy          = {}
   no_forward_proxy           = {}
