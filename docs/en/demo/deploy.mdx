@@ -14,7 +14,7 @@ Allow tens of minutes for bootstrap and hours for a full serial-upgrade rehearsa
 
 - **Terraform** at the version floor in `terraform/versions.tf` — `>= 1.16.1`, for
   provider-defined functions and the `check` block that guards the VIP.
-- **The `xcsh` provider at exactly v9.4.0 for normal deployments.** This deployment uses
+- **The `xcsh` provider at exactly v9.5.0 for normal deployments.** This deployment uses
   only the clean-break SMSv2 contract. A release-candidate acceptance run may substitute one
   reviewed local binary through the explicit procedure below. The local `.terraform.lock.hcl`
   remains gitignored; the exact source constraint is authoritative.
@@ -101,7 +101,7 @@ above before you mint another token.
 ## AWS SMSv2 preflight is mandatory
 
 The AWS Transit Gateway path is pinned to the immutable
-[`xcsh` v9.4.0 release](https://github.com/f5-sales-demo/terraform-provider-xcsh/releases/tag/v9.4.0).
+[`xcsh` v9.5.0 release](https://github.com/f5-sales-demo/terraform-provider-xcsh/releases/tag/v9.5.0).
 That release publishes contract `f5xc-smsv2-api/v1` version `7.0.0` from
 `api-specs-enriched` v7.0.6. Its five AWS SMSv2 capabilities, including
 the evidence-backed `aws_node_configuration` `discovery_rebuild` strategy,
@@ -253,7 +253,7 @@ manifest bound to the expected plan digest, AWS account and region, Sales Demo
 tenant, creator, component, generation, provider IDs, and creation evidence. Its
 configuration-driven import blocks must first produce an import-only saved plan.
 Verify that plan with `scripts/verify-aws-smsv2-orphan-recovery-plan.sh` before
-applying it. Destroy the adopted resources only with provider v9.4.0 or newer,
+applying it. Destroy the adopted resources only with provider v9.5.0 or newer,
 then prove the recovery state is empty and every manifest identity is absent.
 CLI import, direct API deletion, state editing, taint, console cleanup, and broad
 tag-based deletion are not recovery mechanisms.

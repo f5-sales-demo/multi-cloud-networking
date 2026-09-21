@@ -135,29 +135,6 @@ tf() {
   "${TF_RUNNER[@]}" -chdir="$TERRAFORM_DIR" "$@"
 }
 
-preflight_kvm_image() {
-  local plan_file="$PRIVATE_ROOT/kvm-image-preflight.tfplan"
-  local log_file="$PRIVATE_ROOT/kvm-image-preflight.log"
-  local diagnostic_sha256 reason
-
-  if tf plan -input=false -no-color -lock=false -refresh=false \
-    -target='data.xcsh_site_image.kvm' -var-file="$TFVARS" \
-    -var='enable_aws=false' -var='enable_aws_tgw_connect=false' \
-    -var='enable_kvm=true' -var='aws_site_configuration_phase=bootstrap' \
-    -out="$plan_file" >"$log_file" 2>&1; then
-    rm -f -- "$plan_file" "$log_file"
-    return 0
-  fi
-
-  diagnostic_sha256=$(sha256sum "$log_file" | awk '{print $1}')
-  reason=kvm_image_issuance_failed
-  if grep -Fq 'maurice_config_cardinality_exactly_one' "$log_file"; then
-    reason=maurice_config_cardinality_exactly_one
-  fi
-  rm -f -- "$plan_file" "$log_file"
-  die "KVM image prerequisite unavailable: $reason (sanitized_diagnostic_sha256=$diagnostic_sha256)"
-}
-
 terraform_version=$(terraform version -json | jq -r .terraform_version)
 [ "$terraform_version" = 1.16.3 ] || die "Terraform 1.16.3 is required"
 caller_account=$(AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_SDK_LOAD_CONFIG=1 \
@@ -167,9 +144,6 @@ caller_account=$(AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_SDK_LOAD_CONFIG=1 \
 unset caller_account
 
 tf init -reconfigure -input=false -lockfile=readonly -backend-config="$BACKEND_CONFIG"
-if [ "$MODE" != destroy ]; then
-  preflight_kvm_image
-fi
 
 libvirt_unit=""
 for candidate in libvirtd.service virtqemud.service; do
@@ -288,7 +262,7 @@ verify_configured() {
       --expected-site "${final_sites[2]}" --execute-uat
   fi
   kvm_status=$(tf output -json kvm_runtime_status)
-  jq -e '.registration_count == 3 and .online_count == 3 and .mapping_valid == true and .bgp_converged == true and .bgp_session_count == 3' \
+  jq -e '.registration_count == 1 and .online_count == 1 and .mapping_valid == true and .bgp_converged == true and .bgp_session_count == 1' \
     <<<"$kvm_status" >/dev/null || die "KVM runtime/BGP acceptance failed"
   unset kvm_status
   rm -f -- "$PLAN_FILE"
@@ -300,7 +274,7 @@ build_cycle() {
   mkdir -p "$CYCLE_DIR"
   chmod 700 "$CYCLE_DIR"
   run_phase "$cycle" bootstrap create
-  wait_for_approvals bootstrap 3 3
+  wait_for_approvals bootstrap 3 1
   run_phase "$cycle" bootstrap approvals
   capture_bootstrap_mapping_inputs
   run_phase "$cycle" bootstrap_retirement retire

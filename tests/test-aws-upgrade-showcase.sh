@@ -20,7 +20,7 @@ reject_text() {
 }
 
 require_text terraform/versions.tf 'required_version = "= 1.16.3"'
-require_text terraform/versions.tf 'version = "= 9.4.0"'
+require_text terraform/versions.tf 'version = "= 9.5.0"'
 require_text terraform/aws_xc.tf 'disable_ha                 = {}'
 require_text terraform/aws_xc.tf 'cluster_size = 1'
 ## A ground-up CE must request the field-proven runtime pair on its first boot.

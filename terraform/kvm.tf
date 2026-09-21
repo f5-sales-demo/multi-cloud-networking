@@ -9,8 +9,12 @@ locals {
   kvm_ce_nodes = {
     "01" = { address = "10.100.0.11", mac = "52:54:00:10:00:11" }
   }
+  kvm_workload_node   = { address = "10.100.0.100", mac = "52:54:00:10:00:64" }
+  kvm_network_hosts   = merge(local.kvm_ce_nodes, { workload = local.kvm_workload_node })
+  kvm_image_cache_dir = pathexpand("~/.cache/multi-cloud-networking/kvm")
+  kvm_pool_name       = "mcn-kvm-showcase"
 
-  kvm_network_generation = substr(sha256(jsonencode(local.kvm_ce_nodes)), 0, 8)
+  kvm_network_generation = substr(sha256(jsonencode(local.kvm_network_hosts)), 0, 8)
   kvm_network_name       = "ce-bgp-net-${local.kvm_network_generation}"
   # Linux bridge device names are limited to 15 bytes.
   kvm_network_bridge       = "vbgp-${local.kvm_network_generation}"
@@ -25,7 +29,7 @@ locals {
 resource "terraform_data" "kvm_network_identity" {
   count = var.enable_kvm ? 1 : 0
 
-  input = sha256(jsonencode(local.kvm_ce_nodes))
+  input = sha256(jsonencode(local.kvm_network_hosts))
 }
 
 # The Sales Demo tenant issues the currently supported KVM CE appliance as a
@@ -44,6 +48,26 @@ data "xcsh_site_cloud_init" "kvm" {
   enable_management_network = false
 }
 
+resource "libvirt_pool" "kvm" {
+  count = var.enable_kvm ? 1 : 0
+  name  = local.kvm_pool_name
+  type  = "dir"
+  target { path = "/var/lib/libvirt/images/${local.kvm_pool_name}" }
+}
+
+resource "terraform_data" "kvm_ce_image_cache" {
+  count            = var.enable_kvm ? 1 : 0
+  triggers_replace = [data.xcsh_site_image.kvm[0].image_download_url, data.xcsh_site_image.kvm[0].image_md5_sum]
+  provisioner "local-exec" {
+    command     = "../scripts/ensure-verified-kvm-image.sh --url \"$IMAGE_URL\" --digest \"md5:$IMAGE_MD5\" --destination \"$IMAGE_DESTINATION\""
+    working_dir = path.root
+    environment = {
+      IMAGE_URL         = data.xcsh_site_image.kvm[0].image_download_url
+      IMAGE_MD5         = data.xcsh_site_image.kvm[0].image_md5_sum
+      IMAGE_DESTINATION = "${local.kvm_image_cache_dir}/f5xc-${data.xcsh_site_image.kvm[0].image_md5_sum}.qcow2"
+    }
+  }
+}
 resource "libvirt_network" "ce_bgp_net" {
   count = var.enable_kvm ? 1 : 0
 
@@ -62,7 +86,7 @@ resource "libvirt_network" "ce_bgp_net" {
 
   dnsmasq_options {
     dynamic "options" {
-      for_each = local.kvm_ce_nodes
+      for_each = local.kvm_network_hosts
       content {
         option_name  = "dhcp-host"
         option_value = "${options.value.mac},${options.value.address}"
@@ -83,17 +107,18 @@ resource "libvirt_network" "ce_bgp_net" {
 resource "libvirt_volume" "base_cloud" {
   count = var.enable_kvm ? 1 : 0
 
-  name   = "f5xc-kvm-ce-${data.xcsh_site_image.kvm[0].image_md5_sum}.qcow2"
-  pool   = "default"
-  source = data.xcsh_site_image.kvm[0].image_download_url
-  format = "qcow2"
+  name       = "f5xc-kvm-ce-${data.xcsh_site_image.kvm[0].image_md5_sum}.qcow2"
+  pool       = libvirt_pool.kvm[0].name
+  source     = "${local.kvm_image_cache_dir}/f5xc-${data.xcsh_site_image.kvm[0].image_md5_sum}.qcow2"
+  format     = "qcow2"
+  depends_on = [terraform_data.kvm_ce_image_cache]
 }
 
 # Per-CE root overlay disks
 resource "libvirt_volume" "ce_disk" {
   for_each       = local.kvm_enabled_nodes
   name           = "onprem-ce-${each.key}-${local.kvm_network_generation}-${local.kvm_bootstrap_generation}-disk.qcow2"
-  pool           = "default"
+  pool           = libvirt_pool.kvm[0].name
   base_volume_id = libvirt_volume.base_cloud[0].id
   size           = 85899345920
   format         = "qcow2"
@@ -103,7 +128,7 @@ resource "libvirt_volume" "ce_disk" {
 resource "libvirt_cloudinit_disk" "ce_cloudinit" {
   for_each = local.kvm_enabled_nodes
   name     = "onprem-ce-${each.key}-${local.kvm_network_generation}-${local.kvm_bootstrap_generation}-cloudinit.iso"
-  pool     = "default"
+  pool     = libvirt_pool.kvm[0].name
   # The provider returns the modern /etc/vpm/user_data template. It has the
   # lowercase placeholder exactly once; this CE receives its own type-1 JWT.
   user_data = replace(
