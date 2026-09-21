@@ -92,6 +92,14 @@ resource "libvirt_domain" "workload" {
 
   disk { volume_id = libvirt_volume.workload_disk[0].id }
 
+  # Debian 12 requires a serial device with this libvirt/QEMU machine layout.
+  # It also keeps the first-boot and DHCP diagnostics available through virsh.
+  console {
+    type        = "pty"
+    target_port = "0"
+    target_type = "serial"
+  }
+
   lifecycle {
     replace_triggered_by = [libvirt_cloudinit_disk.workload[0], libvirt_network.ce_bgp_net[0]]
   }

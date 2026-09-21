@@ -53,6 +53,8 @@ require 'dhcp4: true' "$workload"
 require 'resource "libvirt_domain" "workload"' "$workload"
 require 'wait_for_lease = true' "$workload"
 require 'mode = "host-passthrough"' "$workload"
+require 'target_type = "serial"' "$workload"
+require 'target_port = "0"' "$workload"
 require 'qemu-guest-agent' "$workload"
 
 require 'resource "docker_container" "kvm_frr"' "$frr"
