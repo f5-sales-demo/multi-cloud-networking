@@ -94,6 +94,7 @@ terraform/recovery/aws-smsv2-orphans/resources.tf -> terraform/recovery/aws-smsv
 terraform/recovery/aws-smsv2-orphans/variables.tf -> terraform/recovery/aws-smsv2-orphans/variables.tf
 terraform/recovery/aws-smsv2-orphans/versions.tf -> terraform/recovery/aws-smsv2-orphans/versions.tf
 terraform/onprem_kvm.tf -> terraform/onprem_kvm.tf
+terraform/onprem_workload.tf -> terraform/onprem_workload.tf
 terraform/outputs.tf -> terraform/outputs.tf
 terraform/providers.tf -> terraform/providers.tf
 terraform/providers_libvirt.tf -> terraform/providers_libvirt.tf
