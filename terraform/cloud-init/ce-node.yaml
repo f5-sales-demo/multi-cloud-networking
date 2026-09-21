@@ -10,7 +10,7 @@
 # CertifiedHardwareEndpoint — without it vpmd exits with
 # "fail to match certified hardware" and never registers.
 #
-# ${token} = generated xcsh_token.ce.uid (or var.registration_token override);
+# ${token} = generated xcsh_token.ce[0].uid (or var.registration_token override);
 # ${cluster_name} = the XC site name (<component>-<region>0N). 0600 root-only: the
 # Token is a credential and vpmd runs as root.
 write_files:

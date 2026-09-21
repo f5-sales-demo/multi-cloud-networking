@@ -104,6 +104,6 @@ origin_port      = 80
 vip              = "10.250.0.10"
 
 # --- Site registration token ---
-# Leave unset: the deployment mints its own tenant-scoped token (xcsh_token.ce) and
+# Leave unset: an enabled Azure deployment mints its own tenant-scoped token (xcsh_token.ce) and
 # feeds its value to cloud-init. Set this only to inject an externally-minted token.
 # registration_token = "..."

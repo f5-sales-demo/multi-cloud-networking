@@ -107,10 +107,10 @@ locals {
   ssh_public_key = var.ssh_public_key != "" ? var.ssh_public_key : file(pathexpand(var.ssh_public_key_path))
 
   # --- CE site registration token fed to cloud-init ---
-  # Prefer the provider-generated xcsh_token.ce.uid (the Computed token VALUE);
+  # Prefer the provider-generated xcsh_token.ce[0].uid (the Computed token VALUE);
   # an explicit var.registration_token still wins when supplied (break-glass /
   # externally-minted token). Empty var (default) => the generated token.
-  ce_registration_token = var.registration_token != "" ? var.registration_token : xcsh_token.ce.uid
+  ce_registration_token = var.registration_token != "" ? var.registration_token : try(xcsh_token.ce[0].uid, null)
 
   # --- CE cloud-init, rendered once per node ---
   # Rendered here rather than inline in the module block so the document is

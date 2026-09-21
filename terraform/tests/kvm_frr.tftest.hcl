@@ -24,6 +24,8 @@ variables {
   deployer               = "tester"
   ssh_public_key         = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l kvm-plan-test-only"
   xc_app_namespace       = "multi-cloud-networking"
+  enable_azure           = false
+  enable_canada          = false
   enable_aws             = false
   enable_aws_tgw_connect = false
   enable_bgp             = false
@@ -69,6 +71,15 @@ run "kvm_frr_and_ce_identity_plan" {
       data.xcsh_site_cloud_init.kvm[0].site_name == xcsh_securemesh_site_v2.onprem_kvm[0].name
     )
     error_message = "KVM must use a site-bound JWT and resolve both the image and cloud-init template by its exact SMSv2 site."
+  }
+
+  assert {
+    condition = (
+      length(xcsh_token.ce) == 0 &&
+      output.registration_token_name == null &&
+      output.registration_token_is_generated == false
+    )
+    error_message = "KVM-only plans must not create the shared Azure registration token."
   }
 
   assert {

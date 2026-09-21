@@ -41,12 +41,6 @@ override_resource {
 
 override_resource {
   override_during = plan
-  target          = xcsh_token.ce
-  values          = { uid = "test-registration-token" }
-}
-
-override_resource {
-  override_during = plan
   target          = xcsh_token.aws["01"]
   values          = { uid = "test-site-token-01" }
 }
@@ -151,8 +145,7 @@ run "aws_site_and_resources" {
       aws_iam_instance_profile.ce[0].name == "mcn-ce-ha-smsv2-aws-ce-profile" &&
       aws_iam_role.workload[0].name == "mcn-ce-ha-smsv2-aws-workload-ssm" &&
       aws_iam_instance_profile.workload[0].name == "mcn-ce-ha-smsv2-aws-workload-ssm" &&
-      xcsh_virtual_site.aws[0].name == "mcn-ce-ha-smsv2-aws-vsite" &&
-      xcsh_token.ce.name == "mcn-ce-ha-smsv2-registration"
+      xcsh_virtual_site.aws[0].name == "mcn-ce-ha-smsv2-aws-vsite"
     )
     error_message = "Every singleton AWS/F5 object must use the immutable SMSv2 generation instead of a collision-prone component-only name."
   }

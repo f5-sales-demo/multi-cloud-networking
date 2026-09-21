@@ -239,18 +239,18 @@ output "ca_ilb_frontend_ip" {
 # ---------------------------------------------------------
 
 output "registration_token_name" {
-  description = "Name (metadata id) of the generated xcsh_token used for CE registration."
-  value       = xcsh_token.ce.name
+  description = "Name (metadata id) of the generated xcsh_token used for Azure CE registration, or null when Azure is disabled."
+  value       = try(xcsh_token.ce[0].name, null)
 }
 
 output "registration_token_is_generated" {
-  description = "True when the CE cloud-init token feed uses the generated xcsh_token.ce.uid (no override supplied)."
+  description = "True when an enabled Azure CE cloud-init token feed uses the generated xcsh_token.ce[0].uid."
   # Whether an override was supplied is not itself secret (the token value is).
-  value = nonsensitive(var.registration_token == "")
+  value = nonsensitive(local.azure_provider_enabled && var.registration_token == "")
 }
 
 output "ce_registration_token" {
-  description = "Resolved CE registration token fed to cloud-init: the generated xcsh_token.ce.uid, or var.registration_token when overridden."
+  description = "Resolved Azure CE registration token fed to cloud-init, or null when Azure is disabled and no override is supplied."
   value       = local.ce_registration_token
   sensitive   = true
 }
