@@ -49,6 +49,7 @@ require 'resource "terraform_data" "kvm_workload_image_cache"' "$workload"
 require 'sha512:$IMAGE_SHA512' "$workload"
 require 'resource "libvirt_domain" "workload"' "$workload"
 require 'wait_for_lease = true' "$workload"
+require 'mode = "host-passthrough"' "$workload"
 require 'qemu-guest-agent' "$workload"
 
 require 'resource "docker_container" "kvm_frr"' "$frr"

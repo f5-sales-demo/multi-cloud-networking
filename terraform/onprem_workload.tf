@@ -69,6 +69,9 @@ resource "libvirt_domain" "workload" {
   vcpu      = 2
   autostart = true
   cloudinit = libvirt_cloudinit_disk.workload[0].id
+  cpu {
+    mode = "host-passthrough"
+  }
 
   network_interface {
     network_id     = libvirt_network.ce_bgp_net[0].id
