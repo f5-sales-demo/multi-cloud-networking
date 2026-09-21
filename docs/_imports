@@ -82,6 +82,14 @@ terraform/modules/kvm-registration-mapping/main.tf -> terraform/modules/kvm-regi
 terraform/modules/kvm-registration-mapping/outputs.tf -> terraform/modules/kvm-registration-mapping/outputs.tf
 terraform/modules/kvm-registration-mapping/variables.tf -> terraform/modules/kvm-registration-mapping/variables.tf
 terraform/modules/kvm-registration-mapping/versions.tf -> terraform/modules/kvm-registration-mapping/versions.tf
+terraform/modules/kvm/kvm.tf -> terraform/modules/kvm/kvm.tf
+terraform/modules/kvm/kvm_frr.tf -> terraform/modules/kvm/kvm_frr.tf
+terraform/modules/kvm/locals.tf -> terraform/modules/kvm/locals.tf
+terraform/modules/kvm/onprem_kvm.tf -> terraform/modules/kvm/onprem_kvm.tf
+terraform/modules/kvm/onprem_workload.tf -> terraform/modules/kvm/onprem_workload.tf
+terraform/modules/kvm/outputs.tf -> terraform/modules/kvm/outputs.tf
+terraform/modules/kvm/providers.tf -> terraform/modules/kvm/providers.tf
+terraform/modules/kvm/variables.tf -> terraform/modules/kvm/variables.tf
 terraform/modules/xc-site/main.tf -> terraform/modules/xc-site/main.tf
 terraform/modules/xc-site/outputs.tf -> terraform/modules/xc-site/outputs.tf
 terraform/modules/xc-site/variables.tf -> terraform/modules/xc-site/variables.tf

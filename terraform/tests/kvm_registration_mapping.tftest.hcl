@@ -2,6 +2,41 @@
 # KVM MAC join. Production callers cannot supply these records: the root module
 # passes only the XC inventory data-source projection.
 
+run "configured_single_node_kvm_mapping_is_exact" {
+  command = plan
+
+  module {
+    source = "./modules/kvm-registration-mapping"
+  }
+
+  variables {
+    enforce = true
+    ce_nodes = {
+      "01" = { address = "10.100.0.11", mac = "52:54:00:10:00:11" }
+    }
+    registration_records = [
+      { hostname = "onprem-ce-01-674f7", provider = "KVM", mac = "52:54:00:10:00:11" },
+    ]
+  }
+
+  assert {
+    condition     = output.mapping_valid
+    error_message = "One observed KVM registration must satisfy a one-node configured topology."
+  }
+
+  assert {
+    condition = (
+      length(output.expected_bgp_peers) == 1 &&
+      output.expected_bgp_peers["node_01_slo"].node == "onprem-ce-01-674f7" &&
+      output.expected_bgp_peers["node_01_slo"].role == "slo" &&
+      output.expected_bgp_peers["node_01_slo"].mac == "52:54:00:10:00:11" &&
+      output.expected_bgp_peers["node_01_slo"].peer_address == "10.100.0.2" &&
+      output.expected_bgp_peers["node_01_slo"].expected_imported_routes == ["198.51.100.0/24"]
+    )
+    error_message = "The one-node KVM mapping must retain the exact observed hostname and owned MAC."
+  }
+}
+
 run "configured_kvm_mapping_is_exact" {
   command = plan
 

@@ -7,6 +7,7 @@ frr="$repo_root/terraform/kvm_frr.tf"
 onprem="$repo_root/terraform/onprem_kvm.tf"
 workload="$repo_root/terraform/onprem_workload.tf"
 variables="$repo_root/terraform/variables.tf"
+resolver="$repo_root/terraform/scripts/xc-kvm-network-interface.py"
 
 fail() {
   printf 'FAIL: %s\n' "$*" >&2
@@ -75,7 +76,18 @@ require 'disable_ha                 = {}' "$onprem"
 reject 'enable_ha                  = {}' "$onprem"
 require 'docker_container.kvm_frr' "$onprem"
 require 'libvirt_domain.ce_node' "$onprem"
+require 'data "external" "kvm_network_interface"' "$onprem"
+require 'data.external.kvm_network_interface[0].result.interface_name' "$onprem"
+require 'resolver_sha256       = filesha256(' "$onprem"
+reject 'name      = "eth0"' "$onprem"
+require 'owner.get("uid")' "$resolver"
+require 'infra.get("provider")' "$resolver"
+require 'network.get("mac_address")' "$resolver"
+require '"site_local_network" not in ethernet' "$resolver"
+require 'hmac.compare_digest(expected_hash, actual_hash)' "$resolver"
 require 'variable "enable_kvm"' "$variables"
 require 'no KVM image lookup occurs while disabled' "$variables"
+
+python3 "$repo_root/tests/test_xc_kvm_network_interface.py"
 
 printf 'PASS: KVM CE identity and FRR lifecycle are Terraform-owned\n'

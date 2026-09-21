@@ -93,6 +93,38 @@ module "kvm_registration_mapping" {
   ce_nodes             = local.kvm_ce_nodes
 }
 
+# XC assigns a fresh node suffix and network_interface object name on every CE
+# registration. Resolve that object from live ownership plus the exact observed
+# KVM MAC; neither the Linux device name nor the XC object name is guessed.
+data "external" "kvm_network_interface" {
+  count = var.enable_kvm ? 1 : 0
+
+  program = ["python3", "${path.module}/scripts/xc-kvm-network-interface.py"]
+  query = {
+    api_url               = local.xc_api_url
+    namespace             = "system"
+    site_name             = xcsh_securemesh_site_v2.onprem_kvm[0].name
+    expected_mac          = local.kvm_ce_nodes["01"].mac
+    timeout_seconds       = "7200"
+    poll_interval_seconds = "10"
+    resolver_sha256       = filesha256("${path.module}/scripts/xc-kvm-network-interface.py")
+  }
+
+  depends_on = [libvirt_domain.ce_node]
+
+  lifecycle {
+    postcondition {
+      condition = (
+        self.result.interface_name != "" &&
+        self.result.hostname != "" &&
+        self.result.device != "" &&
+        lower(self.result.mac) == lower(local.kvm_ce_nodes["01"].mac)
+      )
+      error_message = "KVM BGP requires one live XC network_interface correlated by current site ownership, observed registration hostname/device, and the Terraform-owned CE MAC."
+    }
+  }
+}
+
 data "xcsh_site_bgp_status" "kvm" {
   count = var.enable_kvm && var.aws_site_configuration_phase == "configured" ? 1 : 0
 
@@ -145,7 +177,7 @@ resource "xcsh_bgp" "onprem_ebgp" {
       port    = 179
 
       interface {
-        name      = "eth0"
+        name      = data.external.kvm_network_interface[0].result.interface_name
         namespace = "system"
       }
 
@@ -158,6 +190,7 @@ resource "xcsh_bgp" "onprem_ebgp" {
   # Do not redirect the F5-side peer until both the Terraform-owned router and
   # the CE interfaces with the declared static identities are ready.
   depends_on = [
+    data.external.kvm_network_interface,
     docker_container.kvm_frr,
     libvirt_domain.ce_node,
   ]

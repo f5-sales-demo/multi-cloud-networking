@@ -35,7 +35,7 @@ resource "terraform_data" "gate" {
 
   lifecycle {
     precondition {
-      condition     = local.mapping_valid && length(local.expected_bgp_peers) == 3
+      condition     = local.mapping_valid && length(local.expected_bgp_peers) == length(var.ce_nodes)
       error_message = "Configured KVM verification requires exactly one observed KVM registration hostname for each Terraform-owned CE MAC; missing, duplicate, foreign, or guessed mappings are rejected."
     }
   }
