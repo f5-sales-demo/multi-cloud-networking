@@ -96,6 +96,10 @@ resource "libvirt_network" "ce_bgp_net" {
 
   dns {
     enabled = true
+    # Keep the libvirt search domain authoritative. During CE bootstrap,
+    # gRPC service-config lookups append this suffix; forwarding those misses
+    # can exhaust dnsmasq and stall the Vector -> Vega dependency chain.
+    local_only = true
   }
 
   lifecycle {

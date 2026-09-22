@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 kvm="$repo_root/terraform/kvm.tf"
+module_kvm="$repo_root/terraform/modules/kvm/kvm.tf"
 frr="$repo_root/terraform/kvm_frr.tf"
 onprem="$repo_root/terraform/onprem_kvm.tf"
 workload="$repo_root/terraform/onprem_workload.tf"
@@ -38,6 +39,8 @@ require '10.100.0.11' "$kvm"
 require '10.100.0.100' "$kvm"
 require 'mac            = each.value.mac' "$kvm"
 require 'enabled = true' "$kvm"
+require 'local_only = true' "$kvm"
+require 'local_only = true' "$module_kvm"
 require 'option_name  = "dhcp-host"' "$kvm"
 require 'option_value = "${options.value.mac},${options.value.address}"' "$kvm"
 require 'resource "terraform_data" "kvm_network_identity"' "$kvm"
