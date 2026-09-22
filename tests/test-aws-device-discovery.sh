@@ -2,10 +2,10 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-aws_xc="$repo_root/terraform/aws/aws_xc.tf"
-aws_ce="$repo_root/terraform/aws/aws_ce.tf"
-aws_upgrade="$repo_root/terraform/aws/aws_upgrade.tf"
-variables="$repo_root/terraform/aws/variables_aws.tf"
+aws_xc="$repo_root/terraform/aws_xc.tf"
+aws_ce="$repo_root/terraform/aws_ce.tf"
+aws_upgrade="$repo_root/terraform/aws_upgrade.tf"
+variables="$repo_root/terraform/variables_aws.tf"
 mapping_generator="$repo_root/scripts/generate-aws-smsv2-device-mapping.py"
 
 fail() {
@@ -30,8 +30,8 @@ require "sha256(jsonencode(local.aws_device_mapping_payload))" "$aws_xc"
 require "aws_discovered_device_candidates" "$aws_xc"
 require "aws_discovered_devices" "$aws_xc"
 require "xcsh_site_registrations_by_site\" \"aws_bootstrap" "$aws_xc"
-require "aws_smsv2_bootstrap_registration_projection" "$repo_root/terraform/aws/outputs.tf"
-require "aws_smsv2_owned_eni_projection" "$repo_root/terraform/aws/outputs.tf"
+require "aws_smsv2_bootstrap_registration_projection" "$repo_root/terraform/outputs.tf"
+require "aws_smsv2_owned_eni_projection" "$repo_root/terraform/outputs.tf"
 require "mac_address" "$aws_xc"
 require "aws_network_interface.slo" "$aws_xc"
 require "aws_network_interface.sli" "$aws_xc"

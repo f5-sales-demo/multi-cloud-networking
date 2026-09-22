@@ -239,18 +239,18 @@ output "ca_ilb_frontend_ip" {
 # ---------------------------------------------------------
 
 output "registration_token_name" {
-  description = "Name (metadata id) of the generated xcsh_token used for CE registration."
-  value       = xcsh_token.ce.name
+  description = "Name (metadata id) of the generated xcsh_token used for Azure CE registration, or null when Azure is disabled."
+  value       = try(xcsh_token.ce[0].name, null)
 }
 
 output "registration_token_is_generated" {
-  description = "True when the CE cloud-init token feed uses the generated xcsh_token.ce.uid (no override supplied)."
+  description = "True when an enabled Azure CE cloud-init token feed uses the generated xcsh_token.ce[0].uid."
   # Whether an override was supplied is not itself secret (the token value is).
-  value = nonsensitive(var.registration_token == "")
+  value = nonsensitive(local.azure_provider_enabled && var.registration_token == "")
 }
 
 output "ce_registration_token" {
-  description = "Resolved CE registration token fed to cloud-init: the generated xcsh_token.ce.uid, or var.registration_token when overridden."
+  description = "Resolved Azure CE registration token fed to cloud-init, or null when Azure is disabled and no override is supplied."
   value       = local.ce_registration_token
   sensitive   = true
 }
@@ -279,14 +279,59 @@ output "aws_workload_private_ip" {
   value       = try(aws_instance.workload[0].private_ip, null)
 }
 
-output "aws_origin_public_ip" {
-  description = "Owned AWS HTTP origin used exclusively by the AWS SMSv2 showcase."
-  value       = try(aws_instance.origin[0].public_ip, null)
+output "aws_origin_dns_name" {
+  description = "DNS name of the external HTTP origin used by the AWS SMSv2 showcase."
+  value       = var.aws_origin_dns_name
 }
 
 output "aws_site_names" {
   description = "Canonical independent AWS SecureMesh v2 site names."
   value       = { for key, site in local.aws_sites : key => site.name }
+}
+
+output "aws_smsv2_owned_eni_projection" {
+  description = "Private Terraform-owned AWS ENI MAC projection for the one-to-one bootstrap registration join."
+  sensitive   = true
+  value = flatten([
+    for key, site in local.aws_sites : [
+      { site_key = key, role = "slo", mac = aws_network_interface.slo[site.index].mac_address },
+      { site_key = key, role = "sli", mac = aws_network_interface.sli[site.index].mac_address },
+    ]
+  ])
+}
+
+output "aws_smsv2_bootstrap_registration_projection" {
+  description = "Private observed bootstrap hardware projection for the one-to-one device join."
+  sensitive   = true
+  value = flatten([
+    for key, registration in data.xcsh_site_registrations_by_site.aws_bootstrap : [
+      for item in coalesce(try(registration.items, null), []) : [
+        for network in try(item.get_spec.infra.hw_info.network, []) : {
+          site_key = key
+          mac      = network.mac_address
+          device   = network.name
+        }
+      ]
+    ]
+  ])
+}
+
+output "kvm_runtime_status" {
+  description = "Sanitized KVM registration and BGP convergence summary."
+  value = var.enable_kvm ? {
+    registration_count = length([
+      for registration in values(data.xcsh_site_registration.kvm) : registration if registration.found
+    ])
+    online_count = length([
+      # xcsh_site_registration.state is the registration object's current
+      # state. ONLINE means the matched CE node is admitted and healthy; it is
+      # not inferred from approval-resource presence or from plan completion.
+      for registration in values(data.xcsh_site_registration.kvm) : registration if registration.state == "ONLINE"
+    ])
+    mapping_valid     = local.kvm_registration_mapping_valid
+    bgp_converged     = try(data.xcsh_site_bgp_status.kvm[0].converged, false)
+    bgp_session_count = length(try(data.xcsh_site_bgp_status.kvm[0].peers, {}))
+  } : null
 }
 
 output "aws_tgw_id" {

@@ -163,6 +163,8 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.3
 
       - name: Terraform state backend bootstrap validation
         working-directory: terraform/bootstrap/state-backend
@@ -177,7 +179,7 @@ jobs:
           terraform validate -no-color
 
       - name: Terraform AWS SMSv2 frozen provider initialization
-        working-directory: terraform/aws
+        working-directory: terraform
         run: |
           terraform init -backend=false -input=false -lockfile=readonly
           terraform validate -no-color
@@ -198,7 +200,7 @@ jobs:
   # xcsh provider, so the provider's own schema validators fire at plan with no XC API call.
   # This job resolves f5-sales-demo/xcsh from the public registry, so it only turns green once
   # the exact clean-break provider version required by
-  # `coverage/smsv2/versions.tf` (`= 9.3.0`) is published in the registry. Locally the same tests run
+  # `coverage/smsv2/versions.tf` (`= 9.5.1`) is published in the registry. Locally the same tests run
   # against the dev_overrides build via verify.sh.
   coverage-smsv2:
     name: coverage-smsv2
@@ -214,6 +216,8 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.3
 
       - name: Init (no backend; provider resolved from the registry)
         run: terraform init -input=false -backend=false

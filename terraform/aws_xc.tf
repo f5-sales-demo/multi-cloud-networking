@@ -12,63 +12,132 @@ locals {
       listener_ip = cidrhost(cidrsubnet(var.aws_vpc_cidr, 8, index + 11), 10)
     }
   }
-  # Bootstrap keys are cumulative during controlled replacement: 01, then
-  # 01+02, then all three. The default remains the complete topology.
+  # Bootstrap identities are disposable and deliberately differ from the final
+  # site identities.  The retirement plan deletes these objects before a final
+  # site is ever created on the retained ENIs.
   aws_bootstrap_sites = {
-    for key, site in local.aws_sites : key => site
-    if contains(var.aws_bootstrap_site_keys, key)
+    for key, site in local.aws_sites : key => merge(site, {
+      name     = "${site.name}-bootstrap"
+      hostname = "${site.hostname}-bootstrap"
+    }) if contains(var.aws_bootstrap_site_keys, key)
   }
-  aws_ce_hostnames = [for site in values(local.aws_sites) : site.hostname]
+  aws_active_sites = var.aws_site_configuration_phase == "bootstrap" ? local.aws_bootstrap_sites : (
+    var.aws_site_configuration_phase == "configured" ? local.aws_sites : {}
+  )
+  aws_ce_hostnames = [for site in values(local.aws_active_sites) : site.hostname]
+}
+
+# During bootstrap this is the authoritative observed guest-hardware inventory.
+# It is intentionally absent from configured creation: final sites do not yet
+# have registrations until their CEs boot. The sensitive projection is consumed
+# privately after bootstrap, MAC-joined with Terraform-owned ENIs, then deleted.
+data "xcsh_site_registrations_by_site" "aws_bootstrap" {
+  for_each = var.aws_site_configuration_phase == "bootstrap" ? local.aws_bootstrap_sites : {}
+
+  namespace = "system"
+  site_name = xcsh_securemesh_site_v2.aws[each.key].name
+}
+
+locals {
+  # This private artifact is generated from bootstrap registrations, joined to
+  # Terraform-owned ENI MACs, then retained across retirement. It is never an
+  # arbitrary device input and it must not be committed.
+  aws_device_mapping_document = var.aws_site_configuration_phase == "configured" ? jsondecode(file(var.aws_smsv2_device_mapping_file)) : {
+    schema_version = 1
+    entries        = []
+    checksum       = ""
+  }
+  aws_device_mapping_entries = try(local.aws_device_mapping_document.entries, [])
+  aws_device_mapping_payload = {
+    schema_version = try(local.aws_device_mapping_document.schema_version, 0)
+    entries        = local.aws_device_mapping_entries
+  }
+  aws_discovered_device_candidates = {
+    for key, site in local.aws_sites : key => {
+      slo = [
+        for entry in local.aws_device_mapping_entries : entry
+        if try(entry.site_key, "") == key && try(entry.role, "") == "slo" && try(lower(entry.mac), "") == lower(aws_network_interface.slo[site.index].mac_address)
+      ]
+      sli = [
+        for entry in local.aws_device_mapping_entries : entry
+        if try(entry.site_key, "") == key && try(entry.role, "") == "sli" && try(lower(entry.mac), "") == lower(aws_network_interface.sli[site.index].mac_address)
+      ]
+    }
+  }
+  aws_discovered_devices = {
+    for key, site in local.aws_sites : key => {
+      slo = try(trimspace(one(local.aws_discovered_device_candidates[key].slo).device), null)
+      sli = try(trimspace(one(local.aws_discovered_device_candidates[key].sli).device), null)
+    }
+  }
+  aws_mapping_keys = [for entry in local.aws_device_mapping_entries : "${try(entry.site_key, "")}:${try(entry.role, "")}"]
+  aws_mapping_is_complete = var.aws_site_configuration_phase != "configured" || (
+    try(local.aws_device_mapping_document.schema_version, 0) == 1 &&
+    try(local.aws_device_mapping_document.checksum, "") == sha256(jsonencode(local.aws_device_mapping_payload)) &&
+    length(local.aws_device_mapping_entries) == 2 * length(local.aws_sites) &&
+    length(distinct(local.aws_mapping_keys)) == length(local.aws_mapping_keys) &&
+    alltrue([for entry in local.aws_device_mapping_entries :
+      contains(keys(local.aws_sites), try(entry.site_key, "")) &&
+      contains(["slo", "sli"], try(entry.role, "")) &&
+      can(regex("^[0-9a-f]{2}(:[0-9a-f]{2}){5}$", lower(try(entry.mac, "")))) &&
+      try(length(trimspace(entry.device)), 0) > 0
+    ])
+  )
 }
 
 resource "xcsh_token" "aws" {
-  for_each = local.aws_bootstrap_sites
+  for_each = local.aws_active_sites
 
   name        = "${each.value.name}-registration"
   namespace   = "system"
   description = "Registration token for independent AWS site ${each.value.name}"
+  labels      = local.xc_labels
   type        = 1
   site_name   = xcsh_securemesh_site_v2.aws[each.key].name
 }
 
 resource "xcsh_securemesh_site_v2" "aws" {
-  for_each    = local.aws_sites
+  for_each    = local.aws_active_sites
   name        = each.value.name
   namespace   = "system"
   description = "Independent AWS Customer Edge SecureMesh v2 site ${each.key}"
-  labels      = { "mcn-topology" = "${var.component}-aws" }
+  labels      = local.xc_labels
 
   aws {
     not_managed {
-      node_list {
-        hostname  = each.value.hostname
-        type      = "Control"
-        public_ip = null
+      dynamic "node_list" {
+        for_each = var.aws_site_configuration_phase == "configured" ? [each.value] : []
 
-        interface_list {
-          name = "slo"
-          mtu  = var.aws_smsv2_interface_mtu
-          ethernet_interface {
-            device = try(var.aws_smsv2_devices[each.key].slo, null)
-            mac    = aws_network_interface.slo[each.value.index].mac_address
-          }
-          network_option {
-            site_local_network = {}
-          }
-          dhcp_client = {}
-        }
+        content {
+          hostname  = node_list.value.hostname
+          type      = "Control"
+          public_ip = null
 
-        interface_list {
-          name = "sli"
-          mtu  = var.aws_smsv2_interface_mtu
-          ethernet_interface {
-            device = try(var.aws_smsv2_devices[each.key].sli, null)
-            mac    = aws_network_interface.sli[each.value.index].mac_address
+          interface_list {
+            name = "slo"
+            mtu  = var.aws_smsv2_interface_mtu
+            ethernet_interface {
+              device = local.aws_discovered_devices[each.key].slo
+              mac    = aws_network_interface.slo[node_list.value.index].mac_address
+            }
+            network_option {
+              site_local_network = {}
+            }
+            dhcp_client = {}
           }
-          network_option {
-            site_local_inside_network = {}
+
+          interface_list {
+            name = "sli"
+            mtu  = var.aws_smsv2_interface_mtu
+            ethernet_interface {
+              device = local.aws_discovered_devices[each.key].sli
+              mac    = aws_network_interface.sli[node_list.value.index].mac_address
+            }
+            network_option {
+              site_local_inside_network = {}
+            }
+            dhcp_client = {}
           }
-          dhcp_client = {}
         }
       }
     }
@@ -102,20 +171,33 @@ resource "xcsh_securemesh_site_v2" "aws" {
       volterra_software_version = var.aws_software_version
     }
   }
+
+  lifecycle {
+    precondition {
+      condition = var.aws_site_configuration_phase == "bootstrap" || (
+        local.aws_mapping_is_complete &&
+        length(local.aws_discovered_device_candidates[each.key].slo) == 1 &&
+        length(local.aws_discovered_device_candidates[each.key].sli) == 1 &&
+        try(length(local.aws_discovered_devices[each.key].slo), 0) > 0 &&
+        try(length(local.aws_discovered_devices[each.key].sli), 0) > 0 &&
+        local.aws_discovered_devices[each.key].slo != local.aws_discovered_devices[each.key].sli
+      )
+      error_message = "Configured AWS SMSv2 requires a checksummed bootstrap mapping with exactly one nonempty observed device for each Terraform-owned SLO/SLI ENI MAC, no duplicate or foreign entry, and distinct devices; do not guess guest device names."
+    }
+  }
 }
 
-resource "xcsh_site_cloud_init" "aws" {
-  # Cloud-init records remain stable for all sites. Only the sensitive JWT
-  # issuance is staged, so a CE01 replacement cannot delete peer bootstrap
-  # records from state or the XC API.
-  for_each                  = local.aws_sites
+data "xcsh_site_cloud_init" "aws" {
+  # The console supplies a template, not a mutable cloud-init resource. The
+  # separately-issued, site-bound JWT is substituted by aws_ce.tf.
+  for_each                  = local.aws_active_sites
   provider_ref              = "aws"
   site_name                 = xcsh_securemesh_site_v2.aws[each.key].name
   enable_management_network = false
 }
 
 data "xcsh_site_registration" "aws" {
-  for_each = local.aws_sites
+  for_each = local.aws_active_sites
 
   site_name = each.value.name
   hostname  = each.value.hostname
@@ -141,10 +223,11 @@ resource "xcsh_virtual_site" "aws" {
   count     = var.enable_aws ? 1 : 0
   name      = "${local.aws_resource_prefix}-aws-vsite"
   namespace = data.xcsh_namespace.mcn.name
+  labels    = local.xc_labels
 
   site_type = "CUSTOMER_EDGE"
   site_selector {
-    expressions = ["mcn-topology in (${var.component}-aws)"]
+    expressions = ["mcn-topology in (${local.site_prefix}-aws)"]
   }
 }
 
@@ -153,18 +236,18 @@ resource "xcsh_origin_pool" "aws" {
   name        = "${local.aws_resource_prefix}-aws-pool"
   namespace   = data.xcsh_namespace.mcn.name
   description = "AWS origin pool serving the three-site TGW showcase"
+  labels      = local.xc_labels
   port        = var.origin_port
 
   origin_servers {
     labels = {}
-    public_ip { ip = aws_instance.origin[0].public_ip }
+    public_name { dns_name = var.aws_origin_dns_name }
   }
 
   no_tls                 = {}
   loadbalancer_algorithm = "ROUND_ROBIN"
   endpoint_selection     = "DISTRIBUTED"
 
-  depends_on = [aws_instance.origin]
 }
 
 resource "xcsh_http_loadbalancer" "aws" {
@@ -172,6 +255,12 @@ resource "xcsh_http_loadbalancer" "aws" {
   name      = "${local.aws_resource_prefix}-aws-lb"
   namespace = data.xcsh_namespace.mcn.name
   domains   = [var.aws_lb_domain]
+  labels    = local.xc_labels
+
+  # Final-site names are intentionally derived from stable locals so the
+  # retirement stage can retain this object without dereferencing an empty
+  # site map. Preserve the creation ordering explicitly for configured apply.
+  depends_on = [xcsh_securemesh_site_v2.aws]
 
   http {
     port = 80
@@ -179,12 +268,15 @@ resource "xcsh_http_loadbalancer" "aws" {
 
   advertise_custom {
     dynamic "advertise_where" {
-      for_each = local.aws_sites
+      # Retirement retains the load balancer and its advertisement shape while
+      # bootstrap sites are removed, avoiding an empty resource-map lookup or
+      # a retained-object mutation during the retirement-only phase.
+      for_each = var.aws_site_configuration_phase == "configured" ? local.aws_sites : local.aws_bootstrap_sites
       content {
         site {
           network = "SITE_NETWORK_INSIDE"
           site {
-            name      = xcsh_securemesh_site_v2.aws[advertise_where.key].name
+            name      = advertise_where.value.name
             namespace = "system"
           }
         }

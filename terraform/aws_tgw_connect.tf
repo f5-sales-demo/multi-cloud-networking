@@ -4,8 +4,8 @@ locals {
   # Keep the immutable source revision machine-readable without resembling an
   # access token to secret scanners. The evaluated value is the full release
   # commit recorded by the contract data source.
-  aws_smsv2_api_release_commit = format("%s%s", "55151d9bda8ea8f04c595", "e76ee6b05aee96d7fc7")
-  aws_smsv2_bindings = merge(
+  aws_smsv2_api_release_commit = format("%s%s", "9bae0474d11957257415", "6b9ba1e538e6b0431cf0")
+  aws_smsv2_bindings = var.enable_aws && var.enable_aws_tgw_connect && var.aws_site_configuration_phase == "configured" ? merge(
     {
       for index in range(var.enable_aws ? var.aws_ce_count : 0) :
       format("node_%02d_slo", index + 1) => {
@@ -39,7 +39,7 @@ locals {
         inside_cidr_block = cidrsubnet(var.aws_tgw_inside_cidr, 5, var.aws_ce_count + index)
       }
     },
-  )
+  ) : {}
   # Keep the live routing graph inside the same cumulative boundary as token
   # issuance and cloud-init. This lets each CE reach ONLINE and converge before
   # the next site is admitted without evaluating absent nodes from later stages.
@@ -95,21 +95,31 @@ resource "terraform_data" "aws_tgw_contract_gate" {
       condition = (
         data.xcsh_smsv2_contract.aws[0].contract_id == "f5xc-smsv2-api/v1" &&
         data.xcsh_smsv2_contract.aws[0].contract_version == "7.0.0" &&
-        data.xcsh_smsv2_contract.aws[0].api_release_tag == "v7.0.3" &&
+        data.xcsh_smsv2_contract.aws[0].api_release_tag == "v7.0.6" &&
         data.xcsh_smsv2_contract.aws[0].api_release_commit == local.aws_smsv2_api_release_commit &&
         data.xcsh_smsv2_contract.aws[0].telemetry_schema_id == "f5xc-smsv2-aws-tgw-telemetry/v2"
       )
-      error_message = "Provider v9.3.0 must expose the exact immutable SMSv2 API v7.0 contract."
+      error_message = "Provider v9.5.1 must expose the exact immutable SMSv2 API v7.0.6 contract."
     }
     precondition {
       condition = (
-        length(data.xcsh_smsv2_contract.aws[0].capabilities) == 4 &&
+        length(data.xcsh_smsv2_contract.aws[0].capabilities) == 5 &&
         try(data.xcsh_smsv2_contract.aws[0].capabilities["aws_ce_create"], "") == "available" &&
+        try(data.xcsh_smsv2_contract.aws[0].capabilities["aws_node_configuration"], "") == "available" &&
         try(data.xcsh_smsv2_contract.aws[0].capabilities["runtime_status"], "") == "available" &&
         try(data.xcsh_smsv2_contract.aws[0].capabilities["tgw_connect"], "") == "available" &&
         try(data.xcsh_smsv2_contract.aws[0].capabilities["site_upgrade"], "") == "available"
       )
-      error_message = "Provider v9.3.0 must publish all and only the required SMSv2 capabilities as available."
+      error_message = "Provider v9.5.1 must publish all and only the required SMSv2 capabilities, including evidence-backed AWS node configuration, as available."
+    }
+    precondition {
+      condition = try(
+        jsondecode(data.xcsh_smsv2_contract.aws[0].aws_node_configuration).strategy == "discovery_rebuild" &&
+        jsondecode(data.xcsh_smsv2_contract.aws[0].aws_node_configuration).enforcement == "required" &&
+        jsondecode(data.xcsh_smsv2_contract.aws[0].aws_node_configuration).invariants.device_source == "observed_registration_only",
+        false,
+      )
+      error_message = "AWS configured creation requires the released discovery_rebuild contract with observed-registration-only device mapping."
     }
     precondition {
       condition = (
@@ -134,7 +144,7 @@ module "aws_tgw_connect" {
   amazon_side_asn            = var.aws_tgw_asn
   transit_gateway_cidr_block = var.aws_tgw_gre_cidr
   transport_subnet_ids       = aws_subnet.private_sli[*].id
-  name_prefix                = var.component
+  name_prefix                = local.aws_resource_prefix
   ownership_tags             = local.tags
   depends_on                 = [terraform_data.aws_tgw_contract_gate]
 }
@@ -194,15 +204,16 @@ resource "aws_ec2_transit_gateway_connect_peer" "aws" {
   peer_address                  = each.value.gre_peer_address
   transit_gateway_address       = cidrhost(var.aws_tgw_gre_cidr, each.value.order + 1)
   transit_gateway_attachment_id = module.aws_tgw_connect[0].connect_attachment_ids[each.value.role]
-  tags                          = merge(local.tags, { Name = "${var.component}-aws-tgw-peer-${replace(each.key, "_", "-")}" })
+  tags                          = merge(local.tags, { Name = "${local.aws_resource_prefix}-aws-tgw-peer-${replace(each.key, "_", "-")}" })
   depends_on                    = [terraform_data.aws_tgw_runtime_gate]
 }
 
 resource "xcsh_external_connector" "aws_tgw" {
   for_each    = var.enable_aws && var.enable_aws_tgw_connect ? local.aws_bootstrap_smsv2_bindings : {}
-  name        = "${var.component}-aws-tgw-${replace(each.key, "_", "-")}"
+  name        = "${local.aws_resource_prefix}-aws-tgw-${replace(each.key, "_", "-")}"
   namespace   = "system"
   description = "AWS TGW Connect GRE tunnel for ${each.key}."
+  labels      = local.xc_labels
   ce_site_reference {
     name      = xcsh_securemesh_site_v2.aws[each.value.site_key].name
     namespace = "system"
@@ -233,6 +244,7 @@ resource "xcsh_bgp" "aws_tgw" {
   name        = "${each.value.name}-tgw-bgp"
   namespace   = "system"
   description = "Four-session AWS TGW Connect BGP for independent site ${each.value.name}."
+  labels      = local.xc_labels
   where {
     site {
       # The external-connector API accepts TGW payload only in Site Local

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-aws_root="$repo_root/terraform/aws"
+aws_root="$repo_root/terraform"
 
 fail() {
   printf 'FAIL: %s\n' "$*" >&2
@@ -14,26 +14,20 @@ require_text() {
   grep -Fq -- "$text" "$file" || fail "${file#"$repo_root"/} is missing: $text"
 }
 
-variables="$aws_root/variables.tf"
+variables="$aws_root/variables_ce.tf"
 locals_file="$aws_root/locals.tf"
 tgw="$aws_root/aws_tgw_connect.tf"
 tgw_module="$repo_root/terraform/modules/aws-tgw-connect"
 xc="$aws_root/aws_xc.tf"
 
-require_text "$variables" 'variable "deployment_generation" {'
-deployment_block=$(sed -n '/variable "deployment_generation" {/,/^}/p' "$variables")
-grep -Eq '^[[:space:]]*nullable[[:space:]]*=[[:space:]]*false$' <<<"$deployment_block" || fail "deployment_generation must be required and non-null"
-if grep -Eq '^[[:space:]]*default[[:space:]]*=' <<<"$deployment_block"; then
-  fail "deployment_generation must not have a reusable default"
-fi
-require_text "$variables" 'length("${var.component}-${var.deployment_generation}-aws-nlb") <= 32'
-
-if rg -n 'smsv2_site_generation|variable "site_prefix"' "$aws_root" --glob '*.tf'; then
-  fail "AWS root retains a legacy or bypassable generation input"
-fi
-require_text "$locals_file" 'site_prefix         = "${var.component}-${var.deployment_generation}"'
-require_text "$locals_file" 'deployment_generation = var.deployment_generation'
-require_text "$locals_file" '"mcn-deployment-generation" = var.deployment_generation'
+require_text "$variables" 'variable "smsv2_site_generation" {'
+generation_block=$(sed -n '/variable "smsv2_site_generation" {/,/^}/p' "$variables")
+grep -Eq '^[[:space:]]*default[[:space:]]*=[[:space:]]*"smsv2"$' <<<"$generation_block" ||
+  fail "smsv2_site_generation must use the documented smsv2 identity"
+require_text "$variables" 'smsv2_site_generation must be a DNS-style label'
+require_text "$locals_file" 'site_prefix = coalesce(var.site_prefix, "${var.component}-${var.smsv2_site_generation}")'
+require_text "$locals_file" 'aws_resource_prefix = local.site_prefix'
+require_text "$locals_file" '"mcn-deployment-generation" = var.smsv2_site_generation'
 
 if rg -n '\$\{var\.component\}-aws' "$aws_root" --glob '*.tf'; then
   fail "an AWS/XC resource name or Name tag bypasses the immutable deployment generation"
@@ -53,4 +47,4 @@ for resource in xcsh_external_connector xcsh_bgp; do
   grep -Fq 'labels' <<<"$block" || fail "$resource must carry deployment-generation labels"
 done
 
-printf 'PASS: every AWS and XC identity is bound to one required immutable deployment generation within AWS naming limits\n'
+printf 'PASS: every AWS and XC identity follows the documented immutable SMSv2 generation\n'

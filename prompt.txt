@@ -5,7 +5,7 @@ Write the complete, modular, production-grade Terraform codebase under `terrafor
 ### Core Architectural Specifications
 
 1. **Versions & Providers** (`versions.tf`, `providers.tf`):
-   - Terraform CLI `>= 1.16.1`. Providers: `f5-sales-demo/xcsh` (`= 9.3.0`, setting `api_url = local.xc_api_url` derived from `var.expected_xc_tenant` -> `https://${var.expected_xc_tenant}.console.ves.volterra.io`), `azurerm` (`~> 4.0`, features {}, subscription_id), `azuread` (`~> 3.0`), `external` (`~> 2.3`), `random` (`~> 3.0`). Partial backend: `backend "azurerm" {}` with `backend.hcl.example`.
+   - Terraform CLI `>= 1.16.1`. Providers: `f5-sales-demo/xcsh` (`= 9.5.1`, setting `api_url = local.xc_api_url` derived from `var.expected_xc_tenant` -> `https://${var.expected_xc_tenant}.console.ves.volterra.io`), `azurerm` (`~> 4.0`, features {}, subscription_id), `azuread` (`~> 3.0`), `external` (`~> 2.3`), `random` (`~> 3.0`). Partial backend: `backend "azurerm" {}` with `backend.hcl.example`.
 
 2. **Tenant Guard & Safety Checks** (`data.tf`, `main.tf`, `scripts/xc-env-tenant.sh`):
    - Executable script `scripts/xc-env-tenant.sh` (`chmod +x`) outputs `{"tenant":"<label>","api_url_set":"<bool>"}` from `XCSH_API_URL`.

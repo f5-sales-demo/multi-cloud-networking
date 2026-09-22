@@ -24,7 +24,10 @@ action "xcsh_site_upgrade_os" "aws" {
 }
 
 data "xcsh_site_upgrade_status" "aws" {
-  for_each = { for key, site in local.aws_sites : key => site if contains(var.aws_upgrade_observed_sites, key) }
+  for_each = {
+    for key, site in local.aws_sites : key => site
+    if var.aws_site_configuration_phase == "configured" && contains(var.aws_upgrade_observed_sites, key)
+  }
 
   namespace                 = "system"
   site                      = xcsh_securemesh_site_v2.aws[each.key].name

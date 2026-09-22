@@ -56,7 +56,11 @@ data "external" "xc_env_tenant" {
 # can evaluate any Azure or F5 resource mutation.
 # tflint-ignore: terraform_unused_declarations
 data "xcsh_smsv2_contract" "azure_route_server" {
-  required_capabilities = var.enable_bgp ? ["azure_route_server_ebgp_multihop"] : []
+  count = var.enable_azure && var.enable_bgp ? 1 : 0
+
+  # Provider configuration validation runs before count is expanded. Keep the
+  # unavailable Azure-only requirement absent in KVM/AWS-only plans as well.
+  required_capabilities = var.enable_azure && var.enable_bgp ? ["azure_route_server_ebgp_multihop"] : []
 }
 
 # Guard: the HA VIP MUST be outside every VNet CIDR, or Azure prefers the VNet
@@ -80,7 +84,7 @@ check "ca_vip_outside_vnet_cidrs" {
   }
 }
 
-# Tenant-scoped, reusable site registration token. The provider now ships
+# Tenant-scoped, reusable Azure site registration token. The provider now ships
 # xcsh_token with a Computed `uid` (system_metadata.uid) — the token VALUE a CE
 # feeds to VPM at registration (the resource `id` is the token NAME, not the
 # value). The spec is empty; only metadata is needed and namespace defaults to
@@ -89,6 +93,8 @@ check "ca_vip_outside_vnet_cidrs" {
 # registration is resolved by site name and approved in the post-registration
 # phase (see modules/xc-site/main.tf and the deploy ordering above).
 resource "xcsh_token" "ce" {
+  count = local.azure_provider_enabled ? 1 : 0
+
   name        = "${local.site_prefix}-registration"
   namespace   = "system"
   description = "MCN CE-HA registration token (tenant-scoped, reusable across CE sites)"

@@ -8,6 +8,8 @@ mock_provider "aws" {}
 mock_provider "libvirt" {}
 
 variables {
+  enable_azure           = true
+  enable_kvm             = false
   site_prefix            = null
   lb_name                = null
   origin_pool_name       = null

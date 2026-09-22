@@ -88,30 +88,32 @@ variable "aws_tgw_inside_cidr" {
   }
 }
 
-variable "aws_smsv2_devices" {
-  description = "Guest ethernet device names by independent AWS site key, verified against each ENI MAC. Required when AWS is enabled; no role-to-device names are inferred."
-  type = map(object({
-    slo = string
-    sli = string
-  }))
-  default  = {}
-  nullable = false
+variable "aws_site_configuration_phase" {
+  description = "AWS SMSv2 lifecycle phase. bootstrap creates only distinct -bootstrap sites and CEs; bootstrap_retirement removes only their XC/CE material while retaining AWS networking and ENIs; configured creates distinct final sites and CEs from the private observed device mapping."
+  type        = string
+  default     = "bootstrap"
+  nullable    = false
 
   validation {
-    condition = !var.enable_aws || toset(keys(var.aws_smsv2_devices)) == toset([
-      for index in range(var.aws_ce_count) : format("%02d", index + 1)
-    ])
-    error_message = "Supply aws_smsv2_devices for every enabled AWS site key, with no extra keys."
+    condition     = contains(["bootstrap", "bootstrap_retirement", "configured"], var.aws_site_configuration_phase)
+    error_message = "aws_site_configuration_phase must be bootstrap, bootstrap_retirement, or configured."
   }
 
   validation {
-    condition = alltrue([for devices in values(var.aws_smsv2_devices) : try(
-      devices.slo != devices.sli &&
-      length(devices.slo) >= 1 && length(devices.slo) <= 64 && trimspace(devices.slo) == devices.slo &&
-      length(devices.sli) >= 1 && length(devices.sli) <= 64 && trimspace(devices.sli) == devices.sli,
-      false
-    )])
-    error_message = "Each site needs distinct, nonempty SLO and SLI guest device names of at most 64 characters without surrounding whitespace."
+    condition     = var.aws_site_configuration_phase == "configured" || !var.enable_aws_tgw_connect
+    error_message = "Only configured creates final MAC-bound sites and may enable AWS TGW Connect."
+  }
+}
+
+variable "aws_smsv2_device_mapping_file" {
+  description = "Private, schema-validated device mapping generated from bootstrap registration observations and Terraform-owned ENI MACs. It is required only during configured and must never be committed."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.aws_site_configuration_phase != "configured" || (var.aws_smsv2_device_mapping_file != null && trimspace(var.aws_smsv2_device_mapping_file) != "")
+    error_message = "configured requires aws_smsv2_device_mapping_file generated from bootstrap registration records; arbitrary device input is not accepted."
   }
 }
 
@@ -174,13 +176,13 @@ variable "aws_ce_count" {
 }
 
 variable "aws_bootstrap_site_keys" {
-  description = "Cumulative AWS site keys whose JWT token and cloud-init are issued during a controlled replacement. Use [\"01\"], then [\"01\", \"02\"], then all three; the default is the complete topology."
+  description = "The complete three-site AWS lifecycle set. Partial site admission is not supported: bootstrap, retirement, and configured phases are reviewed as one three-site transition."
   type        = list(string)
   default     = ["01", "02", "03"]
 
   validation {
-    condition     = contains(["01", "01,02", "01,02,03"], join(",", var.aws_bootstrap_site_keys))
-    error_message = "aws_bootstrap_site_keys must be a non-empty cumulative prefix: [\"01\"], [\"01\", \"02\"], or [\"01\", \"02\", \"03\"]."
+    condition     = toset(var.aws_bootstrap_site_keys) == toset(["01", "02", "03"]) && length(var.aws_bootstrap_site_keys) == 3
+    error_message = "aws_bootstrap_site_keys must contain exactly 01, 02, and 03 for the reviewed three-site lifecycle."
   }
 }
 

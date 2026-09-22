@@ -32,6 +32,9 @@ variables {
   # space: unroutable by design, so it cannot name a real host.
   lb_domain              = "mcn-ce-ha.f5-sales-demo.com"
   origin_ip              = "203.0.113.10"
+  enable_azure           = true
+  enable_canada          = false
+  enable_kvm             = false
   enable_aws             = false
   enable_aws_tgw_connect = false
 }
@@ -49,12 +52,12 @@ run "generated_token_is_used" {
 
   # The xcsh_token.ce resource is planned with the expected metadata.
   assert {
-    condition     = xcsh_token.ce.name == "mcn-ce-ha-smsv2-registration"
+    condition     = xcsh_token.ce[0].name == "mcn-ce-ha-smsv2-registration"
     error_message = "The CE registration token resource must use the permanent mcn-ce-ha-smsv2 identity."
   }
 
   assert {
-    condition     = xcsh_token.ce.namespace == "system"
+    condition     = xcsh_token.ce[0].namespace == "system"
     error_message = "The CE registration token must live in the system namespace."
   }
 

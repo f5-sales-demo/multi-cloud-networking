@@ -10,6 +10,8 @@ mock_provider "aws" {}
 mock_provider "libvirt" {}
 
 variables {
+  enable_azure = true
+  enable_kvm   = false
   # Explicitly null so these assert the DERIVED names no matter what a local
   # terraform.tfvars pins — `terraform test` reads that file too, so without this a
   # deployment holding older names steady would turn this suite red on the

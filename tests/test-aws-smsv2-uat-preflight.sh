@@ -48,7 +48,7 @@ done
 if [ -n "$output" ]; then
   if [ "${FAKE_F5_COLLISION:-false}" = true ] && [[ $url == */securemesh_site_v2s/* ]]; then
     name=${url##*/}
-    printf '{"metadata":{"name":"%s","namespace":"system","labels":{"mcn-deployment-generation":"gen-01"}},"system_metadata":{"creator_id":"tester@example.test","creation_timestamp":"2026-09-16T12:00:00Z","uid":"site-0123456789abcdef"}}\n' "$name" >"$output"
+    printf '{"metadata":{"name":"%s","namespace":"system","labels":{"mcn-deployment-generation":"gen-01"}},"system_metadata":{"creator_id":"tester@example.com","creation_timestamp":"2026-09-16T12:00:00Z","uid":"site-0123456789abcdef"}}\n' "$name" >"$output"
     printf 200
   else
     : >"$output"
@@ -76,7 +76,7 @@ init)
   exit 0
   ;;
 version)
-  printf '{"provider_selections":{"registry.terraform.io/f5-sales-demo/xcsh":"9.3.0"}}\n'
+  printf '{"provider_selections":{"registry.terraform.io/f5-sales-demo/xcsh":"9.5.1"}}\n'
   ;;
 plan)
   : >"${chdir}/contract.tfplan"
@@ -114,8 +114,8 @@ show)
     fi
   else
     capability=${FAKE_CAPABILITY_STATE:-available}
-    api_release_tag=${FAKE_API_RELEASE_TAG:-v7.0.4}
-    api_release_commit=${FAKE_API_RELEASE_COMMIT:-92bf351c4f5dad4a6bd5ba2149ac5f1eb41124bf}
+    api_release_tag=${FAKE_API_RELEASE_TAG:-v7.0.6}
+    api_release_commit=${FAKE_API_RELEASE_COMMIT:-9bae0474d119572574156b9ba1e538e6b0431cf0}
     node_strategy=${FAKE_AWS_NODE_STRATEGY:-discovery_rebuild}
     printf '%s\n' "{\"planned_values\":{\"outputs\":{\"contract\":{\"value\":{\"contract_id\":\"f5xc-smsv2-api/v1\",\"contract_version\":\"7.0.0\",\"api_release_tag\":\"${api_release_tag}\",\"api_release_commit\":\"${api_release_commit}\",\"telemetry_schema_id\":\"f5xc-smsv2-aws-tgw-telemetry/v2\",\"capabilities\":{\"aws_ce_create\":\"${capability}\",\"aws_node_configuration\":\"${capability}\",\"runtime_status\":\"${capability}\",\"site_upgrade\":\"${capability}\",\"tgw_connect\":\"${capability}\"},\"aws_node_configuration\":\"{\\\"strategy\\\":\\\"${node_strategy}\\\",\\\"enforcement\\\":\\\"required\\\",\\\"invariants\\\":{\\\"device_source\\\":\\\"observed_registration_only\\\"},\\\"mapping\\\":{\\\"cardinality\\\":\\\"one_to_one\\\"}}\",\"f5xc_authorities\":[\"smsv2_configuration\",\"runtime_health\",\"bgp_peers\",\"bgp_routes\",\"simplified_routes\",\"site_upgrade_observation\"],\"aws_authorities\":[\"eni\",\"transit_gateway\",\"transit_gateway_connect\",\"gre_endpoints\",\"bgp_inside_cidrs\",\"autonomous_system_numbers\"]}}}}}"
   fi
@@ -159,7 +159,7 @@ common=(
   --expected-aws-account 111122223333
   --expected-aws-region ap-northeast-1
   --expected-xc-tenant f5-sales-demo
-  --creator-id tester@example.test
+  --creator-id tester@example.com
   --deployment-generation gen-01
   --lifecycle-phase configured
   --expected-site mcn-ce-ha-aws-ap-northeast-1-01
@@ -202,7 +202,7 @@ fi
 assert_sanitized "$evidence" "$output"
 [ "$(jq -r .provider_mode "$evidence/summary.json")" = registry ] || fail "registry mode not recorded"
 [ "$(jq -r .provider_sha256 "$evidence/summary.json")" = null ] || fail "registry digest must be null"
-echo "ok - exact v9.3.0 available contract passes with sanitized evidence"
+echo "ok - exact v9.5.1 available contract passes with sanitized evidence"
 
 evidence="${TMP_ROOT}/no-explicit-region"
 mkdir "$evidence"
@@ -372,7 +372,7 @@ single_site=(
   --expected-aws-account 111122223333
   --expected-aws-region ap-northeast-1
   --expected-xc-tenant f5-sales-demo
-  --creator-id tester@example.test
+  --creator-id tester@example.com
   --deployment-generation gen-01
   --lifecycle-phase configured
   --expected-site mcn-ce-ha-aws-ap-northeast-1-01
@@ -506,7 +506,7 @@ output="${TMP_ROOT}/destroy.out"
 retirement_sites=(
   --terraform-dir "$TF_DIR" --plan-file "$PLAN_FILE"
   --expected-aws-account 111122223333 --expected-aws-region ap-northeast-1
-  --expected-xc-tenant f5-sales-demo --creator-id tester@example.test
+  --expected-xc-tenant f5-sales-demo --creator-id tester@example.com
   --deployment-generation gen-01 --lifecycle-phase bootstrap_retirement
   --expected-site mcn-ce-ha-aws-ap-northeast-1-01-bootstrap
   --expected-site mcn-ce-ha-aws-ap-northeast-1-02-bootstrap
@@ -578,11 +578,11 @@ mkdir "$evidence"
 output="${TMP_ROOT}/outside-allowlist.out"
 if FAKE_EXTRA_CHANGE=',{"address":"random_id.unrelated","type":"random_id","name":"unrelated","change":{"actions":["create"],"after":{}}}' \
   "$SCRIPT" --evidence-dir "$evidence" "${common[@]}" >"$output" 2>&1; then
-  fail "a change outside the AWS/XC-AWS allowlist must block"
+  fail "a change outside the unified showcase allowlist must block"
 fi
-[ "$(jq -r .reason "$evidence/summary.json")" = plan_resource_outside_aws_allowlist ] || fail "allowlist blocker not recorded"
+[ "$(jq -r .reason "$evidence/summary.json")" = plan_resource_outside_showcase_allowlist ] || fail "allowlist blocker not recorded"
 assert_sanitized "$evidence" "$output"
-echo "ok - changes outside the AWS/XC-AWS allowlist fail closed"
+echo "ok - changes outside the unified showcase allowlist fail closed"
 
 plan_vip_failure() {
   local name=$1 plan_vip=$2 reason=$3

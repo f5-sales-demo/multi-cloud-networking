@@ -13,28 +13,29 @@ bad() {
   FAIL=1
 }
 
-echo "1. Terraform CLI remains unpinned"
+echo "1. lifecycle execution pins Terraform 1.16.3"
 if [ -e "${REPO_ROOT}/terraform/.terraform-version" ]; then
   bad "terraform/.terraform-version pins the Terraform CLI"
 else
-  ok "no local Terraform CLI pin"
+  ok "no competing local Terraform CLI pin"
 fi
-if grep -Eq '^[[:space:]]*terraform_version:' "$WORKFLOW"; then
-  bad "Terraform workflow supplies a pinned Terraform CLI"
+if [ "$(grep -Ec '^[[:space:]]*terraform_version:[[:space:]]*1\.16\.3$' "$WORKFLOW")" -eq 2 ]; then
+  ok "both Terraform workflow jobs pin 1.16.3"
 else
-  ok "setup-terraform uses its latest-version default"
+  bad "Terraform workflow jobs do not both pin 1.16.3"
 fi
 
-echo "2. every xcsh consumer pins exactly v9.3.0"
-for relative in terraform/versions.tf terraform/aws/versions.tf \
+echo "2. every xcsh consumer pins exactly v9.5.1"
+for relative in terraform/versions.tf \
   terraform/recovery/aws-smsv2-orphans/versions.tf \
-  terraform/modules/xc-site/versions.tf coverage/smsv2/versions.tf; do
+  terraform/modules/xc-site/versions.tf \
+  terraform/modules/kvm/providers.tf coverage/smsv2/versions.tf; do
   file="${REPO_ROOT}/${relative}"
   block=$(sed -n '/^[[:space:]]*xcsh = {/,/^[[:space:]]*}/p' "$file")
-  if printf '%s\n' "$block" | grep -Eq 'version[[:space:]]*=[[:space:]]*"= 9\.3\.0"'; then
-    ok "${relative} pins = 9.3.0"
+  if printf '%s\n' "$block" | grep -Eq 'version[[:space:]]*=[[:space:]]*"= 9\.5\.1"'; then
+    ok "${relative} pins = 9.5.1"
   else
-    bad "${relative} does not pin exactly = 9.3.0"
+    bad "${relative} does not pin exactly = 9.5.1"
   fi
   count=$(printf '%s\n' "$block" | grep -Ec '^[[:space:]]*version[[:space:]]*=' || true)
   [ "$count" -eq 1 ] || bad "${relative} has ${count} xcsh version constraints"
@@ -43,10 +44,10 @@ done
 for relative in .github/workflows/terraform.yml prompt.txt docs/en/demo/deploy.mdx \
   docs/en/demo/prompt.mdx docs/en/demo/spec.mdx docs/en/demo/terraform.mdx \
   tests/test-verify-deployment.sh; do
-  if grep -Fq '9.3.0' "${REPO_ROOT}/${relative}"; then
-    ok "${relative} references v9.3.0"
+  if grep -Fq '9.5.1' "${REPO_ROOT}/${relative}"; then
+    ok "${relative} references v9.5.1"
   else
-    bad "${relative} is missing the v9.3.0 reference"
+    bad "${relative} is missing the v9.5.1 reference"
   fi
 done
 legacy_version='7''.''4''.''1'
@@ -77,14 +78,14 @@ fi
 
 echo "4. provider resolution is clean and reproducible"
 if git -C "$REPO_ROOT" ls-files --error-unmatch terraform/.terraform.lock.hcl >/dev/null 2>&1; then
-  bad "terraform lockfile is committed"
+  ok "unified-root Terraform lockfile is committed"
 else
-  ok "Terraform lockfile remains uncommitted"
+  bad "unified-root Terraform lockfile is not committed"
 fi
-if grep -Eq '^\.terraform\.lock\.hcl([[:space:]]|$)' "${REPO_ROOT}/.gitignore"; then
-  ok "local lockfile remains ignored"
+if grep -Fqx '!terraform/.terraform.lock.hcl' "${REPO_ROOT}/.gitignore"; then
+  ok "unified-root lockfile has a narrow ignore exception"
 else
-  bad "local lockfile is not ignored"
+  bad "unified-root lockfile is still ignored"
 fi
 
 echo "5. the fresh-clone example keeps environment values external"

@@ -18,8 +18,8 @@ require_block() {
     fail "aws_iam_instance_profile.${resource} must carry the standard ownership tags"
 }
 
-require_block ce "$repo_root/terraform/aws/aws_ce.tf"
-require_block workload "$repo_root/terraform/aws/aws_vpc.tf"
+require_block ce "$repo_root/terraform/aws_ce.tf"
+require_block workload "$repo_root/terraform/aws_vpc.tf"
 
 require_tgw_module_ownership_tags() {
   local source_file=$1
@@ -29,18 +29,14 @@ require_tgw_module_ownership_tags() {
     fail "aws_tgw_connect in ${source_file#"${repo_root}"/} must pass immutable ownership tags"
 }
 
-require_tgw_module_ownership_tags "$repo_root/terraform/aws/aws_tgw_connect.tf"
 require_tgw_module_ownership_tags "$repo_root/terraform/aws_tgw_connect.tf"
 
-# The tenant guard must be a dependency of planned object metadata. An unused
-# data source is not evaluated by Terraform, which would let a wrong tenant
-# reach the provider before its postcondition could reject the plan.
-locals_file="$repo_root/terraform/aws/locals.tf"
-grep -Eq "^[[:space:]]*xc_tenant[[:space:]]*=[[:space:]]*data\\.external\\.xc_env_tenant\\.result\\.tenant$" "$locals_file" ||
-  fail "AWS root must bind the active XC tenant guard into shared metadata"
-grep -Eq "^[[:space:]]*xc_tenant[[:space:]]*=[[:space:]]*local\\.xc_tenant$" "$locals_file" ||
-  fail "AWS ownership tags must carry the evaluated XC tenant"
-grep -Fq '"mcn-xc-tenant"             = local.xc_tenant' "$locals_file" ||
-  fail "XC labels must carry the evaluated XC tenant"
+# Ownership labels come from configuration, while the separate ambient guard
+# remains evaluated through its diagnostic output.
+locals_file="$repo_root/terraform/locals.tf"
+grep -Fq '"mcn-xc-tenant"             = var.expected_xc_tenant' "$locals_file" ||
+  fail "XC labels must carry the configured XC tenant"
+grep -Fq 'value       = data.external.xc_env_tenant.result.tenant' "$repo_root/terraform/outputs.tf" ||
+  fail "the ambient-tenant guard must remain part of the evaluated graph"
 
-printf 'PASS: AWS ownership metadata evaluates and carries the active XC tenant guard\n'
+printf 'PASS: AWS ownership metadata uses the configured tenant and evaluates the ambient guard\n'

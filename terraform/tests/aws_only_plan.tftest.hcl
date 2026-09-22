@@ -6,6 +6,7 @@ mock_provider "xcsh" {}
 mock_provider "azapi" {}
 mock_provider "aws" {}
 mock_provider "libvirt" {}
+mock_provider "docker" {}
 
 variables {
   lb_domain              = "mcn-ce-ha.f5-sales-demo.com"
@@ -17,7 +18,6 @@ variables {
   xc_app_namespace       = "multi-cloud-networking"
   aws_ce_ami_id          = "ami-0123456789abcdef0"
   aws_workload_ami_id    = "ami-0123456789abcdef0"
-  aws_smsv2_devices      = { "01" = { slo = "ens5", sli = "ens6" }, "02" = { slo = "ens5", sli = "ens6" }, "03" = { slo = "ens5", sli = "ens6" } }
   enable_azure           = false
   enable_aws             = true
   enable_aws_tgw_connect = false

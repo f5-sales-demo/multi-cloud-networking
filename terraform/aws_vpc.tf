@@ -17,7 +17,7 @@ resource "aws_vpc" "aws" {
   enable_dns_support   = true
 
   tags = merge(local.tags, {
-    Name = "${var.component}-aws-vpc"
+    Name = "${local.aws_resource_prefix}-aws-vpc"
   })
 }
 
@@ -27,7 +27,7 @@ resource "aws_internet_gateway" "aws" {
   vpc_id = aws_vpc.aws[0].id
 
   tags = merge(local.tags, {
-    Name = "${var.component}-aws-igw"
+    Name = "${local.aws_resource_prefix}-aws-igw"
   })
 }
 
@@ -41,7 +41,7 @@ resource "aws_subnet" "public_slo" {
   map_public_ip_on_launch = false
 
   tags = merge(local.tags, {
-    Name = "${var.component}-aws-slo-subnet-${count.index + 1}"
+    Name = "${local.aws_resource_prefix}-aws-slo-subnet-${count.index + 1}"
   })
 }
 
@@ -54,7 +54,7 @@ resource "aws_subnet" "private_sli" {
   availability_zone = try(data.aws_availability_zones.available[0].names[count.index], "${var.aws_location}${element(["a", "b", "c"], count.index)}")
 
   tags = merge(local.tags, {
-    Name = "${var.component}-aws-sli-subnet-${count.index + 1}"
+    Name = "${local.aws_resource_prefix}-aws-sli-subnet-${count.index + 1}"
   })
 }
 
@@ -79,7 +79,7 @@ resource "aws_route_table" "public" {
   }
 
   tags = merge(local.tags, {
-    Name = "${var.component}-aws-public-rt"
+    Name = "${local.aws_resource_prefix}-aws-public-rt"
   })
 }
 
@@ -111,7 +111,7 @@ resource "aws_route_table" "private" {
   }
 
   tags = merge(local.tags, {
-    Name = "${var.component}-aws-private-rt"
+    Name = "${local.aws_resource_prefix}-aws-private-rt"
   })
 }
 
@@ -129,14 +129,6 @@ resource "aws_security_group" "ce" {
   name        = "${local.aws_resource_prefix}-aws-ce-sg"
   description = "Security group for F5 XC Customer Edge nodes in AWS"
   vpc_id      = aws_vpc.aws[0].id
-
-  ingress {
-    description = "SSH access"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
   ingress {
     description = "Site Console Local UI"
@@ -183,7 +175,7 @@ resource "aws_security_group" "ce" {
   }
 
   tags = merge(local.tags, {
-    Name = "${var.component}-aws-ce-sg"
+    Name = "${local.aws_resource_prefix}-aws-ce-sg"
   })
 }
 
@@ -196,13 +188,13 @@ resource "aws_vpc" "workload" {
   cidr_block           = var.aws_workload_vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
-  tags                 = merge(local.tags, { Name = "${var.component}-aws-workload-vpc" })
+  tags                 = merge(local.tags, { Name = "${local.aws_resource_prefix}-aws-workload-vpc" })
 }
 
 resource "aws_internet_gateway" "workload" {
   count  = var.enable_aws ? 1 : 0
   vpc_id = aws_vpc.workload[0].id
-  tags   = merge(local.tags, { Name = "${var.component}-aws-workload-igw" })
+  tags   = merge(local.tags, { Name = "${local.aws_resource_prefix}-aws-workload-igw" })
 }
 
 resource "aws_subnet" "workload" {
@@ -211,7 +203,7 @@ resource "aws_subnet" "workload" {
   cidr_block              = cidrsubnet(var.aws_workload_vpc_cidr, 8, 1)
   availability_zone       = try(data.aws_availability_zones.available[0].names[0], "${var.aws_location}a")
   map_public_ip_on_launch = false
-  tags                    = merge(local.tags, { Name = "${var.component}-aws-workload-public" })
+  tags                    = merge(local.tags, { Name = "${local.aws_resource_prefix}-aws-workload-public" })
 }
 
 resource "aws_route_table" "workload" {
@@ -231,7 +223,7 @@ resource "aws_route_table" "workload" {
     }
   }
 
-  tags = merge(local.tags, { Name = "${var.component}-aws-workload-rt" })
+  tags = merge(local.tags, { Name = "${local.aws_resource_prefix}-aws-workload-rt" })
 }
 
 resource "aws_route_table_association" "workload" {
@@ -247,7 +239,7 @@ resource "aws_ec2_transit_gateway_vpc_attachment" "workload" {
   transit_gateway_default_route_table_association = false
   transit_gateway_default_route_table_propagation = false
   vpc_id                                          = aws_vpc.workload[0].id
-  tags                                            = merge(local.tags, { Name = "${var.component}-aws-workload-tgw" })
+  tags                                            = merge(local.tags, { Name = "${local.aws_resource_prefix}-aws-workload-tgw" })
 }
 
 resource "aws_ec2_transit_gateway_route_table_association" "workload" {
@@ -301,7 +293,7 @@ resource "aws_security_group" "workload" {
     cidr_blocks = ["${cidrhost(var.aws_workload_vpc_cidr, 2)}/32"]
   }
 
-  tags = merge(local.tags, { Name = "${var.component}-aws-workload-ssm" })
+  tags = merge(local.tags, { Name = "${local.aws_resource_prefix}-aws-workload-ssm" })
 }
 
 resource "aws_security_group" "smsv2_nlb" {
@@ -327,7 +319,7 @@ resource "aws_security_group" "smsv2_nlb" {
     cidr_blocks = [var.aws_vpc_cidr]
   }
 
-  tags = merge(local.tags, { Name = "${var.component}-aws-smsv2-nlb" })
+  tags = merge(local.tags, { Name = "${local.aws_resource_prefix}-aws-smsv2-nlb" })
 }
 
 resource "aws_lb" "smsv2" {
@@ -353,7 +345,7 @@ resource "aws_lb" "smsv2" {
     }
   }
 
-  tags = merge(local.tags, { Name = "${var.component}-aws-smsv2" })
+  tags = merge(local.tags, { Name = "${local.aws_resource_prefix}-aws-smsv2" })
 }
 
 resource "aws_lb_target_group" "smsv2" {
@@ -373,7 +365,7 @@ resource "aws_lb_target_group" "smsv2" {
     unhealthy_threshold = 2
   }
 
-  tags = merge(local.tags, { Name = "${var.component}-aws-smsv2" })
+  tags = merge(local.tags, { Name = "${local.aws_resource_prefix}-aws-smsv2" })
 }
 
 resource "aws_lb_target_group_attachment" "smsv2" {
@@ -451,123 +443,5 @@ resource "aws_instance" "workload" {
     }
   }
 
-  tags = merge(local.tags, { Name = "${var.component}-aws-ssm-client" })
-}
-
-# The AWS showcase must not depend on an Azure-era public origin.  This
-# instance is the owned, deterministic HTTP endpoint for traffic that enters
-# through the three SMSv2 sites.  It is separate from the SSM client so the
-# UAT can prove both the request path and an independent origin control path.
-resource "aws_security_group" "origin" {
-  count       = var.enable_aws ? 1 : 0
-  name        = "${local.aws_resource_prefix}-aws-origin"
-  description = "HTTP origin reachable only from the workload VPC and owned CE egress IPs"
-  vpc_id      = aws_vpc.workload[0].id
-
-  ingress {
-    description = "HTTP origin control from the workload VPC"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = [var.aws_workload_vpc_cidr]
-  }
-
-  # A public-IP hairpin from the SSM client is source-NATed by the Internet
-  # Gateway, so the private workload CIDR alone cannot authorize the UAT
-  # origin-control request.
-  ingress {
-    description = "HTTP origin control from the owned workload public address"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["${aws_instance.workload[0].public_ip}/32"]
-  }
-
-  # SMSv2 forwarding can retain the CE VPC source address while reaching the
-  # public origin through the site egress path.
-  ingress {
-    description = "HTTP traffic from the Customer Edge VPC"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = [var.aws_vpc_cidr]
-  }
-
-  ingress {
-    description = "HTTP traffic from the three owned Customer Edge egress addresses"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = [for ip in aws_eip.ce[*].public_ip : "${ip}/32"]
-  }
-
-  ingress {
-    description = "HTTP traffic from the published F5 Distributed Cloud service range"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = [
-      "5.182.212.0/22",
-      "103.135.56.0/22",
-      "159.60.128.0/18",
-      "185.94.140.0/22",
-    ]
-  }
-
-  egress {
-    description = "HTTPS package and time bootstrap"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    description = "UDP DNS to the VPC resolver"
-    from_port   = 53
-    to_port     = 53
-    protocol    = "udp"
-    cidr_blocks = ["${cidrhost(var.aws_workload_vpc_cidr, 2)}/32"]
-  }
-
-  tags = merge(local.tags, { Name = "${var.component}-aws-origin" })
-}
-
-resource "aws_instance" "origin" {
-  count                       = var.enable_aws ? 1 : 0
-  ami                         = var.aws_workload_ami_id
-  instance_type               = "t3.micro"
-  subnet_id                   = aws_subnet.workload[0].id
-  ebs_optimized               = true
-  vpc_security_group_ids      = [aws_security_group.origin[0].id]
-  iam_instance_profile        = aws_iam_instance_profile.workload[0].name
-  associate_public_ip_address = true
-  monitoring                  = true
-  user_data_replace_on_change = true
-
-  user_data = <<-EOT
-    #!/bin/bash
-    set -euo pipefail
-    dnf install -y nginx amazon-ssm-agent
-    printf '%s\n' 'mcn-smsv2-aws-origin' > /usr/share/nginx/html/index.html
-    systemctl enable --now amazon-ssm-agent
-    systemctl enable --now nginx
-  EOT
-
-  metadata_options {
-    http_tokens = "required"
-  }
-
-  root_block_device {
-    encrypted = true
-  }
-
-  lifecycle {
-    precondition {
-      condition     = var.aws_workload_ami_id != null
-      error_message = "AWS origin deployment requires the explicit approved aws_workload_ami_id."
-    }
-  }
-
-  tags = merge(local.tags, { Name = "${var.component}-aws-origin" })
+  tags = merge(local.tags, { Name = "${local.aws_resource_prefix}-aws-ssm-client" })
 }

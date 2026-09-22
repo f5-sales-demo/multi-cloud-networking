@@ -4,7 +4,7 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-aws_root="$repo_root/terraform/aws"
+aws_root="$repo_root/terraform"
 xc="$aws_root/aws_xc.tf"
 vpc="$aws_root/aws_vpc.tf"
 variables="$aws_root/variables.tf"

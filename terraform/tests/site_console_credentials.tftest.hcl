@@ -18,6 +18,8 @@ mock_provider "random" {
 }
 
 variables {
+  enable_azure           = true
+  enable_kvm             = false
   lb_domain              = "mcn.example.com"
   origin_ip              = "198.51.100.10"
   enable_aws             = false

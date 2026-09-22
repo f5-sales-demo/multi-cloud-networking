@@ -1,11 +1,12 @@
 terraform {
-  # >= 1.16.1 for provider-defined actions and saved-plan invocation.
-  required_version = ">= 1.16.1"
+  # The automated showcase lifecycle and its test harness execute this exact
+  # version on the authoritative Ubuntu host.
+  required_version = "= 1.16.3"
 
   required_providers {
     xcsh = {
       source  = "f5-sales-demo/xcsh"
-      version = "= 9.3.0"
+      version = "= 9.5.1"
     }
     azapi = {
       source  = "Azure/azapi"

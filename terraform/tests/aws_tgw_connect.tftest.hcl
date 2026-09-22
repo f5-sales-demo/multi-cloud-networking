@@ -4,6 +4,7 @@ mock_provider "azurerm" {}
 mock_provider "azuread" {}
 mock_provider "libvirt" {}
 mock_provider "random" {}
+mock_provider "docker" {}
 
 mock_provider "aws" {
   mock_resource "aws_ec2_transit_gateway_connect_peer" {
@@ -25,17 +26,19 @@ override_data {
   values = {
     contract_id         = "f5xc-smsv2-api/v1"
     contract_version    = "7.0.0"
-    api_release_tag     = "v7.0.3"
-    api_release_commit  = format("%s%s", "55151d9bda8ea8f04c595", "e76ee6b05aee96d7fc7")
+    api_release_tag     = "v7.0.6"
+    api_release_commit  = format("%s%s", "9bae0474d11957257415", "6b9ba1e538e6b0431cf0")
     telemetry_schema_id = "f5xc-smsv2-aws-tgw-telemetry/v2"
     capabilities = {
-      aws_ce_create  = "available"
-      runtime_status = "available"
-      site_upgrade   = "available"
-      tgw_connect    = "available"
+      aws_ce_create          = "available"
+      aws_node_configuration = "available"
+      runtime_status         = "available"
+      site_upgrade           = "available"
+      tgw_connect            = "available"
     }
-    f5xc_authorities = ["smsv2_configuration", "runtime_health", "bgp_peers", "bgp_routes", "simplified_routes", "site_upgrade_observation"]
-    aws_authorities  = ["eni", "transit_gateway", "transit_gateway_connect", "gre_endpoints", "bgp_inside_cidrs", "autonomous_system_numbers"]
+    aws_node_configuration = jsonencode({ strategy = "discovery_rebuild", enforcement = "required", invariants = { device_source = "observed_registration_only" } })
+    f5xc_authorities       = ["smsv2_configuration", "runtime_health", "bgp_peers", "bgp_routes", "simplified_routes", "site_upgrade_observation"]
+    aws_authorities        = ["eni", "transit_gateway", "transit_gateway_connect", "gre_endpoints", "bgp_inside_cidrs", "autonomous_system_numbers"]
   }
 }
 
@@ -102,22 +105,21 @@ override_data {
 }
 
 variables {
-  lb_domain           = "mcn-ce-ha.example.com"
-  aws_lb_domain       = "aws.mcn-ce-ha.example.com"
-  origin_ip           = "203.0.113.10"
-  deployer            = "tester"
-  enable_bastion      = false
-  ssh_public_key      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l plan-test-only"
-  aws_ce_ami_id       = "ami-0123456789abcdef0"
-  aws_workload_ami_id = "ami-0123456789abcdef0"
-  aws_vip             = "10.151.1.10"
-  aws_smsv2_devices = {
-    "01" = { slo = "ens5", sli = "ens6" }
-    "02" = { slo = "ens5", sli = "ens6" }
-    "03" = { slo = "ens5", sli = "ens6" }
-  }
-  enable_aws             = true
-  enable_aws_tgw_connect = true
+  lb_domain                     = "mcn-ce-ha.example.com"
+  aws_lb_domain                 = "aws.mcn-ce-ha.example.com"
+  origin_ip                     = "203.0.113.10"
+  deployer                      = "tester"
+  enable_bastion                = false
+  ssh_public_key                = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l plan-test-only"
+  aws_ce_ami_id                 = "ami-0123456789abcdef0"
+  aws_workload_ami_id           = "ami-0123456789abcdef0"
+  aws_vip                       = "10.151.1.10"
+  enable_azure                  = false
+  enable_kvm                    = false
+  enable_aws                    = true
+  enable_aws_tgw_connect        = true
+  aws_site_configuration_phase  = "configured"
+  aws_smsv2_device_mapping_file = "tests/fixtures/aws-device-mapping.valid.json"
 }
 
 run "plans_three_sites_six_peers_and_workload_attachment" {
@@ -210,24 +212,26 @@ run "plans_three_sites_six_peers_and_workload_attachment" {
   }
 }
 
-run "bootstrap_stage_limits_runtime_and_routing_to_ce01" {
+run "bootstrap_stage_has_no_tgw_or_runtime_actions" {
   command = plan
 
   variables {
-    aws_bootstrap_site_keys = ["01"]
+    aws_site_configuration_phase  = "bootstrap"
+    aws_smsv2_device_mapping_file = null
+    enable_aws_tgw_connect        = false
   }
 
   assert {
     condition = (
-      length(data.xcsh_smsv2_aws_runtime.aws) == 1 &&
-      length(aws_route_table_association.public) == 1 &&
-      length(aws_route_table_association.private) == 1 &&
-      length(terraform_data.aws_tgw_site_route_gate) == 1 &&
-      length(aws_ec2_transit_gateway_connect_peer.aws) == 2 &&
-      length(xcsh_external_connector.aws_tgw) == 2 &&
-      length(xcsh_bgp.aws_tgw) == 1 &&
-      length(data.xcsh_site_bgp_status.aws) == 1
+      length(xcsh_securemesh_site_v2.aws) == 3 &&
+      length(aws_instance.ce) == 3 &&
+      length(data.xcsh_smsv2_aws_runtime.aws) == 0 &&
+      length(terraform_data.aws_tgw_site_route_gate) == 0 &&
+      length(aws_ec2_transit_gateway_connect_peer.aws) == 0 &&
+      length(xcsh_external_connector.aws_tgw) == 0 &&
+      length(xcsh_bgp.aws_tgw) == 0 &&
+      length(data.xcsh_site_bgp_status.aws) == 0
     )
-    error_message = "The CE01 bootstrap stage must evaluate one site's subnet routing, two Connect peers, and its four BGP sessions only."
+    error_message = "Bootstrap must create all three discovery CEs without any TGW or runtime action."
   }
 }

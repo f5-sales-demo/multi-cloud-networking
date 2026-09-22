@@ -6,17 +6,37 @@ mock_provider "xcsh" {}
 mock_provider "azapi" {}
 mock_provider "aws" {}
 mock_provider "libvirt" {}
+mock_provider "docker" {}
 
 override_resource {
   override_during = plan
-  target          = xcsh_token.ce
-  values          = { uid = "test-registration-token" }
+  target          = aws_network_interface.slo[0]
+  values          = { mac_address = "02:00:00:00:00:01" }
 }
-
 override_resource {
   override_during = plan
-  target          = aws_instance.origin
-  values          = { public_ip = "198.51.100.10" }
+  target          = aws_network_interface.slo[1]
+  values          = { mac_address = "02:00:00:00:00:02" }
+}
+override_resource {
+  override_during = plan
+  target          = aws_network_interface.slo[2]
+  values          = { mac_address = "02:00:00:00:00:03" }
+}
+override_resource {
+  override_during = plan
+  target          = aws_network_interface.sli[0]
+  values          = { mac_address = "02:00:00:00:01:01" }
+}
+override_resource {
+  override_during = plan
+  target          = aws_network_interface.sli[1]
+  values          = { mac_address = "02:00:00:00:01:02" }
+}
+override_resource {
+  override_during = plan
+  target          = aws_network_interface.sli[2]
+  values          = { mac_address = "02:00:00:00:01:03" }
 }
 
 override_resource {
@@ -37,21 +57,21 @@ override_resource {
   values          = { uid = "test-site-token-03" }
 }
 
-override_resource {
+override_data {
   override_during = plan
-  target          = xcsh_site_cloud_init.aws["01"]
+  target          = data.xcsh_site_cloud_init.aws["01"]
   values          = { cloud_init_config = "#cloud-config\nwrite_files:\n  - path: /etc/vpm/user_data\n    content: |\n      token: {{ .token }}\n" }
 }
 
-override_resource {
+override_data {
   override_during = plan
-  target          = xcsh_site_cloud_init.aws["02"]
+  target          = data.xcsh_site_cloud_init.aws["02"]
   values          = { cloud_init_config = "#cloud-config\nwrite_files:\n  - path: /etc/vpm/user_data\n    content: |\n      token: {{ .token }}\n" }
 }
 
-override_resource {
+override_data {
   override_during = plan
-  target          = xcsh_site_cloud_init.aws["03"]
+  target          = data.xcsh_site_cloud_init.aws["03"]
   values          = { cloud_init_config = "#cloud-config\nwrite_files:\n  - path: /etc/vpm/user_data\n    content: |\n      token: {{ .token }}\n" }
 }
 
@@ -71,30 +91,29 @@ override_data {
 }
 
 variables {
-  site_prefix         = null
-  lb_name             = null
-  origin_pool_name    = null
-  route_server_name   = null
-  bastion_name        = null
-  client_vm_name      = null
-  region_short        = null
-  resource_group_name = null
-  lb_domain           = "mcn-ce-ha.f5-sales-demo.com"
-  aws_lb_domain       = "aws.mcn-ce-ha.f5-sales-demo.com"
-  origin_ip           = "203.0.113.10"
-  deployer            = "tester"
-  ssh_public_key      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l plan-test-only"
-  aws_ssh_public_key  = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAwsSpecificKeyMaterialOnlyForTests aws-plan-test-only"
-  xc_app_namespace    = "multi-cloud-networking"
-  aws_ce_ami_id       = "ami-0123456789abcdef0"
-  aws_workload_ami_id = "ami-0123456789abcdef0"
-  aws_smsv2_devices = {
-    "01" = { slo = "ens5", sli = "ens6" }
-    "02" = { slo = "ens5", sli = "ens6" }
-    "03" = { slo = "ens5", sli = "ens6" }
-  }
-  enable_aws             = true
-  enable_aws_tgw_connect = false
+  site_prefix                   = null
+  lb_name                       = null
+  origin_pool_name              = null
+  route_server_name             = null
+  bastion_name                  = null
+  client_vm_name                = null
+  region_short                  = null
+  resource_group_name           = null
+  lb_domain                     = "mcn-ce-ha.f5-sales-demo.com"
+  aws_lb_domain                 = "aws.mcn-ce-ha.f5-sales-demo.com"
+  origin_ip                     = "203.0.113.10"
+  deployer                      = "tester"
+  ssh_public_key                = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l plan-test-only"
+  aws_ssh_public_key            = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAwsSpecificKeyMaterialOnlyForTests aws-plan-test-only"
+  xc_app_namespace              = "multi-cloud-networking"
+  aws_ce_ami_id                 = "ami-0123456789abcdef0"
+  aws_workload_ami_id           = "ami-0123456789abcdef0"
+  enable_azure                  = false
+  enable_kvm                    = false
+  enable_aws                    = true
+  enable_aws_tgw_connect        = false
+  aws_site_configuration_phase  = "configured"
+  aws_smsv2_device_mapping_file = "tests/fixtures/aws-device-mapping.valid.json"
 }
 
 run "aws_site_and_resources" {
@@ -126,8 +145,7 @@ run "aws_site_and_resources" {
       aws_iam_instance_profile.ce[0].name == "mcn-ce-ha-smsv2-aws-ce-profile" &&
       aws_iam_role.workload[0].name == "mcn-ce-ha-smsv2-aws-workload-ssm" &&
       aws_iam_instance_profile.workload[0].name == "mcn-ce-ha-smsv2-aws-workload-ssm" &&
-      xcsh_virtual_site.aws[0].name == "mcn-ce-ha-smsv2-aws-vsite" &&
-      xcsh_token.ce.name == "mcn-ce-ha-smsv2-registration"
+      xcsh_virtual_site.aws[0].name == "mcn-ce-ha-smsv2-aws-vsite"
     )
     error_message = "Every singleton AWS/F5 object must use the immutable SMSv2 generation instead of a collision-prone component-only name."
   }
@@ -158,7 +176,7 @@ run "aws_site_and_resources" {
   }
 
   assert {
-    condition     = length(xcsh_securemesh_site_v2.aws) == 3 && length(xcsh_site_cloud_init.aws) == 3 && length(xcsh_token.aws) == 3
+    condition     = length(xcsh_securemesh_site_v2.aws) == 3 && length(data.xcsh_site_cloud_init.aws) == 3 && length(xcsh_token.aws) == 3
     error_message = "AWS must plan three independent sites and one site-scoped bootstrap per site."
   }
 
@@ -177,25 +195,17 @@ run "aws_site_and_resources" {
 
   assert {
     condition = alltrue([
-      for bootstrap in values(xcsh_site_cloud_init.aws) : bootstrap.provider_ref == "aws"
+      for bootstrap in values(data.xcsh_site_cloud_init.aws) : bootstrap.provider_ref == "aws"
     ])
     error_message = "AWS site cloud-init issuance must use the lowercase provider identifier expected by the live API."
   }
 
   assert {
     condition = alltrue([
-      for config in [
-        for key, bootstrap in xcsh_site_cloud_init.aws : replace(
-          replace(replace(bootstrap.cloud_init_config, "{{ .Token }}", xcsh_token.aws[key].uid), "{{ .token }}", xcsh_token.aws[key].uid),
-          "permissions: 0644",
-          "permissions: \"0644\"",
-        )
-      ] :
-      strcontains(nonsensitive(config), "token: test-site-token-") &&
-      !strcontains(nonsensitive(config), "{{ .token }}") &&
-      !strcontains(nonsensitive(config), "{{ .Token }}")
+      for key, bootstrap in data.xcsh_site_cloud_init.aws :
+      bootstrap.site_name == local.aws_active_sites[key].name
     ])
-    error_message = "Every AWS CE must receive resolved cloud-init with no token template placeholder."
+    error_message = "Every AWS CE must retrieve the cloud-init template for its exact SMSv2 site."
   }
 
   assert {
@@ -220,13 +230,8 @@ run "aws_site_and_resources" {
   }
 
   assert {
-    condition = (
-      length(aws_instance.origin) == 1 &&
-      length(aws_security_group.origin) == 1 &&
-      aws_instance.origin[0].iam_instance_profile == aws_iam_instance_profile.workload[0].name &&
-      xcsh_origin_pool.aws[0].origin_servers[0].public_ip.ip == aws_instance.origin[0].public_ip
-    )
-    error_message = "AWS-only traffic must use the owned AWS origin rather than the generic cross-cloud origin input."
+    condition     = xcsh_origin_pool.aws[0].origin_servers[0].public_name.dns_name == var.aws_origin_dns_name
+    error_message = "AWS traffic must use the declared DNS origin rather than an unmanaged instance address."
   }
 }
 
@@ -250,27 +255,22 @@ run "aws_runtime_readiness_cannot_be_shortened" {
   expect_failures = [var.aws_runtime_convergence_timeout_seconds]
 }
 
-run "aws_bootstrap_stage_issues_only_the_first_site" {
+run "aws_bootstrap_stage_uses_distinct_discovery_sites" {
   command = plan
 
   variables {
-    aws_bootstrap_site_keys = ["01"]
+    aws_site_configuration_phase  = "bootstrap"
+    aws_smsv2_device_mapping_file = null
   }
 
   assert {
-    condition     = keys(xcsh_token.aws) == ["01"] && keys(xcsh_site_cloud_init.aws) == ["01", "02", "03"]
-    error_message = "The first controlled replacement must issue only CE01's JWT while retaining all site cloud-init records."
+    condition     = length(xcsh_token.aws) == 3 && alltrue([for site in values(xcsh_securemesh_site_v2.aws) : endswith(site.name, "-bootstrap")])
+    error_message = "Bootstrap must create all three distinct disposable discovery sites."
   }
 
   assert {
-    condition = (
-      strcontains(nonsensitive(local.aws_ce_site_cloud_init["01"]), "token: test-site-token-01") &&
-      strcontains(nonsensitive(local.aws_ce_site_cloud_init["02"]), "token: {{ .token }}") &&
-      strcontains(nonsensitive(local.aws_ce_site_cloud_init["03"]), "token: {{ .token }}") &&
-      !strcontains(nonsensitive(local.aws_ce_site_cloud_init["02"]), "token: \n") &&
-      !strcontains(nonsensitive(local.aws_ce_site_cloud_init["03"]), "token: \n")
-    )
-    error_message = "A staged JWT plan must resolve the selected site and preserve unresolved peer placeholders without rendering blank tokens."
+    condition     = alltrue([for site in values(xcsh_securemesh_site_v2.aws) : length(site.aws.not_managed.node_list) == 0])
+    error_message = "Bootstrap discovery sites must not guess configured node or device identities."
   }
 }
 
@@ -310,38 +310,10 @@ run "aws_disabled_plans_no_aws_resources" {
 
 run "aws_device_discovery_must_be_supplied" {
   command = plan
-  variables { aws_smsv2_devices = {} }
-  expect_failures = [var.aws_smsv2_devices]
-}
-
-run "aws_device_roles_cannot_share_a_device" {
-  command = plan
   variables {
-    aws_smsv2_devices = {
-      "01" = { slo = "ens5", sli = "ens5" }
-      "02" = { slo = "ens5", sli = "ens6" }
-      "03" = { slo = "ens5", sli = "ens6" }
-    }
+    aws_smsv2_device_mapping_file = null
   }
-  expect_failures = [var.aws_smsv2_devices]
-}
-
-run "aws_devices_are_per_site_not_fleet_assumptions" {
-  command = plan
-  variables {
-    aws_smsv2_devices = {
-      "01" = { slo = "ens5", sli = "ens6" }
-      "02" = { slo = "enp0s5", sli = "enp0s6" }
-      "03" = { slo = "eth0", sli = "eth1" }
-    }
-  }
-  assert {
-    condition = alltrue([for key, site in xcsh_securemesh_site_v2.aws :
-      site.aws.not_managed.node_list[0].interface_list[0].ethernet_interface.device == var.aws_smsv2_devices[key].slo &&
-      site.aws.not_managed.node_list[0].interface_list[1].ethernet_interface.device == var.aws_smsv2_devices[key].sli
-    ])
-    error_message = "Preserve each site's MAC-verified guest device selection independently."
-  }
+  expect_failures = [var.aws_smsv2_device_mapping_file]
 }
 
 run "aws_vip_selects_explicitly_labelled_sites" {
@@ -355,8 +327,8 @@ run "aws_vip_selects_explicitly_labelled_sites" {
   }
   assert {
     condition = alltrue([for site in values(xcsh_securemesh_site_v2.aws) :
-      lookup(site.labels, "mcn-topology", "") == "${var.component}-aws"
-    ]) && toset(xcsh_virtual_site.aws[0].site_selector.expressions) == toset(["mcn-topology in (${var.component}-aws)"])
+      lookup(site.labels, "mcn-topology", "") == "${local.site_prefix}-aws"
+    ]) && toset(xcsh_virtual_site.aws[0].site_selector.expressions) == toset(["mcn-topology in (${local.site_prefix}-aws)"])
     error_message = "The virtual site must select an explicit topology label present on every AWS SMSv2 site."
   }
 

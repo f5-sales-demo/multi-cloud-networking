@@ -30,3 +30,27 @@ variable "enable_kvm" {
   type        = bool
   default     = false
 }
+
+variable "kvm_software_version" {
+  description = "F5XC software installed during the KVM CE's first boot. This is pinned explicitly so a fresh install does not consume an unqualified tenant default release."
+  type        = string
+  default     = "crt-20260801-0205"
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^crt-[0-9]{8}-[0-9]{4}$", var.kvm_software_version))
+    error_message = "kvm_software_version must be an explicit F5XC software build such as crt-20260801-0205."
+  }
+}
+
+variable "aws_origin_dns_name" {
+  description = "DNS name of the public HTTP origin for the AWS SMSv2 load balancer."
+  type        = string
+  default     = "httpbin.org"
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}$", var.aws_origin_dns_name))
+    error_message = "aws_origin_dns_name must be a fully-qualified lowercase DNS name."
+  }
+}

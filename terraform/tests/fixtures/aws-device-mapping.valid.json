@@ -1,0 +1,12 @@
+{
+  "checksum": "c6a2360cfaf3f193fae4f75234aaa655401638a6df46b5a9c447846bdf75eb54",
+  "entries": [
+    { "device": "ens5", "mac": "02:00:00:00:00:01", "role": "slo", "site_key": "01" },
+    { "device": "ens6", "mac": "02:00:00:00:01:01", "role": "sli", "site_key": "01" },
+    { "device": "ens5", "mac": "02:00:00:00:00:02", "role": "slo", "site_key": "02" },
+    { "device": "ens6", "mac": "02:00:00:00:01:02", "role": "sli", "site_key": "02" },
+    { "device": "ens5", "mac": "02:00:00:00:00:03", "role": "slo", "site_key": "03" },
+    { "device": "ens6", "mac": "02:00:00:00:01:03", "role": "sli", "site_key": "03" }
+  ],
+  "schema_version": 1
+}
