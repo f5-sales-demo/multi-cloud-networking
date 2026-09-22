@@ -8,6 +8,10 @@ terraform {
     }
     libvirt = { source = "dmacvicar/libvirt", version = "= 0.8.3" }
     docker  = { source = "kreuzwerker/docker", version = "~> 3.0" }
+    external = {
+      source  = "hashicorp/external"
+      version = "~> 2.3"
+    }
   }
 }
 

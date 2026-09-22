@@ -6,9 +6,12 @@ locals {
   aws_sites = {
     for index in range(var.enable_aws ? var.aws_ce_count : 0) :
     format("%02d", index + 1) => {
-      index       = index
-      name        = format("%s-aws-%s-%02d", local.site_prefix, var.aws_location, index + 1)
-      hostname    = format("%s-aws-%s-%02d", local.site_prefix, var.aws_location, index + 1)
+      index = index
+      name  = format("%s-aws-%s-%02d", local.site_prefix, var.aws_location, index + 1)
+      # XC embeds the site and node names in generated child interface names.
+      # Keep the hostname compact so the resulting identity remains within the
+      # platform's 128-byte name limit even when the site name is region-scoped.
+      hostname    = format("%s-aws-%02d", var.component, index + 1)
       listener_ip = cidrhost(cidrsubnet(var.aws_vpc_cidr, 8, index + 11), 10)
     }
   }

@@ -10,6 +10,7 @@ onprem="$repo_root/terraform/onprem_kvm.tf"
 workload="$repo_root/terraform/onprem_workload.tf"
 variables="$repo_root/terraform/variables.tf"
 resolver="$repo_root/terraform/scripts/xc-kvm-network-interface.py"
+observer="$repo_root/terraform/scripts/xc-kvm-bgp-observer.py"
 
 fail() {
   printf 'FAIL: %s\n' "$*" >&2
@@ -97,15 +98,23 @@ require 'libvirt_domain.ce_node' "$onprem"
 require 'data "external" "kvm_network_interface"' "$onprem"
 require 'data.external.kvm_network_interface[0].result.interface_name' "$onprem"
 require 'resolver_sha256       = filesha256(' "$onprem"
+require 'data "external" "kvm_bgp_observer"' "$onprem"
+require 'expected_peer_address   = try(local.kvm_expected_bgp_peers["node_01_slo"].peer_address, "")' "$onprem"
+require 'expected_imported_route = try(one(local.kvm_expected_bgp_peers["node_01_slo"].expected_imported_routes), "")' "$onprem"
+reject 'expected_exported_routes = []' "$onprem"
 reject 'name      = "eth0"' "$onprem"
 require 'owner.get("uid")' "$resolver"
 require 'infra.get("provider")' "$resolver"
 require 'network.get("mac_address")' "$resolver"
 require '"site_local_network" not in ethernet' "$resolver"
 require 'hmac.compare_digest(expected_hash, actual_hash)' "$resolver"
+require 'hmac.compare_digest(' "$observer"
+require 'expected BGP peer state is' "$observer"
+require 'expected imported route has no path from the exact BGP peer' "$observer"
 require 'variable "enable_kvm"' "$variables"
 require 'no KVM image lookup occurs while disabled' "$variables"
 
 python3 "$repo_root/tests/test_xc_kvm_network_interface.py"
+python3 "$repo_root/tests/test_xc_kvm_bgp_observer.py"
 
 printf 'PASS: KVM CE identity and FRR lifecycle are Terraform-owned\n'

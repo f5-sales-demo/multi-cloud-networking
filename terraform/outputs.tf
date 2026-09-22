@@ -329,8 +329,8 @@ output "kvm_runtime_status" {
       for registration in values(data.xcsh_site_registration.kvm) : registration if registration.state == "ONLINE"
     ])
     mapping_valid     = local.kvm_registration_mapping_valid
-    bgp_converged     = try(data.xcsh_site_bgp_status.kvm[0].converged, false)
-    bgp_session_count = length(try(data.xcsh_site_bgp_status.kvm[0].peers, {}))
+    bgp_converged     = try(data.external.kvm_bgp_observer[0].result.converged == "true", false)
+    bgp_session_count = try(data.external.kvm_bgp_observer[0].result.converged == "true" ? 1 : 0, 0)
   } : null
 }
 

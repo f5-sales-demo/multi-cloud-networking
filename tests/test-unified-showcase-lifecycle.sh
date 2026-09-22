@@ -25,7 +25,10 @@ require 'variable "aws_site_configuration_phase"' "$root/variables_aws.tf"
 require 'variable "aws_smsv2_device_mapping_file"' "$root/variables_aws.tf"
 require 'data "xcsh_site_registrations_by_site" "kvm"' "$root/onprem_kvm.tf"
 require 'resource "xcsh_registration_approval" "kvm"' "$root/onprem_kvm.tf"
-require 'data "xcsh_site_bgp_status" "kvm"' "$root/onprem_kvm.tf"
+require 'data "external" "kvm_bgp_observer"' "$root/onprem_kvm.tf"
+reject 'expected_exported_routes = []' "$root/onprem_kvm.tf"
+test -f "$root/scripts/xc-kvm-bgp-observer.py" || fail 'KVM BGP observer is missing'
+test -f "$repo_root/tests/test_xc_kvm_bgp_observer.py" || fail 'KVM BGP observer tests are missing'
 test -f "$root/tests/kvm_registration_mapping.tftest.hcl" || fail 'KVM registration mapping fixtures are missing'
 require 'configured_kvm_mapping_is_exact' "$root/tests/kvm_registration_mapping.tftest.hcl"
 require 'configured_kvm_mapping_rejects_missing_owned_mac' "$root/tests/kvm_registration_mapping.tftest.hcl"
