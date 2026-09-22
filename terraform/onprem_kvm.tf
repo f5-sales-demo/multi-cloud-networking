@@ -59,7 +59,7 @@ resource "xcsh_securemesh_site_v2" "onprem_kvm" {
       default_os_version = {}
     }
     sw {
-      default_sw_version = {}
+      volterra_software_version = var.kvm_software_version
     }
   }
 
@@ -86,6 +86,10 @@ resource "xcsh_token" "kvm" {
   labels      = local.kvm_xc_labels
   type        = 1
   site_name   = xcsh_securemesh_site_v2.onprem_kvm[0].name
+
+  lifecycle {
+    replace_triggered_by = [xcsh_securemesh_site_v2.onprem_kvm[0]]
+  }
 }
 
 data "xcsh_site_registration" "kvm" {
@@ -235,6 +239,10 @@ resource "xcsh_bgp" "onprem_ebgp" {
     }
     passive_mode_disabled = {}
     bfd_disabled          = {}
+  }
+
+  lifecycle {
+    replace_triggered_by = [xcsh_securemesh_site_v2.onprem_kvm[0]]
   }
 
   # Do not redirect the F5-side peer until both the Terraform-owned router and

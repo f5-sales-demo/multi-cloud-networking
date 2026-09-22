@@ -12,6 +12,7 @@ mock_provider "libvirt" {}
 
 variables {
   site_prefix            = null
+  smsv2_site_generation = "smsv2"
   lb_name                = null
   origin_pool_name       = null
   route_server_name      = null
@@ -30,6 +31,7 @@ variables {
   enable_aws_tgw_connect = false
   enable_bgp             = false
   enable_kvm             = true
+  kvm_software_version   = "crt-20251002-0028"
 }
 
 run "kvm_frr_and_ce_identity_plan" {
@@ -125,7 +127,8 @@ run "kvm_frr_and_ce_identity_plan" {
       xcsh_securemesh_site_v2.onprem_kvm[0].re_select.geo_proximity != null &&
       xcsh_securemesh_site_v2.onprem_kvm[0].load_balancing.vip_vrrp_mode == "VIP_VRRP_ENABLE" &&
       xcsh_securemesh_site_v2.onprem_kvm[0].software_settings.os.default_os_version != null &&
-      xcsh_securemesh_site_v2.onprem_kvm[0].software_settings.sw.default_sw_version != null &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].software_settings.sw.default_sw_version == null &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].software_settings.sw.volterra_software_version == "crt-20251002-0028" &&
       xcsh_securemesh_site_v2.onprem_kvm[0].upgrade_settings.kubernetes_upgrade_drain.enable_upgrade_drain.drain_node_timeout == 300 &&
       xcsh_securemesh_site_v2.onprem_kvm[0].upgrade_settings.kubernetes_upgrade_drain.enable_upgrade_drain.drain_max_unavailable_node_count == 1 &&
       xcsh_securemesh_site_v2.onprem_kvm[0].upgrade_settings.kubernetes_upgrade_drain.enable_upgrade_drain.disable_vega_upgrade_mode != null,
