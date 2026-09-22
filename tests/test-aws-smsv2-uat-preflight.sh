@@ -601,6 +601,18 @@ fi
 assert_sanitized "$evidence" "$output"
 echo "ok - an Azure change is rejected without Azure CLI access"
 
+evidence="${TMP_ROOT}/kvm-registration-mapping-gate"
+mkdir "$evidence"
+output="${TMP_ROOT}/kvm-registration-mapping-gate.out"
+if ! FAKE_EXTRA_CHANGE=',{"address":"module.kvm_registration_mapping.terraform_data.gate[0]","type":"terraform_data","name":"gate","index":0,"change":{"actions":["create"],"after":{}}}' \
+  "$SCRIPT" --evidence-dir "$evidence" "${common[@]}" >"$output" 2>&1; then
+  cat "$output" >&2
+  fail "the owned KVM registration mapping gate must be accepted"
+fi
+[ "$(jq -r .status "$evidence/summary.json")" = ready ] || fail "KVM mapping gate ready status not recorded"
+assert_sanitized "$evidence" "$output"
+echo "ok - the exact KVM registration mapping gate is accepted"
+
 evidence="${TMP_ROOT}/outside-allowlist"
 mkdir "$evidence"
 output="${TMP_ROOT}/outside-allowlist.out"
