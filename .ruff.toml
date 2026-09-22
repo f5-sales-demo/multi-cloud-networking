@@ -90,6 +90,9 @@ ignore = [
     "S603",
     "TRY300",
 ]
+"terraform/scripts/xc-kvm-network-interface.py" = [
+    "INP001",
+]
 "tests/test_audit_runner_workflows.py" = [
     "INP001",
     "PT009",
@@ -106,6 +109,11 @@ ignore = [
     "PT027",
 ]
 "tests/test_manage_github_runners.py" = [
+    "INP001",
+    "PT009",
+    "PT027",
+]
+"tests/test_xc_kvm_network_interface.py" = [
     "INP001",
     "PT009",
     "PT027",

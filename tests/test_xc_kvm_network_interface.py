@@ -1,23 +1,23 @@
-#!/usr/bin/env python3
 import importlib.util
 import pathlib
 import unittest
-
+from typing import Any
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "terraform" / "scripts" / "xc-kvm-network-interface.py"
 SPEC = importlib.util.spec_from_file_location("xc_kvm_network_interface", SCRIPT)
-MODULE = importlib.util.module_from_spec(SPEC)
+assert SPEC is not None
 assert SPEC.loader is not None
+MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
 class ResolveInterfaceTests(unittest.TestCase):
     def setUp(self):
-        self.site = {
+        self.site: dict[str, Any] = {
             "system_metadata": {"uid": "site-uid-current"},
         }
-        self.registrations = {
+        self.registrations: dict[str, Any] = {
             "items": [
                 {
                     "get_spec": {
@@ -26,8 +26,14 @@ class ResolveInterfaceTests(unittest.TestCase):
                             "hostname": "onprem-ce-01-674f7",
                             "hw_info": {
                                 "network": [
-                                    {"name": "ens3", "mac_address": "52:54:00:10:00:11"},
-                                    {"name": "docker0", "mac_address": "02:00:00:00:00:01"},
+                                    {
+                                        "name": "ens3",
+                                        "mac_address": "52:54:00:10:00:11",
+                                    },
+                                    {
+                                        "name": "docker0",
+                                        "mac_address": "02:00:00:00:00:01",
+                                    },
                                 ]
                             },
                         }
@@ -35,7 +41,7 @@ class ResolveInterfaceTests(unittest.TestCase):
                 }
             ]
         }
-        self.interfaces = {
+        self.interfaces: dict[str, Any] = {
             "items": [
                 {
                     "name": "stale-interface",
@@ -89,7 +95,7 @@ class ResolveInterfaceTests(unittest.TestCase):
 
     def test_rejects_stale_owner_uid(self):
         self.interfaces["items"] = self.interfaces["items"][:1]
-        with self.assertRaises(MODULE.DiscoveryPending):
+        with self.assertRaises(MODULE.DiscoveryPendingError):
             MODULE.resolve_interface(
                 "system",
                 "mcn-ce-ha-smsv2-kvm",
@@ -101,7 +107,7 @@ class ResolveInterfaceTests(unittest.TestCase):
 
     def test_rejects_duplicate_owned_registration_mac(self):
         self.registrations["items"].append(self.registrations["items"][0])
-        with self.assertRaises(MODULE.DiscoveryPending):
+        with self.assertRaises(MODULE.DiscoveryPendingError):
             MODULE.resolve_interface(
                 "system",
                 "mcn-ce-ha-smsv2-kvm",
@@ -116,7 +122,7 @@ class ResolveInterfaceTests(unittest.TestCase):
         ethernet = owned["get_spec"]["ethernet_interface"]
         ethernet.pop("site_local_network")
         ethernet["site_local_inside_network"] = {}
-        with self.assertRaises(MODULE.DiscoveryPending):
+        with self.assertRaises(MODULE.DiscoveryPendingError):
             MODULE.resolve_interface(
                 "system",
                 "mcn-ce-ha-smsv2-kvm",
