@@ -57,9 +57,9 @@ run "kvm_frr_and_ce_identity_plan" {
       libvirt_domain.ce_node["01"].memory == 32768 &&
       libvirt_domain.ce_node["01"].vcpu == 8 &&
       libvirt_domain.ce_node["01"].cpu[0].mode == "host-passthrough" &&
-      libvirt_volume.ce_disk["01"].size == 85899345920
+      libvirt_volume.ce_disk["01"].size == 107374182400
     )
-    error_message = "The KVM CE must use the reviewed 32 GiB, 8-vCPU host-passthrough, 80 GiB runtime shape."
+    error_message = "The KVM CE must use the reviewed 32 GiB, 8-vCPU host-passthrough, 100 GiB runtime shape."
   }
 
   assert {

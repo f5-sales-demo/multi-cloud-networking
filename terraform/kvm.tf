@@ -120,7 +120,7 @@ resource "libvirt_volume" "ce_disk" {
   name           = "onprem-ce-${each.key}-${local.kvm_network_generation}-${local.kvm_bootstrap_generation}-disk.qcow2"
   pool           = libvirt_pool.kvm[0].name
   base_volume_id = libvirt_volume.base_cloud[0].id
-  size           = 85899345920
+  size           = 107374182400
   format         = "qcow2"
 }
 
