@@ -26,8 +26,8 @@ override_data {
   values = {
     contract_id         = "f5xc-smsv2-api/v1"
     contract_version    = "7.0.0"
-    api_release_tag     = "v7.0.6"
-    api_release_commit  = format("%s%s", "9bae0474d11957257415", "6b9ba1e538e6b0431cf0")
+    api_release_tag     = "v7.0.8"
+    api_release_commit  = format("%s%s", "1c7f9e01f2011a3a4267", "d024e1eee5f71b65481f")
     telemetry_schema_id = "f5xc-smsv2-aws-tgw-telemetry/v2"
     capabilities = {
       aws_ce_create          = "available"

@@ -13,7 +13,7 @@ AWS_REGION=ap-northeast-1
 AWS_ACCOUNT=280469140135
 XC_TENANT=f5-sales-demo
 COMPONENT=mcn-ce-ha
-GENERATION=smsv2
+GENERATION=""
 MODE=full
 PRIVATE_ROOT=""
 CREATOR_ID=$(git -C "$REPO_ROOT" config user.email 2>/dev/null || true)
@@ -144,6 +144,11 @@ caller_account=$(AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_SDK_LOAD_CONFIG=1 \
 unset caller_account
 
 tf init -reconfigure -input=false -lockfile=readonly -backend-config="$BACKEND_CONFIG"
+generation_json=$(printf '%s\n' 'var.smsv2_site_generation' | tf console -var-file="$TFVARS") ||
+  die "cannot resolve smsv2_site_generation from tfvars"
+GENERATION=$(jq -er 'select(type == "string" and test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"))' <<<"$generation_json") ||
+  die "smsv2_site_generation is not a DNS-style label"
+unset generation_json
 
 libvirt_unit=""
 for candidate in libvirtd.service virtqemud.service; do
