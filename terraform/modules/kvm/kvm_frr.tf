@@ -66,6 +66,16 @@ resource "docker_container" "kvm_frr" {
   privileged = true
   must_run   = true
   restart    = "unless-stopped"
+  log_opts = {
+    "max-file" = "3"
+    "max-size" = "10m"
+  }
+
+  ulimit {
+    name = "nofile"
+    hard = 65536
+    soft = 65536
+  }
 
   upload {
     file        = "/etc/frr/daemons"
