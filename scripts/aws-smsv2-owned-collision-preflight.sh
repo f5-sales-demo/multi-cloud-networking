@@ -443,7 +443,7 @@ while IFS= read -r item; do
   fi
   if [[ $type == terraform_data ]]; then
     case "$address" in
-    terraform_data.aws_tgw_contract_gate[[]0[]] | terraform_data.aws_tgw_runtime_gate[[]0[]] | terraform_data.aws_tgw_site_route_gate[[]*[]])
+    terraform_data.aws_tgw_contract_gate[[]0[]] | terraform_data.aws_tgw_runtime_gate[[]0[]] | terraform_data.aws_tgw_site_route_gate[[]*[]] | module.kvm_registration_mapping.terraform_data.gate[[]0[]])
       continue
       ;;
     *) die "preflight has no complete ownership adapter for internal Terraform data resource: $address" ;;
