@@ -48,7 +48,7 @@ done
 if [ -n "$output" ]; then
   if [ "${FAKE_F5_COLLISION:-false}" = true ] && [[ $url == */securemesh_site_v2s/* ]]; then
     name=${url##*/}
-    printf '{"metadata":{"name":"%s","namespace":"system","labels":{"mcn-deployment-generation":"gen-01"}},"system_metadata":{"creator_id":"tester@example.test","creation_timestamp":"2026-09-16T12:00:00Z","uid":"site-0123456789abcdef"}}\n' "$name" >"$output"
+    printf '{"metadata":{"name":"%s","namespace":"system","labels":{"mcn-deployment-generation":"gen-01"}},"system_metadata":{"creator_id":"tester@example.com","creation_timestamp":"2026-09-16T12:00:00Z","uid":"site-0123456789abcdef"}}\n' "$name" >"$output"
     printf 200
   else
     : >"$output"
@@ -76,7 +76,7 @@ init)
   exit 0
   ;;
 version)
-  printf '{"provider_selections":{"registry.terraform.io/f5-sales-demo/xcsh":"9.5.0"}}\n'
+  printf '{"provider_selections":{"registry.terraform.io/f5-sales-demo/xcsh":"9.5.1"}}\n'
   ;;
 plan)
   : >"${chdir}/contract.tfplan"
@@ -159,7 +159,7 @@ common=(
   --expected-aws-account 111122223333
   --expected-aws-region ap-northeast-1
   --expected-xc-tenant f5-sales-demo
-  --creator-id tester@example.test
+  --creator-id tester@example.com
   --deployment-generation gen-01
   --lifecycle-phase configured
   --expected-site mcn-ce-ha-aws-ap-northeast-1-01
@@ -202,7 +202,7 @@ fi
 assert_sanitized "$evidence" "$output"
 [ "$(jq -r .provider_mode "$evidence/summary.json")" = registry ] || fail "registry mode not recorded"
 [ "$(jq -r .provider_sha256 "$evidence/summary.json")" = null ] || fail "registry digest must be null"
-echo "ok - exact v9.5.0 available contract passes with sanitized evidence"
+echo "ok - exact v9.5.1 available contract passes with sanitized evidence"
 
 evidence="${TMP_ROOT}/no-explicit-region"
 mkdir "$evidence"
@@ -372,7 +372,7 @@ single_site=(
   --expected-aws-account 111122223333
   --expected-aws-region ap-northeast-1
   --expected-xc-tenant f5-sales-demo
-  --creator-id tester@example.test
+  --creator-id tester@example.com
   --deployment-generation gen-01
   --lifecycle-phase configured
   --expected-site mcn-ce-ha-aws-ap-northeast-1-01
@@ -506,7 +506,7 @@ output="${TMP_ROOT}/destroy.out"
 retirement_sites=(
   --terraform-dir "$TF_DIR" --plan-file "$PLAN_FILE"
   --expected-aws-account 111122223333 --expected-aws-region ap-northeast-1
-  --expected-xc-tenant f5-sales-demo --creator-id tester@example.test
+  --expected-xc-tenant f5-sales-demo --creator-id tester@example.com
   --deployment-generation gen-01 --lifecycle-phase bootstrap_retirement
   --expected-site mcn-ce-ha-aws-ap-northeast-1-01-bootstrap
   --expected-site mcn-ce-ha-aws-ap-northeast-1-02-bootstrap

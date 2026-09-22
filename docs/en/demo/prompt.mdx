@@ -50,7 +50,7 @@ Write the complete, modular, production-grade Terraform codebase under `terrafor
 
 1. **Versions & Providers** (`versions.tf`, `providers.tf`):
    - Terraform CLI `>= 1.16.1`.
-   - Providers: `f5-sales-demo/xcsh` (`= 9.5.0`, setting `api_url = local.xc_api_url` derived from
+   - Providers: `f5-sales-demo/xcsh` (`= 9.5.1`, setting `api_url = local.xc_api_url` derived from
      `var.expected_xc_tenant` -> `https://${var.expected_xc_tenant}.console.ves.volterra.io`),
      `azurerm` (`~> 4.0`, features {}, subscription_id), `azuread` (`~> 3.0`),
      `external` (`~> 2.3`), `random` (`~> 3.0`).
@@ -140,7 +140,7 @@ terraform plan -var="origin_ip=203.0.113.10" -var="lb_domain=example.com"
 
 | Constraint / Pattern | Why it is explicitly enforced |
 | --- | --- |
-| `f5-sales-demo/xcsh = 9.5.0` | Provides the immutable SMSv2 contract, evidence-backed AWS node configuration, Azure NIC MAC-read stability, the pre-mutation Azure Route Server multihop capability gate, and the Site-UID KVM image resolver. |
+| `f5-sales-demo/xcsh = 9.5.1` | Provides the immutable SMSv2 contract, evidence-backed AWS node configuration, Azure NIC MAC-read stability, the pre-mutation Azure Route Server multihop capability gate, and the Site-UID KVM image resolver. |
 | `data "external" "xc_env_tenant"` | Executes `scripts/xc-env-tenant.sh` to enforce `var.expected_xc_tenant` (`f5-sales-demo`) and prevent accidental tenant cross-contamination. |
 | `replace_triggered_by = [terraform_data.ce_vm]` | Couples `xcsh_securemesh_site_v2` lifecycle to the Azure VM instance ID, preventing `UniqueSecondaryIndexViolation` on node rebuilds. |
 | `CertifiedHardwareEndpoint` in Cloud-Init | Renders `/etc/vpm/config.yaml` with `azure.yml` endpoint required by `vpmd` on marketplace `volterra-node` images. |

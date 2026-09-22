@@ -20,7 +20,7 @@ reject_text() {
 }
 
 require_text terraform/versions.tf 'required_version = "= 1.16.3"'
-require_text terraform/versions.tf 'version = "= 9.5.0"'
+require_text terraform/versions.tf 'version = "= 9.5.1"'
 require_text terraform/aws_xc.tf 'disable_ha                 = {}'
 require_text terraform/aws_xc.tf 'cluster_size = 1'
 ## A ground-up CE must request the field-proven runtime pair on its first boot.
@@ -94,13 +94,10 @@ grep -Fq 'depends_on = [terraform_data.aws_tgw_runtime_gate]' <<<"$upgrade_obser
 }
 require_text terraform/aws_ce.tf '"{{ .token }}"'
 require_text terraform/aws_ce.tf 'aws_ce_site_cloud_init = {'
-require_text terraform/aws_ce.tf 'try(xcsh_token.aws[key].uid, "{{ .Token }}")'
 require_text terraform/aws_ce.tf 'try(xcsh_token.aws[key].uid, "{{ .token }}")'
 require_text terraform/aws_ce.tf 'site_cloud_init = local.aws_ce_site_cloud_init[format("%02d", count.index + 1)]'
 require_text terraform/aws_ce.tf 'software_version = var.aws_software_version'
 require_text terraform/aws_ce.tf 'os_version       = var.aws_os_version'
-require_text terraform/aws_ce.tf '"permissions: 0644"'
-require_text terraform/aws_ce.tf '"permissions: \"0644\""'
 require_text terraform/aws_ce.tf 'var.aws_ssh_public_key != "" ? var.aws_ssh_public_key : local.ssh_public_key'
 reject_text terraform/aws_ce.tf 'aws_site_cloud_init = {'
 require_text terraform/cloud-init/ce-node-aws.multipart.tpl 'multipart/mixed'

@@ -1,11 +1,13 @@
 terraform {
+  required_version = ">= 1.8"
+
   required_providers {
     xcsh = {
       source  = "f5-sales-demo/xcsh"
-      version = "= 9.5.0"
+      version = "= 9.5.1"
     }
     libvirt = { source = "dmacvicar/libvirt", version = "= 0.8.3" }
-    docker  = { source = "kreuzwerker/docker" }
+    docker  = { source = "kreuzwerker/docker", version = "~> 3.0" }
   }
 }
 

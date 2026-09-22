@@ -66,11 +66,12 @@ trap 'rm -rf "$scratch"' EXIT
 manifest="$scratch/manifest.json"
 plan="$scratch/plan.json"
 receipt="$scratch/receipt.json"
+provider_source='registry.terraform.io/f5-sales-demo/xcsh'
 
 jq -n '{
   schema_version:2,status:"blocked",recovery_mode:"legacy_unlabelled",
   plan_sha256:"sha256:source-plan",aws_account_id:"123456789012",aws_region:"us-east-1",
-  xc_tenant:"f5-sales-demo",creator_id:"tester@example.test",component:"mcn-ce-ha",
+  xc_tenant:"f5-sales-demo",creator_id:"tester@example.com",component:"mcn-ce-ha",
   deployment_generation:"gen-01",inventory_captured_at:"2026-09-16T12:00:00Z",
   collisions:[
     {engine:"aws",type:"aws_key_pair",address:"aws_key_pair.ce[0]",name:"mcn-ce-ha-gen-01-key",
@@ -101,8 +102,8 @@ jq -n '{
   ]
 }' >"$manifest"
 
-jq -n '{format_version:"1.2",terraform_version:"1.16.3",
-  configuration:{provider_config:{xcsh:{full_name:"registry.terraform.io/f5-sales-demo/xcsh",version_constraint:"9.5.0"}}},
+jq --arg provider_source "$provider_source" -n '{format_version:"1.2",terraform_version:"1.16.3",
+  configuration:{provider_config:{xcsh:{full_name:$provider_source,version_constraint:"9.5.1"}}},
   resource_changes:[
   {address:"aws_key_pair.recovery[\"aws_key_pair.ce[0]\"]",type:"aws_key_pair",
    change:{actions:["no-op"],importing:{id:"mcn-ce-ha-gen-01-key"}}},
@@ -156,8 +157,8 @@ fi
 
 destroy_plan="$scratch/destroy-plan.json"
 destroy_receipt="$scratch/destroy-receipt.json"
-jq -n '{format_version:"1.2",terraform_version:"1.16.3",
-  configuration:{provider_config:{xcsh:{full_name:"registry.terraform.io/f5-sales-demo/xcsh",version_constraint:"9.5.0"}}},
+jq --arg provider_source "$provider_source" -n '{format_version:"1.2",terraform_version:"1.16.3",
+  configuration:{provider_config:{xcsh:{full_name:$provider_source,version_constraint:"9.5.1"}}},
   resource_changes:[
     {address:"aws_key_pair.recovery[\"aws_key_pair.ce[0]\"]",type:"aws_key_pair",
      change:{actions:["delete"],before:{id:"mcn-ce-ha-gen-01-key",key_name:"mcn-ce-ha-gen-01-key"},after:null}},
