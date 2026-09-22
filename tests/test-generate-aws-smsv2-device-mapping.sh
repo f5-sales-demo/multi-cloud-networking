@@ -48,6 +48,24 @@ reject() {
 "$GENERATOR" --verify-file "$MAPPING" --eni-file "$ENIS"
 echo "ok - valid private mapping generates and verifies"
 
+python3 - "$REGISTRATIONS" "$SCRATCH/runtime-interfaces.json" <<'PY'
+import json
+import sys
+values = json.load(open(sys.argv[1], encoding="utf-8"))
+for site in ("01", "02", "03"):
+    values.extend(
+        [
+            {"site_key": site, "mac": f"02:aa:00:00:{int(site):02x}:00", "device": f"runtime-{site}-0"},
+            {"site_key": site, "mac": f"02:aa:00:00:{int(site):02x}:01", "device": f"runtime-{site}-1"},
+        ]
+    )
+json.dump(values, open(sys.argv[2], "w", encoding="utf-8"))
+PY
+"$GENERATOR" --registration-file "$SCRATCH/runtime-interfaces.json" --eni-file "$ENIS" --output "$SCRATCH/runtime-output.json"
+"$GENERATOR" --verify-file "$SCRATCH/runtime-output.json" --eni-file "$ENIS"
+[ "$(jq '.entries | length' "$SCRATCH/runtime-output.json")" = 6 ] || fail "runtime interfaces leaked into mapping"
+echo "ok - unmatched guest runtime interfaces are excluded from the owned ENI join"
+
 python3 - "$REGISTRATIONS" "$SCRATCH/missing.json" <<'PY'
 import json
 import sys
@@ -72,7 +90,7 @@ values = json.load(open(sys.argv[1], encoding="utf-8"))
 values[0]["mac"] = "02:ff:ff:ff:ff:ff"
 json.dump(values, open(sys.argv[2], "w", encoding="utf-8"))
 PY
-reject registration_mapping_invalid "$GENERATOR" --registration-file "$SCRATCH/foreign.json" --eni-file "$ENIS" --output "$SCRATCH/foreign-output.json"
+reject registration_mapping_not_one_to_one "$GENERATOR" --registration-file "$SCRATCH/foreign.json" --eni-file "$ENIS" --output "$SCRATCH/foreign-output.json"
 
 python3 - "$ENIS" "$SCRATCH/malformed-eni.json" <<'PY'
 import json

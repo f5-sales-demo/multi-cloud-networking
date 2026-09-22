@@ -134,12 +134,24 @@ def main() -> None:
             str(item.get("mac", "")).lower(),
             str(item.get("device", "")).strip(),
         )
+        if (
+            not isinstance(site_key, str)
+            or site_key not in SITE_KEYS
+            or not MAC.fullmatch(mac)
+            or not device
+        ):
+            fail("registration_mapping_invalid")
         matching_keys = [
             key
             for key, owned_mac in owned.items()
             if key[0] == site_key and owned_mac == mac
         ]
-        if len(matching_keys) != 1 or not MAC.fullmatch(mac) or not device:
+        # SMSv2 registrations report guest-runtime interfaces in addition to
+        # the EC2 ENIs. Only an exact same-site owned-MAC match may enter the
+        # configured mapping; valid unmatched runtime interfaces are inert.
+        if not matching_keys:
+            continue
+        if len(matching_keys) != 1:
             fail("registration_mapping_invalid")
         key = matching_keys[0]
         if key in observed:
