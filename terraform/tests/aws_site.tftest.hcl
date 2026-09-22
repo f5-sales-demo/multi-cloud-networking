@@ -261,6 +261,7 @@ run "aws_bootstrap_stage_uses_distinct_discovery_sites" {
   variables {
     aws_site_configuration_phase  = "bootstrap"
     aws_smsv2_device_mapping_file = null
+    smsv2_site_generation         = "smsv2-current"
   }
 
   assert {
@@ -271,6 +272,14 @@ run "aws_bootstrap_stage_uses_distinct_discovery_sites" {
   assert {
     condition     = alltrue([for site in values(xcsh_securemesh_site_v2.aws) : length(site.aws.not_managed.node_list) == 0])
     error_message = "Bootstrap discovery sites must not guess configured node or device identities."
+  }
+
+  assert {
+    condition = (
+      length(distinct([for token in values(xcsh_token.aws) : token.name])) == 3 &&
+      alltrue([for token in values(xcsh_token.aws) : length(token.name) >= 1 && length(token.name) <= 64])
+    )
+    error_message = "Bootstrap registration-token names must remain unique and within the provider/API 64-character limit."
   }
 }
 
