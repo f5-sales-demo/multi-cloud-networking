@@ -5,12 +5,12 @@ variable "enable_kvm" {
 variable "software_version" {
   description = "Explicit F5XC software build installed during the KVM CE's first boot."
   type        = string
-  default     = "crt-20251002-0028"
+  default     = "crt-20260801-0205"
   nullable    = false
 
   validation {
     condition     = can(regex("^crt-[0-9]{8}-[0-9]{4}$", var.software_version))
-    error_message = "software_version must be an explicit F5XC software build such as crt-20251002-0028."
+    error_message = "software_version must be an explicit F5XC software build such as crt-20260801-0205."
   }
 }
 
