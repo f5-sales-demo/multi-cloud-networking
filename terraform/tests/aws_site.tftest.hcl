@@ -277,9 +277,13 @@ run "aws_bootstrap_stage_uses_distinct_discovery_sites" {
   assert {
     condition = (
       length(distinct([for token in values(xcsh_token.aws) : token.name])) == 3 &&
-      alltrue([for token in values(xcsh_token.aws) : length(token.name) >= 1 && length(token.name) <= 64])
+      alltrue([for token in values(xcsh_token.aws) :
+        length(token.name) >= 1 &&
+        length(token.name) <= 63 &&
+        can(regex("^[a-z]([-a-z0-9]*[a-z0-9])?$", token.name))
+      ])
     )
-    error_message = "Bootstrap registration-token names must remain unique and within the provider/API 64-character limit."
+    error_message = "Bootstrap registration-token names must remain unique DNS-1035 labels within the XC API 63-character limit."
   }
 }
 
