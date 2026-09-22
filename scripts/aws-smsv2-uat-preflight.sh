@@ -443,6 +443,20 @@ bootstrap)
       select(.type == "aws_instance" and .name == "ce") |
       select(.change.actions == ["create"]) ] | length) == 3) or
     (([.resource_changes[]? |
+      select(.type == "xcsh_securemesh_site_v2" and .name == "aws") |
+      select(.change.actions == ["no-op"]) |
+      .change.after.name] | unique | sort) == $sites and
+     ([.resource_changes[]? |
+      select(.type == "xcsh_token" and .name == "aws") |
+      select(.change.actions == ["create"]) |
+      .change.after.site_name] | unique | sort) == $sites and
+     ([.resource_changes[]? |
+      select(.type == "aws_instance" and .name == "ce") |
+      select(.change.actions == ["create"]) |
+      .change.after.tags["ves-io-site-name"]] | unique | sort) == $sites and
+     ([.resource_changes[]? |
+      select(.change.actions != ["no-op"] and .change.actions != ["read"])] | length) == 6) or
+    (([.resource_changes[]? |
       select(.type == "xcsh_registration_approval" and .name == "aws") |
       select(.change.actions == ["create"])] | length) == 3 and
      ([.resource_changes[]? |

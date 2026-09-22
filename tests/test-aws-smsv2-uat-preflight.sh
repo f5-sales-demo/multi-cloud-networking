@@ -27,6 +27,7 @@ cat >"${BIN}/aws" <<'SH'
 #!/usr/bin/env bash
 case "$*" in
 *"describe-vpcs"*) printf '{"Vpcs":[]}\n' ;;
+*"describe-instances"*) printf '{"Reservations":[]}\n' ;;
 *) printf '{"%s":"%s"}\n' 'Acc''ount' "${FAKE_AWS_ACCOUNT:-111122223333}" ;;
 esac
 SH
@@ -92,7 +93,9 @@ show)
     site_02_actions=${FAKE_SITE_02_ACTIONS:-${FAKE_SITE_ACTIONS:-'"create"'}}
     site_03_actions=${FAKE_SITE_03_ACTIONS:-${FAKE_SITE_ACTIONS:-'"create"'}}
     extra=${FAKE_EXTRA_CHANGE:-}
-    if [ "${FAKE_TARGETED_BOOTSTRAP:-false}" = true ]; then
+    if [ "${FAKE_BOOTSTRAP_CONTINUATION:-false}" = true ]; then
+      printf '%s\n' '{"planned_values":{"outputs":{"aws_vip":{"value":"10.151.1.10"},"aws_smsv2_site_listener_ips":{"value":{"01":"10.150.11.10","02":"10.150.12.10","03":"10.150.13.10"}}}},"resource_changes":[{"address":"aws_instance.ce[0]","type":"aws_instance","name":"ce","index":0,"change":{"actions":["create"],"after":{"tags":{"ves-io-site-name":"mcn-ce-ha-aws-ap-northeast-1-01-bootstrap"}}}},{"address":"aws_instance.ce[1]","type":"aws_instance","name":"ce","index":1,"change":{"actions":["create"],"after":{"tags":{"ves-io-site-name":"mcn-ce-ha-aws-ap-northeast-1-02-bootstrap"}}}},{"address":"aws_instance.ce[2]","type":"aws_instance","name":"ce","index":2,"change":{"actions":["create"],"after":{"tags":{"ves-io-site-name":"mcn-ce-ha-aws-ap-northeast-1-03-bootstrap"}}}},{"address":"xcsh_securemesh_site_v2.aws[\"01\"]","type":"xcsh_securemesh_site_v2","name":"aws","index":"01","change":{"actions":["no-op"],"after":{"name":"mcn-ce-ha-aws-ap-northeast-1-01-bootstrap"}}},{"address":"xcsh_securemesh_site_v2.aws[\"02\"]","type":"xcsh_securemesh_site_v2","name":"aws","index":"02","change":{"actions":["no-op"],"after":{"name":"mcn-ce-ha-aws-ap-northeast-1-02-bootstrap"}}},{"address":"xcsh_securemesh_site_v2.aws[\"03\"]","type":"xcsh_securemesh_site_v2","name":"aws","index":"03","change":{"actions":["no-op"],"after":{"name":"mcn-ce-ha-aws-ap-northeast-1-03-bootstrap"}}},{"address":"xcsh_token.aws[\"01\"]","type":"xcsh_token","name":"aws","index":"01","change":{"actions":["create"],"after":{"name":"token-01","namespace":"system","site_name":"mcn-ce-ha-aws-ap-northeast-1-01-bootstrap","labels":{"mcn-deployment-generation":"gen-01"}}}},{"address":"xcsh_token.aws[\"02\"]","type":"xcsh_token","name":"aws","index":"02","change":{"actions":["create"],"after":{"name":"token-02","namespace":"system","site_name":"mcn-ce-ha-aws-ap-northeast-1-02-bootstrap","labels":{"mcn-deployment-generation":"gen-01"}}}},{"address":"xcsh_token.aws[\"03\"]","type":"xcsh_token","name":"aws","index":"03","change":{"actions":["create"],"after":{"name":"token-03","namespace":"system","site_name":"mcn-ce-ha-aws-ap-northeast-1-03-bootstrap","labels":{"mcn-deployment-generation":"gen-01"}}}}]}'
+    elif [ "${FAKE_TARGETED_BOOTSTRAP:-false}" = true ]; then
       printf '{"complete":false,"planned_values":{"outputs":{}},"resource_changes":[{"address":"xcsh_securemesh_site_v2.aws_01","type":"xcsh_securemesh_site_v2","name":"aws","change":{"actions":["create"],"after":{"name":"mcn-ce-ha-aws-ap-northeast-1-01","namespace":"system","labels":{"mcn-deployment-generation":"gen-01"}}}},{"address":"xcsh_securemesh_site_v2.aws_02","type":"xcsh_securemesh_site_v2","name":"aws","change":{"actions":["create"],"after":{"name":"mcn-ce-ha-aws-ap-northeast-1-02","namespace":"system","labels":{"mcn-deployment-generation":"gen-01"}}}},{"address":"xcsh_securemesh_site_v2.aws_03","type":"xcsh_securemesh_site_v2","name":"aws","change":{"actions":["create"],"after":{"name":"mcn-ce-ha-aws-ap-northeast-1-03","namespace":"system","labels":{"mcn-deployment-generation":"gen-01"}}}}]}\n'
     elif [ "${FAKE_SHARED_TOPOLOGY_ONLY:-false}" = true ]; then
       printf '{"planned_values":{"outputs":{"aws_vip":{"value":%s},"aws_smsv2_site_listener_ips":{"value":%s},"aws_site_names":{"value":{"01":"mcn-ce-ha-aws-ap-northeast-1-01","02":"mcn-ce-ha-aws-ap-northeast-1-02","03":"mcn-ce-ha-aws-ap-northeast-1-03"}}}},"resource_changes":[{"address":"aws_vpc.workload[0]","type":"aws_vpc","name":"workload","index":0,"change":{"actions":["create"],"after":{"cidr_block":"10.151.0.0/16","tags":{"Name":"mcn-ce-ha-gen-01-workload","component":"mcn-ce-ha","deployment_generation":"gen-01","deployer":"tester","managed_by":"terraform"}}}}]}\n' "$plan_vip" "$plan_listeners"
@@ -165,6 +168,19 @@ common=(
   --expected-site mcn-ce-ha-aws-ap-northeast-1-01
   --expected-site mcn-ce-ha-aws-ap-northeast-1-02
   --expected-site mcn-ce-ha-aws-ap-northeast-1-03
+)
+bootstrap_common=(
+  --terraform-dir "$TF_DIR"
+  --plan-file "$PLAN_FILE"
+  --expected-aws-account 111122223333
+  --expected-aws-region ap-northeast-1
+  --expected-xc-tenant f5-sales-demo
+  --creator-id tester@example.com
+  --deployment-generation gen-01
+  --lifecycle-phase bootstrap
+  --expected-site mcn-ce-ha-aws-ap-northeast-1-01-bootstrap
+  --expected-site mcn-ce-ha-aws-ap-northeast-1-02-bootstrap
+  --expected-site mcn-ce-ha-aws-ap-northeast-1-03-bootstrap
 )
 
 fail() {
@@ -499,6 +515,18 @@ fi
 [ "$(jq -r .status "$evidence/summary.json")" = ready ] || fail "targeted bootstrap ready status not recorded"
 assert_sanitized "$evidence" "$output"
 echo "ok - targeted bootstrap accepts omitted apply-only plan outputs"
+
+evidence="${TMP_ROOT}/bootstrap-continuation"
+mkdir "$evidence"
+output="${TMP_ROOT}/bootstrap-continuation.out"
+if ! FAKE_BOOTSTRAP_CONTINUATION=true \
+  "$SCRIPT" --evidence-dir "$evidence" "${bootstrap_common[@]}" >"$output" 2>&1; then
+  cat "$output" >&2
+  fail "bootstrap continuation must accept three existing exact sites plus three tokens and three CE instances"
+fi
+[ "$(jq -r .status "$evidence/summary.json")" = ready ] || fail "bootstrap continuation ready status not recorded"
+assert_sanitized "$evidence" "$output"
+echo "ok - bootstrap continuation binds existing sites, tokens, and CE instances"
 
 evidence="${TMP_ROOT}/destroy"
 mkdir "$evidence"
