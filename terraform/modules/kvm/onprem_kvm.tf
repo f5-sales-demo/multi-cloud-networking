@@ -106,15 +106,21 @@ module "kvm_registration_mapping" {
   ce_nodes             = local.kvm_ce_nodes
 }
 
-data "xcsh_site_bgp_status" "kvm" {
+data "external" "kvm_bgp_observer" {
   count = var.enable_kvm && var.acceptance_phase == "configured" ? 1 : 0
 
-  namespace                = "system"
-  site                     = xcsh_securemesh_site_v2.onprem_kvm[0].name
-  expected_exported_routes = []
-  expected_peers           = local.kvm_expected_bgp_peers
-  timeout_seconds          = 1800
-  poll_interval_seconds    = 10
+  program = ["python3", "${path.module}/../../scripts/xc-kvm-bgp-observer.py"]
+  query = {
+    api_url                 = var.xc_api_url
+    namespace               = "system"
+    site_name               = xcsh_securemesh_site_v2.onprem_kvm[0].name
+    expected_node           = try(local.kvm_expected_bgp_peers["node_01_slo"].node, "")
+    expected_peer_address   = try(local.kvm_expected_bgp_peers["node_01_slo"].peer_address, "")
+    expected_imported_route = try(one(local.kvm_expected_bgp_peers["node_01_slo"].expected_imported_routes), "")
+    timeout_seconds         = "1800"
+    poll_interval_seconds   = "10"
+    observer_sha256         = filesha256("${path.module}/../../scripts/xc-kvm-bgp-observer.py")
+  }
 
   depends_on = [
     module.kvm_registration_mapping,
@@ -122,6 +128,19 @@ data "xcsh_site_bgp_status" "kvm" {
     xcsh_bgp.onprem_ebgp,
     docker_container.kvm_frr,
   ]
+
+  lifecycle {
+    postcondition {
+      condition = (
+        self.result.converged == "true" &&
+        self.result.registered_node == try(local.kvm_expected_bgp_peers["node_01_slo"].node, "") &&
+        self.result.peer_address == "10.100.0.2" &&
+        self.result.state == "Established" &&
+        self.result.imported_route == "198.51.100.0/24"
+      )
+      error_message = "KVM BGP requires the exact registered node, one Established 10.100.0.2 peer, and imported route 198.51.100.0/24."
+    }
+  }
 }
 
 # eBGP Peering configuration for On-Prem KVM Site

@@ -225,6 +225,15 @@ run "aws_site_and_resources" {
   }
 
   assert {
+    condition = alltrue([
+      for key, site in local.aws_sites :
+      site.hostname == format("%s-aws-%s", var.component, key) &&
+      length(format("ves-io-securemesh-site-v2-%s-network-%s-ens5-0", site.name, site.hostname)) <= 128
+    ])
+    error_message = "AWS CE hostnames must be compact and keep XC-generated child interface names within the 128-byte API limit."
+  }
+
+  assert {
     condition     = length(aws_vpc.workload) == 1 && length(aws_instance.workload) == 1 && length(aws_security_group.workload) == 1
     error_message = "AWS must plan a dedicated workload VPC and SSM client."
   }
