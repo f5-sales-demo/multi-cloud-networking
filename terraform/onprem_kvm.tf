@@ -22,6 +22,56 @@ resource "xcsh_securemesh_site_v2" "onprem_kvm" {
   no_s2s_connectivity_slo    = {}
   disable_url_categorization = {}
   disable_management_network = {}
+
+  # Match the non-AppStack SMSv2 Console defaults during first-boot software
+  # installation. Provider v9.5.1 does not expose software_settings.waf_signatures;
+  # every supported default from the Console-created KVM object is explicit here.
+  dns_ntp_config {
+    f5_dns_default = {}
+    f5_ntp_default = {}
+  }
+
+  local_vrf {
+    default_config     = {}
+    default_sli_config = {}
+  }
+
+  offline_survivability_mode {
+    no_offline_survivability_mode = {}
+  }
+
+  performance_enhancement_mode {
+    perf_mode_l7_enhanced {
+      jumbo_disabled = {}
+    }
+  }
+
+  re_select {
+    geo_proximity = {}
+  }
+
+  load_balancing {
+    vip_vrrp_mode = "VIP_VRRP_ENABLE"
+  }
+
+  software_settings {
+    os {
+      default_os_version = {}
+    }
+    sw {
+      default_sw_version = {}
+    }
+  }
+
+  upgrade_settings {
+    kubernetes_upgrade_drain {
+      enable_upgrade_drain {
+        drain_node_timeout               = 300
+        drain_max_unavailable_node_count = 1
+        disable_vega_upgrade_mode        = {}
+      }
+    }
+  }
 }
 
 # A KVM CE must never consume the generic tenant token. The issued JWT is

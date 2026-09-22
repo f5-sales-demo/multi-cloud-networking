@@ -113,6 +113,26 @@ run "kvm_frr_and_ce_identity_plan" {
     )
     error_message = "The one-node KVM site must disable HA so XC generates a one-node registration configuration."
   }
+
+  assert {
+    condition = try(
+      xcsh_securemesh_site_v2.onprem_kvm[0].dns_ntp_config.f5_dns_default != null &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].dns_ntp_config.f5_ntp_default != null &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].local_vrf.default_config != null &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].local_vrf.default_sli_config != null &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].performance_enhancement_mode.perf_mode_l7_enhanced.jumbo_disabled != null &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].offline_survivability_mode.no_offline_survivability_mode != null &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].re_select.geo_proximity != null &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].load_balancing.vip_vrrp_mode == "VIP_VRRP_ENABLE" &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].software_settings.os.default_os_version != null &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].software_settings.sw.default_sw_version != null &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].upgrade_settings.kubernetes_upgrade_drain.enable_upgrade_drain.drain_node_timeout == 300 &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].upgrade_settings.kubernetes_upgrade_drain.enable_upgrade_drain.drain_max_unavailable_node_count == 1 &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].upgrade_settings.kubernetes_upgrade_drain.enable_upgrade_drain.disable_vega_upgrade_mode != null,
+      false,
+    )
+    error_message = "KVM SMSv2 must declare the supported Console defaults used by a successful Secure Mesh installation."
+  }
 }
 
 run "kvm_disabled_skips_the_image_lookup_and_plans_no_kvm_resources" {
