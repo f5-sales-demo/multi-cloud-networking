@@ -26,6 +26,8 @@ require 'variable "aws_smsv2_device_mapping_file"' "$root/variables_aws.tf"
 require 'data "xcsh_site_registrations_by_site" "kvm"' "$root/onprem_kvm.tf"
 require 'resource "xcsh_registration_approval" "kvm"' "$root/onprem_kvm.tf"
 require 'data "external" "kvm_bgp_observer"' "$root/onprem_kvm.tf"
+reject 'hostname  = "onprem-ce-${each.key}"' "$root/onprem_kvm.tf"
+reject 'hostname  = "onprem-ce-${each.key}"' "$root/modules/kvm/onprem_kvm.tf"
 reject 'expected_exported_routes = []' "$root/onprem_kvm.tf"
 test -f "$root/scripts/xc-kvm-bgp-observer.py" || fail 'KVM BGP observer is missing'
 test -f "$repo_root/tests/test_xc_kvm_bgp_observer.py" || fail 'KVM BGP observer tests are missing'

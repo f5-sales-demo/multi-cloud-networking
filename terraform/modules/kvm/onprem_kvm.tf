@@ -54,8 +54,9 @@ resource "xcsh_token" "kvm" {
 data "xcsh_site_registration" "kvm" {
   for_each = local.kvm_enabled_nodes
 
+  # XC may append a runtime suffix to the cloud-init hostname. This site is
+  # single-node, so exact site scoping uniquely resolves its live registration.
   site_name = local.kvm_site_name
-  hostname  = "onprem-ce-${each.key}"
   namespace = "system"
 
 }
