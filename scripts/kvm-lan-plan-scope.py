@@ -14,7 +14,7 @@ from typing import Any
 
 SCHEMA_VERSION = "mcn.kvm-lan-preflight/v1"
 DOMAIN = 'libvirt_domain.ce_node["01"]'
-SITE = "xcsh_securemesh_site_v2.onprem_kvm[0]"
+INTERFACE = 'xcsh_network_interface.kvm_lan_sli["sli"]'
 APPLICATION = {
     "xcsh_virtual_site.kvm_lan[0]",
     "xcsh_origin_pool.kvm_lan[0]",
@@ -153,14 +153,55 @@ def validate_plan(document: object, stage: str) -> dict[str, Any]:
             )
         domain_action = "replace"
     else:
-        required = {SITE, *APPLICATION}
+        required = {INTERFACE, *APPLICATION}
         if set(changes) != required:
             raise ValueError(
-                "configured plan is missing required owned site/application actions or contains an action outside them"
+                "configured plan is missing the imported SLI/application actions or contains an action outside them"
             )
-        if changes[SITE] != ["update"]:
+        if changes[INTERFACE] != ["update"]:
             raise ValueError(
-                "configured plan must update the existing owned KVM site in place"
+                "configured plan must update only the imported owned KVM SLI interface"
+            )
+        interface_change = next(
+            change
+            for change in _items(document.get("resource_changes"))
+            if _mapping(change).get("address") == INTERFACE
+        )
+        import_id = (
+            _mapping(_mapping(interface_change).get("change"))
+            .get("importing", {})
+            .get("id")
+        )
+        resources = {
+            resource.get("address"): resource
+            for resource in _resources(
+                _mapping(_mapping(document.get("planned_values")).get("root_module"))
+            )
+        }
+        interface = _mapping(_mapping(resources.get(INTERFACE)).get("values"))
+        ethernet = _mapping(interface.get("ethernet_interface"))
+        observed = _mapping(_variable(document, "kvm_lan_observed_node"))
+        static_ip = _mapping(_mapping(ethernet.get("static_ip")).get("node_static_ip"))
+        expected_import_id = "system/" + str(interface.get("name", ""))
+        if import_id != expected_import_id or import_id == "system/":
+            raise ValueError(
+                "configured plan must import the exact system SLI interface before update"
+            )
+        if (
+            interface.get("namespace") != "system"
+            or interface.get("name") != observed.get("sli_interface_name")
+            or ethernet.get("device") != observed.get("sli_device")
+            or ethernet.get("node") != observed.get("hostname")
+            or ethernet.get("mtu") != lan.get("mtu")
+            or static_ip.get("ip_address") != lan.get("sli_cidr")
+            or ethernet.get("site_local_inside_network") is None
+            or ethernet.get("no_ipv6_address") is None
+            or ethernet.get("untagged") is None
+            or ethernet.get("not_primary") is None
+            or ethernet.get("dhcp_client") is not None
+        ):
+            raise ValueError(
+                "configured plan SLI import does not match the reviewed owned interface shape"
             )
         if any(changes[address] != ["create"] for address in APPLICATION):
             raise ValueError(
@@ -174,6 +215,7 @@ def validate_plan(document: object, stage: str) -> dict[str, Any]:
         "change_count": len(changes),
         "change_addresses": sorted(changes),
         "domain_action": domain_action,
+        "interface_import_id": import_id if stage == "configured" else None,
         "host_network": {
             "bridge": lan["bridge"],
             "uplink": lan["uplink"],

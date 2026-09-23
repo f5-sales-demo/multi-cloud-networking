@@ -9,46 +9,6 @@ resource "xcsh_securemesh_site_v2" "onprem_kvm" {
 
   kvm {
     not_managed {
-      dynamic "node_list" {
-        for_each = var.enable_kvm_lan && var.kvm_lan_configuration_phase == "configured" && var.kvm_lan != null && var.kvm_lan_observed_node != null ? [var.kvm_lan_observed_node] : []
-
-        content {
-          hostname = node_list.value.hostname
-          type     = "Control"
-
-          # XC requires the primary SLO in every node update, but rejects any
-          # attempt to alter its runtime-created identity. Preserve the exact
-          # registered shape: device-derived name, MTU 0, owned MAC, and DHCP.
-          interface_list {
-            name = node_list.value.slo_device
-            mtu  = 0
-            ethernet_interface {
-              device = node_list.value.slo_device
-              mac    = local.kvm_ce_nodes["01"].mac
-            }
-            network_option {
-              site_local_network = {}
-            }
-            dhcp_client = {}
-          }
-
-          interface_list {
-            name = node_list.value.sli_device
-            mtu  = var.kvm_lan.mtu
-            ethernet_interface {
-              device = node_list.value.sli_device
-              mac    = var.kvm_lan.sli_mac
-            }
-            network_option {
-              site_local_inside_network = {}
-            }
-            static_ip {
-              ip_address = var.kvm_lan.sli_cidr
-            }
-            no_ipv6_address = {}
-          }
-        }
-      }
     }
   }
 
@@ -241,12 +201,11 @@ data "external" "kvm_lan_network_interface" {
     resolver_sha256       = filesha256("${path.module}/scripts/xc-kvm-network-interface.py")
   }
 
-  depends_on = [xcsh_securemesh_site_v2.onprem_kvm, libvirt_domain.ce_node]
-
   lifecycle {
     postcondition {
       condition = (
         self.result.interface_name != "" &&
+        self.result.interface_name == var.kvm_lan_observed_node.sli_interface_name &&
         self.result.hostname == var.kvm_lan_observed_node.hostname &&
         self.result.device == var.kvm_lan_observed_node.sli_device &&
         lower(self.result.mac) == lower(var.kvm_lan.sli_mac) &&
@@ -255,6 +214,45 @@ data "external" "kvm_lan_network_interface" {
       error_message = "KVM LAN requires one live owned SLI interface matching the staged hostname, device, and Terraform-owned SLI MAC."
     }
   }
+}
+
+locals {
+  kvm_lan_sli_interfaces = local.kvm_lan_configured ? toset(["sli"]) : toset([])
+}
+
+# XC creates node interfaces as children of the registered site. The site API
+# rejects any post-registration node_list update that restates the immutable
+# primary SLO, so adopt only the resolved secondary child and update it in place.
+resource "xcsh_network_interface" "kvm_lan_sli" {
+  for_each = local.kvm_lan_sli_interfaces
+
+  name      = var.kvm_lan_observed_node.sli_interface_name
+  namespace = "system"
+
+  ethernet_interface {
+    device   = var.kvm_lan_observed_node.sli_device
+    node     = var.kvm_lan_observed_node.hostname
+    mtu      = var.kvm_lan.mtu
+    priority = 0
+
+    site_local_inside_network = {}
+    monitor_disabled          = {}
+    not_primary               = {}
+    no_ipv6_address           = {}
+    untagged                  = {}
+
+    static_ip {
+      node_static_ip {
+        ip_address = var.kvm_lan.sli_cidr
+      }
+    }
+  }
+}
+
+import {
+  for_each = local.kvm_lan_sli_interfaces
+  to       = xcsh_network_interface.kvm_lan_sli[each.key]
+  id       = "system/${var.kvm_lan_observed_node.sli_interface_name}"
 }
 
 # The provider convergence data source intentionally requires a nonempty

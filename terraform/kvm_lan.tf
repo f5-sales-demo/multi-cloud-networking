@@ -123,5 +123,5 @@ resource "xcsh_http_loadbalancer" "kvm_lan" {
   disable_api_definition = {}
   l7_ddos_protection {}
 
-  depends_on = [data.external.kvm_lan_network_interface]
+  depends_on = [xcsh_network_interface.kvm_lan_sli]
 }

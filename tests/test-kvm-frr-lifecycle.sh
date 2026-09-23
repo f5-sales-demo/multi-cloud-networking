@@ -131,19 +131,19 @@ require 'replace_triggered_by = [xcsh_securemesh_site_v2.onprem_kvm[0].id]' "$on
 reject_exact '    replace_triggered_by = [xcsh_securemesh_site_v2.onprem_kvm[0]]' "$onprem"
 require 'disable_ha                 = {}' "$onprem"
 reject 'enable_ha                  = {}' "$onprem"
-configured_node=$(sed -n '/dynamic "node_list"/,/^      }/p' "$onprem")
-grep -Fq 'site_local_inside_network = {}' <<<"$configured_node" ||
-  fail 'configured KVM node payload must declare the new SLI'
-grep -Fq 'site_local_network = {}' <<<"$configured_node" ||
-  fail 'configured KVM node payload must preserve the required primary SLO'
-grep -Fq 'name = node_list.value.slo_device' <<<"$configured_node" ||
-  fail 'configured KVM primary SLO name must equal its immutable runtime device'
-grep -Fq 'name = node_list.value.sli_device' <<<"$configured_node" ||
-  fail 'configured KVM SLI name must equal its runtime device'
-! grep -Fq 'name = node_list.value.slo_interface_name' <<<"$configured_node" ||
-  fail 'configured KVM node payload must not use the XC object name as the primary interface name'
-! grep -Fq 'name = node_list.value.sli_interface_name' <<<"$configured_node" ||
-  fail 'configured KVM node payload must not use the XC object name as the secondary interface name'
+reject 'dynamic "node_list"' "$onprem"
+require 'resource "xcsh_network_interface" "kvm_lan_sli"' "$onprem"
+require 'to       = xcsh_network_interface.kvm_lan_sli[each.key]' "$onprem"
+require 'id       = "system/${var.kvm_lan_observed_node.sli_interface_name}"' "$onprem"
+require 'name      = var.kvm_lan_observed_node.sli_interface_name' "$onprem"
+require 'device   = var.kvm_lan_observed_node.sli_device' "$onprem"
+require 'node     = var.kvm_lan_observed_node.hostname' "$onprem"
+require 'site_local_inside_network = {}' "$onprem"
+require 'no_ipv6_address           = {}' "$onprem"
+require 'untagged                  = {}' "$onprem"
+require 'not_primary               = {}' "$onprem"
+require 'ip_address = var.kvm_lan.sli_cidr' "$onprem"
+reject 'xcsh_network_interface.kvm_lan_slo' "$onprem"
 require 'docker_container.kvm_frr' "$onprem"
 require 'libvirt_domain.ce_node' "$onprem"
 require 'data "external" "kvm_network_interface"' "$onprem"
@@ -162,7 +162,8 @@ require 'role must be slo or sli' "$resolver"
 require 'hmac.compare_digest(expected_hash, actual_hash)' "$resolver"
 require 'mcn.kvm-lan-preflight/v1' "$plan_scope"
 require 'hardware plan must use KVM domain replacement' "$plan_scope"
-require 'configured plan is missing required owned site/application actions' "$plan_scope"
+require 'configured plan is missing the imported SLI/application actions' "$plan_scope"
+require 'configured plan must import the exact system SLI interface before update' "$plan_scope"
 require 'terraform -chdir="$TERRAFORM_DIR" show -json "$KVM_LAN_PLAN"' "$lifecycle"
 require 'hmac.compare_digest(' "$observer"
 require 'expected BGP peer state is' "$observer"
