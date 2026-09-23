@@ -50,6 +50,28 @@ data "external" "xc_env_tenant" {
   }
 }
 
+# KVM uses one explicitly allocated host network. Branch naming cannot make its
+# subnet, MACs, FRR identity, or host capacity safe to share. Reject a preview
+# before any mutation until a separately reviewed allocation contract exists.
+resource "terraform_data" "deployment_identity_guard" {
+  input = local.deployment_environment_key
+
+  lifecycle {
+    precondition {
+      condition     = local.deployment_is_production || !var.enable_kvm
+      error_message = "KVM previews are unsupported without a separately approved subnet, MAC, bridge, FRR, and capacity allocation; disable KVM or deploy exact refs/heads/main."
+    }
+    precondition {
+      condition     = length(local.deployment_environment_key) <= 32
+      error_message = "deployment environment key exceeds its 32-character contract."
+    }
+    precondition {
+      condition     = length(local.lb_domain) <= 253 && length(local.ca_lb_domain) <= 253 && length(local.aws_lb_domain) <= 253
+      error_message = "environment-scoped load-balancer domain exceeds the DNS limit."
+    }
+  }
+}
+
 # Azure Route Server requires eBGP multihop, but the immutable SMSv2 contract
 # currently supplies no schema-valid request control for it.  Keeping this
 # requirement in a data source validates it during planning, before Terraform
@@ -98,6 +120,7 @@ resource "xcsh_token" "ce" {
   name        = "${local.site_prefix}-registration"
   namespace   = "system"
   description = "MCN CE-HA registration token (tenant-scoped, reusable across CE sites)"
+  labels      = local.azure_xc_labels
 }
 
 # Pure expansion of ce_count into the per-CE node map (hostname, site_name,
@@ -231,6 +254,7 @@ module "xc_site" {
   sw_version           = var.ce_sw_version
   enable_bgp           = var.enable_bgp
   approve_registration = var.approve_registration
+  labels               = local.azure_xc_labels
 }
 
 # The Azure side of each eBGP session (Route Server -> CE eth0/SLO IP).
@@ -289,6 +313,7 @@ resource "xcsh_origin_pool" "this" {
   name        = local.origin_pool_name
   namespace   = data.xcsh_namespace.mcn.name
   description = "MCN reference origin pool -> ${var.origin_ip}:${var.origin_port}"
+  labels      = local.azure_xc_labels
 
   port = var.origin_port
 
@@ -323,8 +348,9 @@ resource "xcsh_http_loadbalancer" "this" {
   name        = local.lb_name
   namespace   = data.xcsh_namespace.mcn.name
   description = "BGP/ECMP HA: custom VIP ${var.vip} advertised from every CE site."
+  labels      = local.azure_xc_labels
 
-  domains = [var.lb_domain]
+  domains = [local.lb_domain]
 
   http {
     port = 80
@@ -489,6 +515,7 @@ module "xc_site_ca" {
   sw_version           = var.ce_sw_version
   enable_bgp           = var.enable_bgp
   approve_registration = var.approve_registration
+  labels               = local.ca_xc_labels
 }
 
 # Azure Route Server eBGP session for Canadian CEs.
@@ -523,6 +550,7 @@ resource "xcsh_virtual_site" "canada_re" {
   count     = var.enable_azure && var.enable_canada ? 1 : 0
   name      = local.ca_re_vsite_name
   namespace = data.xcsh_namespace.mcn.name
+  labels    = local.ca_xc_labels
 
   site_type = "REGIONAL_EDGE"
   site_selector {
@@ -534,6 +562,7 @@ resource "xcsh_virtual_site" "canada_ce" {
   count     = var.enable_azure && var.enable_canada ? 1 : 0
   name      = local.ca_ce_vsite_name
   namespace = data.xcsh_namespace.mcn.name
+  labels    = local.ca_xc_labels
 
   site_type = "CUSTOMER_EDGE"
   site_selector {
@@ -546,6 +575,7 @@ resource "xcsh_origin_pool" "canada" {
   name        = local.ca_origin_pool_name
   namespace   = data.xcsh_namespace.mcn.name
   description = "Canada reference origin pool -> ${var.origin_ip}:${var.origin_port}"
+  labels      = local.ca_xc_labels
 
   port = var.origin_port
 
@@ -568,8 +598,9 @@ resource "xcsh_http_loadbalancer" "canada" {
   name        = local.ca_lb_name
   namespace   = data.xcsh_namespace.mcn.name
   description = "Canada Regional HA: custom VIP ${var.ca_vip} advertised strictly via Canadian Regional Edges (Toronto and Montreal) and Canadian CEs."
+  labels      = local.ca_xc_labels
 
-  domains = [var.ca_lb_domain]
+  domains = [local.ca_lb_domain]
 
   http {
     port = 80

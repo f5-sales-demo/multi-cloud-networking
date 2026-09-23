@@ -2,6 +2,28 @@
 # Topology
 # ---------------------------------------------------------
 
+output "deployment_provenance" {
+  description = "Versioned, secret-free source and ownership identity for this Terraform state."
+  value = {
+    schema_version      = local.deployment_identity_schema
+    repository          = var.source_repository
+    repository_url      = "https://github.com/${var.source_repository}"
+    main_navigation_url = "https://github.com/${var.source_repository}/tree/main"
+    source_ref          = var.source_ref
+    source_ref_sha256   = local.source_ref_sha256
+    source_commit       = var.source_commit_sha
+    source_commit_url   = "https://github.com/${var.source_repository}/commit/${var.source_commit_sha}"
+    environment_key     = local.deployment_environment_key
+    production          = local.deployment_is_production
+    owner_id            = var.deployment_owner_id
+    actor_id            = var.deployment_actor_id
+    state_key           = local.showcase_backend_key
+    recovery_state_key  = local.recovery_backend_key
+    artifact_scope      = local.deployment_artifact_scope
+    lock_scope          = "${var.source_repository}:${local.deployment_environment_key}"
+  }
+}
+
 output "ce_nodes" {
   description = "Expanded per-CE node map (hostname, site_name, slo_ip, az, interface_name)."
   value       = module.ce_topology.ce_nodes
@@ -62,7 +84,7 @@ output "client_vm_name" {
 
 output "lb_domain" {
   description = "Domain the HTTP load balancer matches on. Requests to the VIP MUST send it as the Host header; without it the load balancer has no matching domain and answers 404."
-  value       = var.lb_domain
+  value       = local.lb_domain
 }
 
 output "origin_ip" {
@@ -196,7 +218,7 @@ output "vip" {
 
 output "ca_lb_domain" {
   description = "Domain served by the Canada HTTP load balancer."
-  value       = var.ca_lb_domain
+  value       = local.ca_lb_domain
 }
 
 output "ca_re_virtual_site_name" {
@@ -356,7 +378,7 @@ output "aws_ce_public_ips" {
 
 output "aws_lb_domain" {
   description = "Domain served by the AWS HTTP load balancer."
-  value       = var.aws_lb_domain
+  value       = local.aws_lb_domain
 }
 
 output "aws_loadbalancer_name" {

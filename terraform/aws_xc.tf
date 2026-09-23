@@ -258,7 +258,7 @@ resource "xcsh_http_loadbalancer" "aws" {
   count     = var.enable_aws ? 1 : 0
   name      = "${local.aws_resource_prefix}-aws-lb"
   namespace = data.xcsh_namespace.mcn.name
-  domains   = [var.aws_lb_domain]
+  domains   = [local.aws_lb_domain]
   labels    = local.xc_labels
 
   # Final-site names are intentionally derived from stable locals so the

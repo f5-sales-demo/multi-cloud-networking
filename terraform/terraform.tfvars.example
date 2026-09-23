@@ -1,12 +1,21 @@
 # Copy to terraform.tfvars and adjust. terraform.tfvars is gitignored.
 #
-# Only TWO variables have no default and must be supplied: origin_ip and
-# lb_domain. Everything else has a working default, and every OBJECT NAME derives
+# Seven variables have no default and must be supplied: the five reviewed source
+# identity values below plus origin_ip and lb_domain. Every OBJECT NAME derives
 # from var.component — so you get mcn-ce-ha-eastus01/02/03, mcn-ce-ha-f5se,
 # mcn-ce-ha-pool, mcn-ce-ha-rs, mcn-ce-ha-bastion and rg-mcn-ce-ha-<you> without
 # naming any of them here. Change component once and all of them follow.
 
 # --- REQUIRED: no defaults, deliberately ---
+# These values bind the state and every saved plan to reviewed source. Use the
+# exact checked-out branch and commit. Owner and actor are stable non-personal
+# identifiers, never names or email addresses.
+source_repository   = "f5-sales-demo/multi-cloud-networking"
+source_ref          = "refs/heads/main"
+source_commit_sha   = "<LOWERCASE_40_HEX_COMMIT>"
+deployment_owner_id = "showcase-team"
+deployment_actor_id = "terraform-cli"
+
 # origin_ip has no default because any default is one specific machine, and a
 # stale one silently sends this deployment's traffic to somebody else's host
 # instead of failing. lb_domain has none because the load balancer matches on

@@ -180,14 +180,22 @@ After the reviewed apply, generate both ignored backend configurations and migra
 bootstrap stack's local state programmatically:
 
 ```bash
-./scripts/configure-aws-state-backend.sh --profile '<AWS_SSO_PROFILE>'
+SOURCE_REF="$(git symbolic-ref --quiet HEAD)"
+SOURCE_COMMIT_SHA="$(git rev-parse HEAD)"
+./scripts/configure-aws-state-backend.sh \
+  --profile '<AWS_SSO_PROFILE>' \
+  --source-ref "$SOURCE_REF" \
+  --source-commit-sha "$SOURCE_COMMIT_SHA" \
+  --deployment-owner-id 'showcase-team' \
+  --deployment-actor-id 'terraform-cli'
 ```
 
 The script verifies that the selected AWS identity owns the KMS key, creates the
 bootstrap and showcase state-key configurations emitted by the module without credentials,
 and uses Terraform's supported `-force-copy` migration. Repeating the command verifies the
-existing remote metadata and reconfigures it idempotently. The showcase has no old state to
-migrate.
+existing remote metadata and reconfigures it idempotently. Production keeps the existing
+showcase key; a preview receives its deterministic environment-specific key before init.
+The showcase has no old state to migrate.
 
 ### AWS saved-plan sequence
 

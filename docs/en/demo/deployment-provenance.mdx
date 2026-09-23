@@ -1,0 +1,119 @@
+---
+title: Deployment provenance
+description: Understand source identity, protected metadata, isolated state, naming, and lifecycle boundaries for production and preview deployments.
+sidebar:
+  order: 25
+  label: Deployment provenance
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Every Terraform plan is bound to one canonical repository, an exact branch ref,
+an immutable commit, a non-personal owner identifier, and a non-personal automation
+actor identifier. The contract schema is `mcn.deployment-identity/v1`.
+
+Only `f5-sales-demo/multi-cloud-networking` at the exact ref `refs/heads/main` is
+production. Similar names such as `Main`, `prod`, or `production` are previews.
+`refs/pull/123/merge`, fork repositories, abbreviated refs, invalid commits, email
+addresses, and unsafe identifiers are rejected before Terraform initialization.
+
+## Environment identity
+
+Production retains its existing physical names, DNS inputs, and state keys. A
+preview key is a readable branch slug plus the first 12 hexadecimal characters of
+SHA-256 over `mcn.deployment-identity/v1`, NUL, repository, NUL, and full source ref.
+The key is at most 32 characters.
+
+`feature/a` and `feature-a` have the same readable slug but different hashes because
+the full refs differ. Unicode-only or otherwise empty slugs use `branch`; slash,
+underscore, case changes, long refs, and new commits remain deterministic. The commit
+is absent from environment identity, so advancing a branch updates provenance without
+creating another environment.
+
+```sh
+scripts/deployment-identity.py \
+  --repository f5-sales-demo/multi-cloud-networking \
+  --source-ref refs/heads/feature/a \
+  --source-commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  --owner-id showcase-team \
+  --actor-id github-actions
+```
+
+## Provenance schema and limits
+
+| Field | Meaning | Limit and validation |
+| --- | --- | --- |
+| `environment_key` | Stable production or preview identity | Maximum 32 lowercase ASCII characters; hash preserves full-ref distinctions |
+| `repository` | Canonical source owner and repository | Exact allowlisted value |
+| `source_ref` | Actual reviewed branch | Full valid `refs/heads/*`; retained in the Terraform output and state |
+| `source_ref_sha256` | Safe tag or label reference | 64 hex characters in cloud tags; first 32 in XC labels |
+| `source_commit` | Applied immutable revision | Lowercase 40-hex Git object ID |
+| `owner_id` | Stable team or service owner | Non-personal lowercase identifier, 3–63 characters |
+| `actor_id` | Applying automation identity | Non-personal lowercase identifier, 3–63 characters |
+| `state_key` | S3 state and native lock identity | Production remains unchanged; previews use `environments/<environment-key>/` |
+| `artifact_scope` | Private saved-plan and evidence directory | `production` or `preview/<environment-key>` |
+
+The `deployment_provenance` Terraform output also exposes repository, navigation and
+commit URLs, recovery-state key, production status, and lock scope. It contains no
+credentials or personal email. The `main` URL is navigation, never a claim that a
+feature deployment was applied from `main`.
+
+## Metadata ownership
+
+Terraform merges user tags first and protected standard tags last. Callers can add
+unrelated tags but cannot replace environment, repository, ref hash, source commit,
+owner, actor, or `managed_by`. XC labels retain generation, topology, and tenant
+selectors and add bounded provenance values.
+
+| Surface | Branch-owned | Shared or read-only | Provenance representation |
+| --- | --- | --- | --- |
+| S3 state and lock | Environment key and lock object | Bootstrap bucket, KMS key, logging, replication | Full output plus environment-specific key |
+| AWS and XC | Names, tags, sites, pools, load balancers, artifacts | Account, credentials, XC tenant and application namespace | Protected tags or labels plus output |
+| Azure and XC | Names, resource groups, sites, pools, load balancers | Subscription, credentials, XC tenant and application namespace | Protected tags or labels plus output |
+| DNS host values | Environment-prefixed LB hostnames | Parent DNS zones | Derived hostname; parent-zone records remain operator owned |
+| KVM | Production only | Host capacity, subnet, bridge, MAC/IP space, FRR and image cache | Preview mutation is rejected before planning |
+
+Not every provider object supports tags or labels. Terraform state and the canonical
+output map those exceptions. Metadata is evidence and never deletion authority.
+Provider-maintained creator fields are not overwritten.
+
+## Saved plans and lifecycle
+
+Run `configure-aws-state-backend.sh` with the same source ref, commit, owner, and actor
+used by `showcase-lifecycle.sh`. The backend key is selected before `terraform init`.
+The lifecycle verifies the checked-out branch and commit, checks existing state
+ownership, and stores plans only in the matching artifact scope. Each mode-`0600`
+receipt binds the exact plan digest to environment key, source commit, and backend
+key. A stale or cross-environment receipt is rejected.
+
+Production authorization belongs to protected credentials and review. A user-supplied
+name, tag, or branch called `production` cannot grant production authority. Validation
+workflows remain credential-free and never apply untrusted pull-request code.
+
+## Rename, retirement, and recreation
+
+A branch rename creates a different environment because the full ref changes. It does
+not inherit the old state or resources. Retire the old preview with its original ref,
+reviewed state, exact saved destroy plan, and ownership checks; then create the renamed
+preview as new. Branch deletion does not trigger automatic teardown. A recreated ref
+resolves to the same identity, so retained state must prove the same full ownership or
+be explicitly retired before reuse. Failed teardown retains state and evidence for
+reconciliation. Broad deletion by slug or tags is unsupported.
+
+## Unsupported and unverified cases
+
+KVM previews are unsupported until an operator supplies a separately reviewed host,
+subnet, bridge, MAC/IP, FRR, and capacity allocation. Naming alone cannot isolate the
+fixed production topology. Preview DNS records and certificates are not created by
+this root; derived hostnames require separately authorized parent-zone work. Forks,
+pull-request merge refs, cross-repository sources, manual post-apply tagging, state-key
+reuse, saved-plan reuse, and ownership transfer by renaming are unsupported.
+
+<Aside type="caution" title="Live acceptance is still required">
+Repository tests prove deterministic identity, protected precedence, name and state
+derivation, and fail-closed lifecycle checks. They do not prove two previews plus main
+can coexist, DNS and TLS traffic, provider readback, quotas, zero-drift reconciliation,
+or ownership-safe live teardown. Those tests require separate explicit authorization
+and approved allocations. Until that evidence exists, do not describe live branch
+isolation as accepted.
+</Aside>

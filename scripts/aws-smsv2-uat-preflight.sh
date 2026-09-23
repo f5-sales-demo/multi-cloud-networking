@@ -30,6 +30,11 @@ SCRATCH=""
 FAILOVER_STOPPED=false
 TRAFFIC_STARTED=false
 TRAFFIC_MARKER=""
+SOURCE_REPOSITORY=""
+SOURCE_REF=""
+SOURCE_COMMIT_SHA=""
+DEPLOYMENT_OWNER_ID=""
+DEPLOYMENT_ACTOR_ID=""
 
 usage() {
   cat <<'EOF'
@@ -46,6 +51,11 @@ Required options:
                           Exact immutable generation required by the saved plan.
   --component VALUE       Ownership component (default: mcn-ce-ha).
   --expected-site NAME       Repeat for the one-site or three-site stage being reviewed.
+  --source-repository NAME   Canonical source repository.
+  --source-ref REF           Exact reviewed branch ref.
+  --source-commit-sha SHA    Exact reviewed commit.
+  --deployment-owner-id ID   Non-personal deployment owner.
+  --deployment-actor-id ID   Non-personal automation actor.
 
 Optional:
   --terraform-dir PATH   Defaults to the dedicated AWS-only Terraform root.
@@ -172,6 +182,26 @@ while [ "$#" -gt 0 ]; do
     EXPECTED_SITES+=("${2:?}")
     shift 2
     ;;
+  --source-repository)
+    SOURCE_REPOSITORY=${2:?}
+    shift 2
+    ;;
+  --source-ref)
+    SOURCE_REF=${2:?}
+    shift 2
+    ;;
+  --source-commit-sha)
+    SOURCE_COMMIT_SHA=${2:?}
+    shift 2
+    ;;
+  --deployment-owner-id)
+    DEPLOYMENT_OWNER_ID=${2:?}
+    shift 2
+    ;;
+  --deployment-actor-id)
+    DEPLOYMENT_ACTOR_ID=${2:?}
+    shift 2
+    ;;
   --xc-context)
     XC_CONTEXT=${2:?}
     shift 2
@@ -196,7 +226,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-for value in EVIDENCE_DIR PLAN_FILE EXPECTED_AWS_ACCOUNT EXPECTED_AWS_REGION EXPECTED_XC_TENANT CREATOR_ID DEPLOYMENT_GENERATION COMPONENT; do
+for value in EVIDENCE_DIR PLAN_FILE EXPECTED_AWS_ACCOUNT EXPECTED_AWS_REGION EXPECTED_XC_TENANT CREATOR_ID DEPLOYMENT_GENERATION COMPONENT SOURCE_REPOSITORY SOURCE_REF SOURCE_COMMIT_SHA DEPLOYMENT_OWNER_ID DEPLOYMENT_ACTOR_ID; do
   [ -n "${!value}" ] || die "missing required preflight argument"
 done
 [[ "$PLAN_MODE" == apply || "$PLAN_MODE" == destroy ]] || die "plan mode must be apply or destroy"
@@ -622,7 +652,7 @@ tf() {
 }
 
 tf_plan() {
-  local -a tfvars_args=() phase_args=()
+  local -a tfvars_args=() phase_args=() identity_args=()
   if [ -n "$TFVARS" ]; then
     [ -r "$TFVARS" ] || return 1
     tfvars_args=(-var-file="$TFVARS")
@@ -635,7 +665,14 @@ tf_plan() {
   else
     phase_args+=(-var='enable_aws_tgw_connect=false')
   fi
-  tf plan "${tfvars_args[@]}" "${phase_args[@]}" "$@"
+  identity_args=(
+    -var="source_repository=$SOURCE_REPOSITORY"
+    -var="source_ref=$SOURCE_REF"
+    -var="source_commit_sha=$SOURCE_COMMIT_SHA"
+    -var="deployment_owner_id=$DEPLOYMENT_OWNER_ID"
+    -var="deployment_actor_id=$DEPLOYMENT_ACTOR_ID"
+  )
+  tf plan "${tfvars_args[@]}" "${identity_args[@]}" "${phase_args[@]}" "$@"
 }
 
 ssm_run() {

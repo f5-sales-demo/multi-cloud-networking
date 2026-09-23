@@ -21,6 +21,8 @@ on:
       - 'docs/llms-links.json'
       - 'tests/test-terraform-imports.sh'
       - 'tests/test-terraform-version-policy.sh'
+      - 'tests/test-deployment-provenance.sh'
+      - 'tests/test_deployment_identity.py'
       - 'tests/test-aws-smsv2-uat-preflight.sh'
       - 'tests/test-aws-smsv2-lifecycle-plan.sh'
       - 'tests/test-generate-aws-smsv2-device-mapping.sh'
@@ -35,6 +37,8 @@ on:
       - 'tests/test-configure-aws-state-backend.sh'
       - 'tests/test-terraform-with-aws-sso.sh'
       - 'scripts/configure-aws-state-backend.sh'
+      - 'scripts/deployment-identity.py'
+      - 'scripts/showcase-lifecycle.sh'
       - 'scripts/terraform-with-aws-sso.sh'
       - 'scripts/aws-smsv2-uat-preflight.sh'
       - 'scripts/aws-smsv2-lifecycle-plan.sh'
@@ -52,6 +56,8 @@ on:
       - 'docs/llms-links.json'
       - 'tests/test-terraform-imports.sh'
       - 'tests/test-terraform-version-policy.sh'
+      - 'tests/test-deployment-provenance.sh'
+      - 'tests/test_deployment_identity.py'
       - 'tests/test-aws-smsv2-uat-preflight.sh'
       - 'tests/test-aws-smsv2-lifecycle-plan.sh'
       - 'tests/test-generate-aws-smsv2-device-mapping.sh'
@@ -66,6 +72,8 @@ on:
       - 'tests/test-configure-aws-state-backend.sh'
       - 'tests/test-terraform-with-aws-sso.sh'
       - 'scripts/configure-aws-state-backend.sh'
+      - 'scripts/deployment-identity.py'
+      - 'scripts/showcase-lifecycle.sh'
       - 'scripts/terraform-with-aws-sso.sh'
       - 'scripts/aws-smsv2-uat-preflight.sh'
       - 'scripts/aws-smsv2-lifecycle-plan.sh'
@@ -83,6 +91,13 @@ concurrency:
 
 env:
   TF_IN_AUTOMATION: 'true'
+  TF_VAR_source_repository: f5-sales-demo/multi-cloud-networking
+  # The general Terraform suite asserts stable production names. Dedicated
+  # deployment_provenance tests exercise preview refs explicitly.
+  TF_VAR_source_ref: refs/heads/main
+  TF_VAR_source_commit_sha: ${{ github.event.pull_request.head.sha || github.sha }}
+  TF_VAR_deployment_owner_id: showcase-team
+  TF_VAR_deployment_actor_id: github-actions
 
 jobs:
   validate:
@@ -104,6 +119,14 @@ jobs:
       - name: Terraform provider version policy
         working-directory: .
         run: bash tests/test-terraform-version-policy.sh
+
+      - name: Deployment identity unit tests
+        working-directory: .
+        run: python3 -m unittest tests/test_deployment_identity.py
+
+      - name: Deployment provenance and isolation contract
+        working-directory: .
+        run: bash tests/test-deployment-provenance.sh
 
       - name: AWS SMSv2 UAT preflight unit tests
         working-directory: .

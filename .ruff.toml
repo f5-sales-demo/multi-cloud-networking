@@ -113,6 +113,11 @@ ignore = [
     "PT009",
     "PT027",
 ]
+"tests/test_deployment_identity.py" = [
+    "INP001",
+    "PT009",
+    "PT027",
+]
 "tests/test_xc_kvm_network_interface.py" = [
     "INP001",
     "PT009",

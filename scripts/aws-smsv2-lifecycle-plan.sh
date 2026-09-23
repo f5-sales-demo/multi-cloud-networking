@@ -17,6 +17,13 @@ CONFIGURED_TGW=true
 CLEANUP_PRIVATE_INPUTS=false
 PREFLIGHT_ARGS=()
 EXPECTED_AWS_REGION=""
+SOURCE_REPOSITORY=""
+SOURCE_REF=""
+SOURCE_COMMIT_SHA=""
+DEPLOYMENT_OWNER_ID=""
+DEPLOYMENT_ACTOR_ID=""
+DEPLOYMENT_ENVIRONMENT_KEY=""
+BACKEND_KEY=""
 
 usage() {
   cat <<'EOF'
@@ -24,6 +31,8 @@ Usage: aws-smsv2-lifecycle-plan.sh --phase bootstrap|bootstrap_retirement|config
   --plan-file PRIVATE_PATH --evidence-dir EMPTY_PRIVATE_DIRECTORY --tfvars PRIVATE_TFVARS \
   --expected-aws-account ID --expected-aws-region REGION --expected-xc-tenant NAME \
   --creator-id EMAIL --deployment-generation VALUE --expected-site NAME [--expected-site NAME ...] \
+  --source-repository NAME --source-ref REF --source-commit-sha SHA \
+  --deployment-owner-id ID --deployment-actor-id ID --deployment-environment-key KEY --backend-key KEY \
   [--mapping-file PRIVATE_PATH --registration-projection PRIVATE_PATH --eni-projection PRIVATE_PATH] \
   [--configured-tgw true|false] [--cleanup-private-inputs] [--apply]
 
@@ -89,6 +98,34 @@ while [ "$#" -gt 0 ]; do
     PREFLIGHT_ARGS+=("$1" "${2:?}")
     shift 2
     ;;
+  --source-repository)
+    SOURCE_REPOSITORY=${2:?}
+    shift 2
+    ;;
+  --source-ref)
+    SOURCE_REF=${2:?}
+    shift 2
+    ;;
+  --source-commit-sha)
+    SOURCE_COMMIT_SHA=${2:?}
+    shift 2
+    ;;
+  --deployment-owner-id)
+    DEPLOYMENT_OWNER_ID=${2:?}
+    shift 2
+    ;;
+  --deployment-actor-id)
+    DEPLOYMENT_ACTOR_ID=${2:?}
+    shift 2
+    ;;
+  --deployment-environment-key)
+    DEPLOYMENT_ENVIRONMENT_KEY=${2:?}
+    shift 2
+    ;;
+  --backend-key)
+    BACKEND_KEY=${2:?}
+    shift 2
+    ;;
   -h | --help)
     usage
     exit 0
@@ -105,6 +142,20 @@ case "$CONFIGURED_TGW" in true | false) ;; *) die "--configured-tgw must be true
 [ -n "$EVIDENCE_DIR" ] || die "--evidence-dir is required"
 [ -n "$TFVARS" ] || die "--tfvars is required"
 [ -n "$EXPECTED_AWS_REGION" ] || die "--expected-aws-region is required"
+[ -n "$SOURCE_REPOSITORY" ] || die "--source-repository is required"
+[ -n "$SOURCE_REF" ] || die "--source-ref is required"
+[ -n "$SOURCE_COMMIT_SHA" ] || die "--source-commit-sha is required"
+[ -n "$DEPLOYMENT_OWNER_ID" ] || die "--deployment-owner-id is required"
+[ -n "$DEPLOYMENT_ACTOR_ID" ] || die "--deployment-actor-id is required"
+[ -n "$DEPLOYMENT_ENVIRONMENT_KEY" ] || die "--deployment-environment-key is required"
+[ -n "$BACKEND_KEY" ] || die "--backend-key is required"
+PREFLIGHT_ARGS+=(
+  --source-repository "$SOURCE_REPOSITORY"
+  --source-ref "$SOURCE_REF"
+  --source-commit-sha "$SOURCE_COMMIT_SHA"
+  --deployment-owner-id "$DEPLOYMENT_OWNER_ID"
+  --deployment-actor-id "$DEPLOYMENT_ACTOR_ID"
+)
 [ -f "$TFVARS" ] || die "--tfvars is not readable"
 [ -d "$EVIDENCE_DIR" ] || die "--evidence-dir must already exist"
 
@@ -141,6 +192,13 @@ else
 fi
 
 TF_RUNNER=("$REPO_ROOT/scripts/terraform-with-aws-sso.sh" --profile sso --region "$EXPECTED_AWS_REGION")
+TF_IDENTITY_ARGS=(
+  -var="source_repository=$SOURCE_REPOSITORY"
+  -var="source_ref=$SOURCE_REF"
+  -var="source_commit_sha=$SOURCE_COMMIT_SHA"
+  -var="deployment_owner_id=$DEPLOYMENT_OWNER_ID"
+  -var="deployment_actor_id=$DEPLOYMENT_ACTOR_ID"
+)
 PLAN_MODE=apply
 TF_PHASE_ARGS=(-var="aws_site_configuration_phase=$PHASE")
 if [ "$PHASE" = configured ]; then
@@ -152,9 +210,13 @@ if [ "$PHASE" = bootstrap_retirement ]; then PLAN_MODE=destroy; fi
 
 if [ "$APPLY" = true ]; then
   PLAN_SHA256="sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')"
-  jq -e --arg phase "$PHASE" --arg plan_sha256 "$PLAN_SHA256" '
-    .phase == $phase and .plan_sha256 == $plan_sha256' "$EVIDENCE_DIR/plan-receipt.json" >/dev/null ||
-    die "saved plan receipt does not match the requested phase and digest"
+  jq -e --arg phase "$PHASE" --arg plan_sha256 "$PLAN_SHA256" \
+    --arg environment_key "$DEPLOYMENT_ENVIRONMENT_KEY" --arg source_commit "$SOURCE_COMMIT_SHA" \
+    --arg backend_key "$BACKEND_KEY" '
+    .phase == $phase and .plan_sha256 == $plan_sha256 and
+    .environment_key == $environment_key and .source_commit == $source_commit and
+    .backend_key == $backend_key' "$EVIDENCE_DIR/plan-receipt.json" >/dev/null ||
+    die "cross-environment or stale saved plan receipt rejected"
   jq -e '.status == "ready" and .reason == "preflight_passed"' "$EVIDENCE_DIR/summary.json" >/dev/null ||
     die "saved plan does not have a ready preflight receipt"
   "${TF_RUNNER[@]}" -- -chdir="$TERRAFORM_DIR" apply -input=false -no-color "$PLAN_FILE"
@@ -179,7 +241,7 @@ fi
 mkdir -p "$(dirname "$PLAN_FILE")"
 umask 077
 "${TF_RUNNER[@]}" -- -chdir="$TERRAFORM_DIR" plan -input=false -no-color -var-file="$TFVARS" \
-  "${TF_PHASE_ARGS[@]}" -out="$PLAN_FILE"
+  "${TF_IDENTITY_ARGS[@]}" "${TF_PHASE_ARGS[@]}" -out="$PLAN_FILE"
 
 PLAN_SHA256="sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')"
 PREFLIGHT_INPUT_ARGS=(--tfvars "$TFVARS")
@@ -193,7 +255,10 @@ fi
 
 [ "$PLAN_SHA256" = "sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')" ] || die "saved plan changed during review"
 jq -n --arg phase "$PHASE" --arg plan_sha256 "$PLAN_SHA256" \
-  '{phase:$phase, plan_sha256:$plan_sha256}' >"$EVIDENCE_DIR/plan-receipt.json"
+  --arg environment_key "$DEPLOYMENT_ENVIRONMENT_KEY" --arg source_commit "$SOURCE_COMMIT_SHA" \
+  --arg backend_key "$BACKEND_KEY" \
+  '{phase:$phase,plan_sha256:$plan_sha256,environment_key:$environment_key,source_commit:$source_commit,backend_key:$backend_key}' \
+  >"$EVIDENCE_DIR/plan-receipt.json"
 chmod 600 "$EVIDENCE_DIR/plan-receipt.json"
 
 exit 0

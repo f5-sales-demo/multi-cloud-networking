@@ -18,6 +18,7 @@ mkdir -p "$work/repo/scripts" "$work/repo/terraform/bootstrap/state-backend/.ter
   "$work/repo/terraform" "$work/repo/terraform/recovery/aws-smsv2-orphans" "$work/bin"
 cp "$source_script" "$work/repo/scripts/"
 cp "$source_wrapper" "$work/repo/scripts/"
+cp "$repo_root/scripts/deployment-identity.py" "$work/repo/scripts/"
 
 cat >"$work/source-config" <<'CONFIG'
 [profile default]
@@ -82,7 +83,23 @@ run_configure() {
     BACKEND_TEST_FAILED_MARKER="$work/failed-once" \
     PATH="$work/bin:$PATH" \
     AWS_CONFIG_FILE="$work/source-config" \
-    "$work/repo/scripts/configure-aws-state-backend.sh" --profile default
+    "$work/repo/scripts/configure-aws-state-backend.sh" --profile default \
+    --source-ref refs/heads/main \
+    --source-commit-sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+    --deployment-owner-id showcase-team \
+    --deployment-actor-id github-actions
+}
+
+run_configure_preview() {
+  BACKEND_TEST_CALLS="$work/calls" \
+    BACKEND_TEST_FAILED_MARKER="$work/failed-once" \
+    PATH="$work/bin:$PATH" \
+    AWS_CONFIG_FILE="$work/source-config" \
+    "$work/repo/scripts/configure-aws-state-backend.sh" --profile default \
+    --source-ref refs/heads/feature/a \
+    --source-commit-sha bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+    --deployment-owner-id showcase-team \
+    --deployment-actor-id github-actions
 }
 
 if BACKEND_TEST_FAIL_ONCE=1 run_configure >/dev/null 2>&1; then
@@ -108,5 +125,14 @@ grep -Fq 'init -force-copy -input=false -backend-config=backend.hcl' "$work/call
 
 run_configure
 grep -Fq 'init -reconfigure -input=false -backend-config=backend.hcl' "$work/calls" || fail "remote state was not reconfigured idempotently"
+
+run_configure_preview
+preview_key=$("$work/repo/scripts/deployment-identity.py" \
+  --repository f5-sales-demo/multi-cloud-networking \
+  --source-ref refs/heads/feature/a \
+  --source-commit bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  --owner-id showcase-team --actor-id github-actions | jq -r .stateKey)
+grep -Fq "key          = \"$preview_key\"" "$aws_hcl" || fail "preview showcase key is not isolated"
+grep -Fq "/environments/" "$recovery_hcl" || fail "preview recovery key is not isolated"
 
 printf 'PASS: AWS backend files and bootstrap-state migration are generated deterministically\n'
