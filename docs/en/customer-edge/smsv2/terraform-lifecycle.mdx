@@ -106,18 +106,19 @@ realize an added NIC through its domain Update path:
    IPv4 and IPv6 users, switch multi-MAC/anti-spoof approval, duplicate-address
    checks, reserved VIP, real HTTP origin owner, local DNS name, and access scope.
 2. Set `enable_kvm_lan = true`, set `kvm_lan_configuration_phase = "hardware"`,
-   and supply the complete `kvm_lan` object. Leave `kvm_lan_observed_node = null`.
+   and supply the complete `kvm_lan` object.
 3. Create a full-root saved plan with
    `-replace='libvirt_domain.ce_node["01"]'`. Do not use `-target`. The plan must
    replace only the owned CE domain, keep SLO first, and create the bridged SLI
    second. Review its SHA-256 with `showcase-lifecycle.sh --mode kvm-lan-preflight`.
 4. Apply that reviewed plan through the normal saved-plan path. After the rebuilt
-   CE registers, correlate both devices to the Terraform-owned MACs. Do not guess
-   `ethX` or reuse a prior registration suffix.
-5. Set `kvm_lan_configuration_phase = "configured"` and supply the exact staged
-   hostname, devices, and interface names in `kvm_lan_observed_node`. Review a
-   second full-root plan. It may update only the owned site and create the owned
-   KVM LAN virtual site, origin pool, and HTTP load balancer.
+   CE registers, the xcsh provider correlates both devices to the current Site UID,
+   live registration, and Terraform-owned MACs. Do not guess `ethX` or reuse a
+   prior registration suffix.
+5. Set `kvm_lan_configuration_phase = "configured"` and review a second full-root
+   plan. It may adopt and update only the exact owned runtime SLI child, and create
+   the owned KVM LAN virtual site, origin pool, and HTTP load balancer. The primary
+   SLO remains platform-owned and read-only.
 6. Apply the reviewed plan, then prove the CE is online, the original single BGP
    peer remains established, exactly one SLO and one SLI exist, and an independent
    LAN client reaches the real origin through the inside custom VIP on port 80.
@@ -129,7 +130,8 @@ already match the host. It exits before credential loading, service enablement,
 Terraform initialization, or apply/destroy. Receipts are written mode `0600`
 outside the repository. It does not prove the switch VLAN, IP reservation, local
 DNS, origin service, ARP/neighbor behavior, return route, or client traffic; those
-remain mandatory live acceptance evidence.
+remain mandatory live acceptance evidence. Runtime interface names, hostnames,
+and devices are provider outputs rather than operator-supplied inputs.
 
 Disabling the feature removes only Terraform-owned XC application objects and
 the CE's declared SLI topology. The shared bridge, uplink, physical LAN, local DNS,

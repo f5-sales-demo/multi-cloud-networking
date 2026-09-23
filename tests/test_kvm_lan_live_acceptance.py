@@ -24,7 +24,7 @@ def config():
         },
         "plan": {
             "sha256": "sha256:" + "b" * 64,
-            "preflight_schema": "mcn.kvm-lan-preflight/v1",
+            "preflight_schema": "mcn.kvm-lan-preflight/v2",
             "preflight_bound": True,
         },
         "host": {
@@ -76,7 +76,7 @@ def observations():
         },
         "plan": {
             "sha256": "sha256:" + "b" * 64,
-            "preflight_schema": "mcn.kvm-lan-preflight/v1",
+            "preflight_schema": "mcn.kvm-lan-preflight/v2",
             "preflight_bound": True,
         },
         "host": {

@@ -5,10 +5,8 @@ action "xcsh_site_upgrade_sw" "aws" {
   for_each = local.aws_sites
 
   config {
-    name      = each.value.name
-    namespace = "system"
-    version   = var.aws_software_version
-    force     = false
+    site             = each.value.name
+    software_version = var.aws_software_version
   }
 }
 
@@ -16,10 +14,8 @@ action "xcsh_site_upgrade_os" "aws" {
   for_each = local.aws_sites
 
   config {
-    name      = each.value.name
-    namespace = "system"
-    version   = var.aws_os_version
-    force     = false
+    site       = each.value.name
+    os_version = var.aws_os_version
   }
 }
 
@@ -29,7 +25,6 @@ data "xcsh_site_upgrade_status" "aws" {
     if var.aws_site_configuration_phase == "configured" && contains(var.aws_upgrade_observed_sites, key)
   }
 
-  namespace                 = "system"
   site                      = xcsh_securemesh_site_v2.aws[each.key].name
   expected_software_version = var.aws_software_version
   expected_os_version       = var.aws_os_version

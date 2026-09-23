@@ -107,6 +107,18 @@ module "kvm_registration_mapping" {
   ce_nodes             = local.kvm_ce_nodes
 }
 
+data "xcsh_smsv2_kvm_runtime" "kvm_slo" {
+  count = var.enable_kvm ? 1 : 0
+
+  namespace             = "system"
+  site                  = local.kvm_site_name
+  expected_mac          = local.kvm_ce_nodes["01"].mac
+  timeout_seconds       = 7200
+  poll_interval_seconds = 10
+
+  depends_on = [libvirt_domain.ce_node]
+}
+
 data "external" "kvm_bgp_observer" {
   count = var.enable_kvm && var.acceptance_phase == "configured" ? 1 : 0
 
@@ -178,7 +190,7 @@ resource "xcsh_bgp" "onprem_ebgp" {
       port    = 179
 
       interface {
-        name      = "eth0"
+        name      = data.xcsh_smsv2_kvm_runtime.kvm_slo[0].interface_name
         namespace = "system"
       }
 
@@ -195,6 +207,7 @@ resource "xcsh_bgp" "onprem_ebgp" {
   # Do not redirect the F5-side peer until both the Terraform-owned router and
   # the CE interfaces with the declared static identities are ready.
   depends_on = [
+    data.xcsh_smsv2_kvm_runtime.kvm_slo,
     docker_container.kvm_frr,
     libvirt_domain.ce_node,
   ]

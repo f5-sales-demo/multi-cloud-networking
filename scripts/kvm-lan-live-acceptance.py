@@ -145,7 +145,7 @@ def _validate_config(document: object) -> dict[str, Any]:
         raise ValueError("source.commit_sha is malformed")
     if not SHA256.fullmatch(_text(plan.get("sha256"))):
         raise ValueError("plan.sha256 is malformed")
-    if plan.get("preflight_schema") != "mcn.kvm-lan-preflight/v1":
+    if plan.get("preflight_schema") != "mcn.kvm-lan-preflight/v2":
         raise ValueError("plan.preflight_schema is unsupported")
     required_host_text = (
         "bridge",

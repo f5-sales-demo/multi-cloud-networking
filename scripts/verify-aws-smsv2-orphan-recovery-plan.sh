@@ -5,7 +5,7 @@ PLAN_JSON=""
 MANIFEST=""
 RECEIPT=""
 MODE=""
-PATCHED_PROVIDER_VERSION="9.5.1"
+PATCHED_PROVIDER_VERSION="10.1.0"
 
 usage() {
   printf '%s\n' \
