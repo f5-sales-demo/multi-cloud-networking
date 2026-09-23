@@ -98,8 +98,12 @@ run "kvm_frr_and_ce_identity_plan" {
   }
 
   assert {
-    condition     = length(data.external.kvm_network_interface) == 1
-    error_message = "KVM BGP must have exactly one deferred live XC network_interface discovery."
+    condition = (
+      length(data.xcsh_smsv2_kvm_runtime.kvm_slo) == 1 &&
+      data.xcsh_smsv2_kvm_runtime.kvm_slo[0].site == local.kvm_site_name &&
+      data.xcsh_smsv2_kvm_runtime.kvm_slo[0].expected_mac == local.kvm_ce_nodes["01"].mac
+    )
+    error_message = "KVM BGP must use exactly one provider-owned runtime SLO lookup keyed by site and MAC."
   }
 
   assert {

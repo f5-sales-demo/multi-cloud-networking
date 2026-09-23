@@ -3,7 +3,7 @@
 # destroyed by this root.
 locals {
   kvm_lan_enabled    = var.enable_kvm && var.enable_kvm_lan && var.kvm_lan != null
-  kvm_lan_configured = local.kvm_lan_enabled && var.kvm_lan_configuration_phase == "configured" && var.kvm_lan_observed_node != null
+  kvm_lan_configured = local.kvm_lan_enabled && var.kvm_lan_configuration_phase == "configured"
   kvm_lan_name_stem  = "${substr(local.kvm_site_name, 0, 43)}-${substr(sha256(local.kvm_site_name), 0, 8)}"
 }
 
@@ -28,14 +28,13 @@ check "kvm_lan_prerequisites" {
   }
 }
 
-check "kvm_lan_observed_mapping" {
+check "kvm_lan_phase_contract" {
   assert {
     condition = (
-      (!var.enable_kvm_lan && var.kvm_lan_configuration_phase == "disabled" && var.kvm_lan == null && var.kvm_lan_observed_node == null) ||
-      (var.enable_kvm_lan && var.kvm_lan_configuration_phase == "hardware" && var.kvm_lan_observed_node == null) ||
-      (var.enable_kvm_lan && var.kvm_lan_configuration_phase == "configured" && var.kvm_lan_observed_node != null)
+      (!var.enable_kvm_lan && var.kvm_lan_configuration_phase == "disabled" && var.kvm_lan == null) ||
+      (var.enable_kvm_lan && contains(["hardware", "configured"], var.kvm_lan_configuration_phase) && var.kvm_lan != null)
     )
-    error_message = "KVM LAN phase must be disabled with no observed mapping, hardware with no guessed mapping, or configured with exact staged node/device evidence."
+    error_message = "KVM LAN phase must be disabled without a LAN contract, or enabled in hardware/configured phase with the complete LAN contract. Runtime identity is provider-owned and never supplied as an input."
   }
 }
 
@@ -123,5 +122,5 @@ resource "xcsh_http_loadbalancer" "kvm_lan" {
   disable_api_definition = {}
   l7_ddos_protection {}
 
-  depends_on = [xcsh_network_interface.kvm_lan_sli]
+  depends_on = [xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli]
 }

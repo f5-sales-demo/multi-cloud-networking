@@ -25,7 +25,7 @@ resource "xcsh_securemesh_site_v2" "onprem_kvm" {
   disable_management_network = {}
 
   # Match the non-AppStack SMSv2 Console defaults during first-boot software
-  # installation. Provider v9.5.1 does not expose software_settings.waf_signatures;
+  # installation. Provider v10.1.0 does not expose software_settings.waf_signatures;
   # every supported default from the Console-created KVM object is explicit here.
   dns_ntp_config {
     f5_dns_default = {}
@@ -149,69 +149,31 @@ module "kvm_registration_mapping" {
   ce_nodes             = local.kvm_ce_nodes
 }
 
-# XC assigns a fresh node suffix and network_interface object name on every CE
-# registration. Resolve that object from live ownership plus the exact observed
-# KVM MAC; neither the Linux device name nor the XC object name is guessed.
-data "external" "kvm_network_interface" {
+# Resolve the platform-owned primary interface from the current Site UID, live
+# KVM registration, and Terraform-owned MAC. Names and guest devices are always
+# observed from XC rather than derived from hostname conventions.
+data "xcsh_smsv2_kvm_runtime" "kvm_slo" {
   count = var.enable_kvm ? 1 : 0
 
-  program = ["python3", "${path.module}/scripts/xc-kvm-network-interface.py"]
-  query = {
-    api_url               = local.xc_api_url
-    namespace             = "system"
-    site_name             = xcsh_securemesh_site_v2.onprem_kvm[0].name
-    expected_mac          = local.kvm_ce_nodes["01"].mac
-    role                  = "slo"
-    timeout_seconds       = "7200"
-    poll_interval_seconds = "10"
-    resolver_sha256       = filesha256("${path.module}/scripts/xc-kvm-network-interface.py")
-  }
+  namespace             = "system"
+  site                  = local.kvm_site_name
+  expected_mac          = local.kvm_ce_nodes["01"].mac
+  timeout_seconds       = 7200
+  poll_interval_seconds = 10
 
   depends_on = [libvirt_domain.ce_node]
 
   lifecycle {
     postcondition {
       condition = (
-        self.result.interface_name != "" &&
-        self.result.hostname != "" &&
-        self.result.device != "" &&
-        lower(self.result.mac) == lower(local.kvm_ce_nodes["01"].mac)
-        && self.result.role == "slo"
+        self.interface_name != "" &&
+        self.hostname != "" &&
+        self.device != "" &&
+        lower(self.mac) == lower(local.kvm_ce_nodes["01"].mac) &&
+        self.online &&
+        self.registration_state == "ONLINE"
       )
-      error_message = "KVM BGP requires one live XC network_interface correlated by current site ownership, observed registration hostname/device, and the Terraform-owned CE MAC."
-    }
-  }
-}
-
-# Post-configuration proof is deliberately separate from the staged hardware
-# mapping input. Depending on an SLI runtime object before declaring SLI would
-# create a bootstrap cycle and encourage guessed guest device names.
-data "external" "kvm_lan_network_interface" {
-  count = var.enable_kvm_lan && var.kvm_lan_configuration_phase == "configured" && var.kvm_lan != null && var.kvm_lan_observed_node != null ? 1 : 0
-
-  program = ["python3", "${path.module}/scripts/xc-kvm-network-interface.py"]
-  query = {
-    api_url               = local.xc_api_url
-    namespace             = "system"
-    site_name             = xcsh_securemesh_site_v2.onprem_kvm[0].name
-    expected_mac          = var.kvm_lan.sli_mac
-    role                  = "sli"
-    timeout_seconds       = "7200"
-    poll_interval_seconds = "10"
-    resolver_sha256       = filesha256("${path.module}/scripts/xc-kvm-network-interface.py")
-  }
-
-  lifecycle {
-    postcondition {
-      condition = (
-        self.result.interface_name != "" &&
-        self.result.interface_name == var.kvm_lan_observed_node.sli_interface_name &&
-        self.result.hostname == var.kvm_lan_observed_node.hostname &&
-        self.result.device == var.kvm_lan_observed_node.sli_device &&
-        lower(self.result.mac) == lower(var.kvm_lan.sli_mac) &&
-        self.result.role == "sli"
-      )
-      error_message = "KVM LAN requires one live owned SLI interface matching the staged hostname, device, and Terraform-owned SLI MAC."
+      error_message = "KVM BGP requires one ONLINE XC runtime SLO correlated by current site ownership, live registration hostname/device, and the Terraform-owned CE MAC."
     }
   }
 }
@@ -222,37 +184,18 @@ locals {
 
 # XC creates node interfaces as children of the registered site. The site API
 # rejects any post-registration node_list update that restates the immutable
-# primary SLO, so adopt only the resolved secondary child and update it in place.
-resource "xcsh_network_interface" "kvm_lan_sli" {
+# primary SLO. The KVM-specific provider resource adopts only the exact owned
+# secondary child, reconciles ambiguous PUT outcomes, and restores DHCP on
+# destroy without deleting the platform-owned child.
+resource "xcsh_smsv2_kvm_runtime_interface" "kvm_lan_sli" {
   for_each = local.kvm_lan_sli_interfaces
 
-  name      = var.kvm_lan_observed_node.sli_interface_name
-  namespace = "system"
+  namespace    = "system"
+  site         = local.kvm_site_name
+  expected_mac = var.kvm_lan.sli_mac
+  ipv4_cidr    = var.kvm_lan.sli_cidr
 
-  ethernet_interface {
-    device   = var.kvm_lan_observed_node.sli_device
-    node     = var.kvm_lan_observed_node.hostname
-    mtu      = var.kvm_lan.mtu
-    priority = 0
-
-    site_local_inside_network = {}
-    monitor_disabled          = {}
-    not_primary               = {}
-    no_ipv6_address           = {}
-    untagged                  = {}
-
-    static_ip {
-      node_static_ip {
-        ip_address = var.kvm_lan.sli_cidr
-      }
-    }
-  }
-}
-
-import {
-  for_each = local.kvm_lan_sli_interfaces
-  to       = xcsh_network_interface.kvm_lan_sli[each.key]
-  id       = "system/${var.kvm_lan_observed_node.sli_interface_name}"
+  depends_on = [libvirt_domain.ce_node]
 }
 
 # The provider convergence data source intentionally requires a nonempty
@@ -329,7 +272,7 @@ resource "xcsh_bgp" "onprem_ebgp" {
       port    = 179
 
       interface {
-        name      = data.external.kvm_network_interface[0].result.interface_name
+        name      = data.xcsh_smsv2_kvm_runtime.kvm_slo[0].interface_name
         namespace = "system"
       }
 
@@ -346,7 +289,7 @@ resource "xcsh_bgp" "onprem_ebgp" {
   # Do not redirect the F5-side peer until both the Terraform-owned router and
   # the CE interfaces with the declared static identities are ready.
   depends_on = [
-    data.external.kvm_network_interface,
+    data.xcsh_smsv2_kvm_runtime.kvm_slo,
     docker_container.kvm_frr,
     libvirt_domain.ce_node,
   ]

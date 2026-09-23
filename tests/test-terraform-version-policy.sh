@@ -25,17 +25,17 @@ else
   bad "Terraform workflow jobs do not both pin 1.16.3"
 fi
 
-echo "2. every xcsh consumer pins exactly v9.5.1"
+echo "2. every xcsh consumer pins exactly v10.1.0"
 for relative in terraform/versions.tf \
   terraform/recovery/aws-smsv2-orphans/versions.tf \
   terraform/modules/xc-site/versions.tf \
   terraform/modules/kvm/providers.tf coverage/smsv2/versions.tf; do
   file="${REPO_ROOT}/${relative}"
   block=$(sed -n '/^[[:space:]]*xcsh = {/,/^[[:space:]]*}/p' "$file")
-  if printf '%s\n' "$block" | grep -Eq 'version[[:space:]]*=[[:space:]]*"= 9\.5\.1"'; then
-    ok "${relative} pins = 9.5.1"
+  if printf '%s\n' "$block" | grep -Eq 'version[[:space:]]*=[[:space:]]*"= 10\.1\.0"'; then
+    ok "${relative} pins = 10.1.0"
   else
-    bad "${relative} does not pin exactly = 9.5.1"
+    bad "${relative} does not pin exactly = 10.1.0"
   fi
   count=$(printf '%s\n' "$block" | grep -Ec '^[[:space:]]*version[[:space:]]*=' || true)
   [ "$count" -eq 1 ] || bad "${relative} has ${count} xcsh version constraints"
@@ -44,10 +44,10 @@ done
 for relative in .github/workflows/terraform.yml prompt.txt docs/en/demo/deploy.mdx \
   docs/en/demo/prompt.mdx docs/en/demo/spec.mdx docs/en/demo/terraform.mdx \
   tests/test-verify-deployment.sh; do
-  if grep -Fq '9.5.1' "${REPO_ROOT}/${relative}"; then
-    ok "${relative} references v9.5.1"
+  if grep -Fq '10.1.0' "${REPO_ROOT}/${relative}"; then
+    ok "${relative} references v10.1.0"
   else
-    bad "${relative} is missing the v9.5.1 reference"
+    bad "${relative} is missing the v10.1.0 reference"
   fi
 done
 legacy_version='7''.''4''.''1'
@@ -68,7 +68,7 @@ else
   bad "expected exactly five xcsh provider declarations, found ${source_count}"
 fi
 
-echo "3. the v9 clean break has no legacy observation-freshness inputs"
+echo "3. the v10 clean break has no legacy observation-freshness inputs"
 if grep -R -n -E 'aws_bgp_max_observation_age_seconds|max_observation_age_seconds|observed_at' \
   "${REPO_ROOT}/terraform" --include='*.tf' --include='*.tftest.hcl'; then
   bad "legacy observation freshness fields remain in Terraform"

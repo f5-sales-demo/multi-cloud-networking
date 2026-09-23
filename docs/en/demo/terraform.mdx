@@ -111,7 +111,7 @@ OS image.
 <Aside type="caution" title="Sales Demo image prerequisite">
 The KVM image lookup is deliberately fail-closed. The Sales Demo tenant must expose
 exactly one valid tenant-owned `maurice_config`; this is a platform prerequisite,
-not Terraform-managed infrastructure. With `xcsh` v9.5.1, planning resolves
+not Terraform-managed infrastructure. With `xcsh` v10.1.0, planning resolves
 `External tenant prerequisite unavailable` before any apply, libvirt, Docker,
 Azure, or F5 configuration mutation. Keep `enable_kvm = false`
 (the default) to omit KVM from an unrelated apply or to produce a KVM-only destroy
@@ -250,7 +250,7 @@ Tenant, app namespace, load balancer, origin pool and the VIP.
 
 ### `terraform/versions.tf`
 
-Terraform floor and provider constraints. The xcsh provider is pinned exactly to the v9.5.1 release; the unified root lock file is committed and CI uses it read-only.
+Terraform floor and provider constraints. The xcsh provider is pinned exactly to the v10.1.0 release; the unified root lock file is committed and CI uses it read-only.
 
 <Code code={versions} lang="hcl" title="terraform/versions.tf" />
 

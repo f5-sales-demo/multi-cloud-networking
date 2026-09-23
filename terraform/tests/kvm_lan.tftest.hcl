@@ -98,43 +98,34 @@ run "hardware_phase_declares_the_second_nic_only" {
   }
 }
 
-run "configured_phase_imports_and_changes_only_the_runtime_sli" {
+run "configured_phase_adopts_and_changes_only_the_runtime_sli" {
   command = plan
 
   override_data {
-    target = data.external.kvm_lan_network_interface[0]
+    target          = data.xcsh_smsv2_kvm_runtime.kvm_slo[0]
+    override_during = plan
     values = {
-      result = {
-        interface_name = "ves-io-securemesh-site-v2-test-network-onprem-ce-01-674f7-ens4-0"
-        hostname       = "onprem-ce-01-674f7"
-        device         = "ens4"
-        mac            = "52:54:00:20:00:11"
-        role           = "sli"
-      }
+      interface_name     = "ves-io-securemesh-site-v2-test-network-onprem-ce-01-674f7-ens3-0"
+      hostname           = "onprem-ce-01-674f7"
+      device             = "ens3"
+      mac                = "52:54:00:10:00:11"
+      online             = true
+      registration_state = "ONLINE"
     }
   }
 
-  # Terraform cannot execute import blocks against a mock provider. Override
-  # only the adopted child here; the plan-scope tests validate the real import.
   override_resource {
-    target = xcsh_network_interface.kvm_lan_sli["sli"]
+    target          = xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli["sli"]
+    override_during = plan
     values = {
-      name      = "ves-io-securemesh-site-v2-test-network-onprem-ce-01-674f7-ens4-0"
-      namespace = "system"
-      ethernet_interface = {
-        device                    = "ens4"
-        node                      = "onprem-ce-01-674f7"
-        mtu                       = 1500
-        site_local_inside_network = {}
-        no_ipv6_address           = {}
-        untagged                  = {}
-        not_primary               = {}
-        static_ip = {
-          node_static_ip = {
-            ip_address = "192.0.2.2/24"
-          }
-        }
-      }
+      namespace      = "system"
+      site           = "test"
+      expected_mac   = "52:54:00:20:00:11"
+      ipv4_cidr      = "192.0.2.2/24"
+      interface_name = "ves-io-securemesh-site-v2-test-network-onprem-ce-01-674f7-ens4-0"
+      hostname       = "onprem-ce-01-674f7"
+      device         = "ens4"
+      configured     = true
     }
   }
 
@@ -165,13 +156,6 @@ run "configured_phase_imports_and_changes_only_the_runtime_sli" {
       switch_multi_mac_approved   = true
       duplicate_addresses_checked = true
     }
-    kvm_lan_observed_node = {
-      hostname           = "onprem-ce-01-674f7"
-      slo_device         = "ens3"
-      sli_device         = "ens4"
-      slo_interface_name = "ves-io-securemesh-site-v2-test-network-onprem-ce-01-674f7-ens3-0"
-      sli_interface_name = "ves-io-securemesh-site-v2-test-network-onprem-ce-01-674f7-ens4-0"
-    }
   }
 
   assert {
@@ -188,28 +172,24 @@ run "configured_phase_imports_and_changes_only_the_runtime_sli" {
       libvirt_domain.ce_node["01"].network_interface[0].mac == "52:54:00:10:00:11" &&
       libvirt_domain.ce_node["01"].network_interface[1].mac == "52:54:00:20:00:11" &&
       length(xcsh_securemesh_site_v2.onprem_kvm[0].kvm.not_managed.node_list) == 0 &&
-      length(xcsh_network_interface.kvm_lan_sli) == 1 &&
-      xcsh_network_interface.kvm_lan_sli["sli"].name == "ves-io-securemesh-site-v2-test-network-onprem-ce-01-674f7-ens4-0" &&
-      xcsh_network_interface.kvm_lan_sli["sli"].namespace == "system" &&
-      xcsh_network_interface.kvm_lan_sli["sli"].ethernet_interface.device == "ens4" &&
-      xcsh_network_interface.kvm_lan_sli["sli"].ethernet_interface.node == "onprem-ce-01-674f7" &&
-      xcsh_network_interface.kvm_lan_sli["sli"].ethernet_interface.mtu == 1500 &&
-      xcsh_network_interface.kvm_lan_sli["sli"].ethernet_interface.static_ip.node_static_ip.ip_address == "192.0.2.2/24" &&
-      xcsh_network_interface.kvm_lan_sli["sli"].ethernet_interface.site_local_inside_network != null &&
-      xcsh_network_interface.kvm_lan_sli["sli"].ethernet_interface.no_ipv6_address != null &&
-      xcsh_network_interface.kvm_lan_sli["sli"].ethernet_interface.untagged != null &&
-      xcsh_network_interface.kvm_lan_sli["sli"].ethernet_interface.not_primary != null &&
+      length(xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli) == 1 &&
+      xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli["sli"].namespace == "system" &&
+      xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli["sli"].site == local.kvm_site_name &&
+      xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli["sli"].expected_mac == "52:54:00:20:00:11" &&
+      xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli["sli"].ipv4_cidr == "192.0.2.2/24" &&
+      xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli["sli"].device == "ens4" &&
+      xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli["sli"].configured &&
       length(xcsh_bgp.onprem_ebgp) == 1 &&
       xcsh_http_loadbalancer.kvm_lan[0].http.port == 80 &&
       xcsh_http_loadbalancer.kvm_lan[0].advertise_custom.advertise_where[0].port == 80 &&
       xcsh_http_loadbalancer.kvm_lan[0].advertise_custom.advertise_where[0].virtual_site_with_vip.ip == "192.0.2.10" &&
       xcsh_http_loadbalancer.kvm_lan[0].advertise_custom.advertise_where[0].virtual_site_with_vip.network == "SITE_NETWORK_SPECIFIED_VIP_INSIDE"
     )
-    error_message = "Configured KVM LAN must leave the site payload empty, import and change only the exact runtime SLI child, and bind the exact site to the inside VIP and real LAN origin."
+    error_message = "Configured KVM LAN must leave the site payload empty, adopt only the exact runtime SLI child, and bind the exact site to the inside VIP and real LAN origin."
   }
 }
 
-run "configured_phase_rejects_missing_observed_mapping" {
+run "configured_phase_rejects_missing_lan_contract" {
   command = plan
 
   variables {
@@ -217,5 +197,5 @@ run "configured_phase_rejects_missing_observed_mapping" {
     kvm_lan_configuration_phase = "configured"
   }
 
-  expect_failures = [check.kvm_lan_prerequisites, check.kvm_lan_observed_mapping]
+  expect_failures = [check.kvm_lan_prerequisites, check.kvm_lan_phase_contract]
 }

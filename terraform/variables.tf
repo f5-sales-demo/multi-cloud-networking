@@ -97,7 +97,7 @@ variable "enable_kvm_lan" {
 }
 
 variable "kvm_lan_configuration_phase" {
-  description = "KVM LAN rollout phase: disabled, hardware (two NICs only), or configured (observed SLO/SLI mapping plus inside VIP)."
+  description = "KVM LAN rollout phase: disabled, hardware (two NICs only), or configured (provider-owned runtime discovery plus inside VIP)."
   type        = string
   default     = "disabled"
   nullable    = false
@@ -201,29 +201,6 @@ variable "kvm_lan" {
       false,
     )
     error_message = "kvm_lan requires a valid backend port, lowercase HTTP domain, and nonempty reservation, origin-owner, and access-scope records."
-  }
-}
-
-variable "kvm_lan_observed_node" {
-  description = "Staged post-rebuild registration evidence. Supply only for configured phase after exact MAC-to-device discovery; never guess guest device names."
-  type = object({
-    hostname           = string
-    slo_device         = string
-    sli_device         = string
-    slo_interface_name = string
-    sli_interface_name = string
-  })
-  default  = null
-  nullable = true
-
-  validation {
-    condition = var.kvm_lan_observed_node == null || try(
-      alltrue([for value in values(var.kvm_lan_observed_node) : trimspace(value) != ""]) &&
-      var.kvm_lan_observed_node.slo_device != var.kvm_lan_observed_node.sli_device &&
-      var.kvm_lan_observed_node.slo_interface_name != var.kvm_lan_observed_node.sli_interface_name,
-      false,
-    )
-    error_message = "kvm_lan_observed_node requires nonempty hostname/interface values and distinct SLO/SLI devices and interface names."
   }
 }
 

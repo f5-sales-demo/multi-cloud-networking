@@ -376,10 +376,10 @@ output "kvm_lan_contract" {
     backend_owner      = var.kvm_lan.backend_owner
     http_domain        = var.kvm_lan.http_domain
     access_scope       = var.kvm_lan.access_scope
-    observed_hostname  = try(var.kvm_lan_observed_node.hostname, null)
-    observed_slo       = try(var.kvm_lan_observed_node.slo_device, null)
-    observed_sli       = try(var.kvm_lan_observed_node.sli_device, null)
-    realized_sli       = try(data.external.kvm_lan_network_interface[0].result.interface_name, null)
+    observed_hostname  = try(data.xcsh_smsv2_kvm_runtime.kvm_slo[0].hostname, null)
+    observed_slo       = try(data.xcsh_smsv2_kvm_runtime.kvm_slo[0].device, null)
+    observed_sli       = try(xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli["sli"].device, null)
+    realized_sli       = try(xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli["sli"].device, null)
     virtual_site_name  = try(xcsh_virtual_site.kvm_lan[0].name, null)
     origin_pool_name   = try(xcsh_origin_pool.kvm_lan[0].name, null)
     load_balancer_name = try(xcsh_http_loadbalancer.kvm_lan[0].name, null)
