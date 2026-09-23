@@ -187,19 +187,22 @@ def validate_plan(document: object, stage: str) -> dict[str, Any]:
             raise ValueError(
                 "configured plan must import the exact system SLI interface before update"
             )
-        if (
-            interface.get("namespace") != "system"
-            or interface.get("name") != observed.get("sli_interface_name")
-            or ethernet.get("device") != observed.get("sli_device")
-            or ethernet.get("node") != observed.get("hostname")
-            or ethernet.get("mtu") != lan.get("mtu")
-            or static_ip.get("ip_address") != lan.get("sli_cidr")
-            or ethernet.get("site_local_inside_network") is None
-            or ethernet.get("no_ipv6_address") is None
-            or ethernet.get("untagged") is None
-            or ethernet.get("not_primary") is None
-            or ethernet.get("dhcp_client") is not None
-        ):
+        shape_matches = all(
+            (
+                interface.get("namespace") == "system",
+                interface.get("name") == observed.get("sli_interface_name"),
+                ethernet.get("device") == observed.get("sli_device"),
+                ethernet.get("node") == observed.get("hostname"),
+                ethernet.get("mtu") == lan.get("mtu"),
+                static_ip.get("ip_address") == lan.get("sli_cidr"),
+                ethernet.get("site_local_inside_network") is not None,
+                ethernet.get("no_ipv6_address") is not None,
+                ethernet.get("untagged") is not None,
+                ethernet.get("not_primary") is not None,
+                ethernet.get("dhcp_client") is None,
+            )
+        )
+        if not shape_matches:
             raise ValueError(
                 "configured plan SLI import does not match the reviewed owned interface shape"
             )
