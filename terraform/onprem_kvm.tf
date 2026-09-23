@@ -17,19 +17,6 @@ resource "xcsh_securemesh_site_v2" "onprem_kvm" {
           type     = "Control"
 
           interface_list {
-            name = node_list.value.slo_interface_name
-            mtu  = var.kvm_lan.mtu
-            ethernet_interface {
-              device = node_list.value.slo_device
-              mac    = local.kvm_ce_nodes["01"].mac
-            }
-            network_option {
-              site_local_network = {}
-            }
-            dhcp_client = {}
-          }
-
-          interface_list {
             name = node_list.value.sli_interface_name
             mtu  = var.kvm_lan.mtu
             ethernet_interface {

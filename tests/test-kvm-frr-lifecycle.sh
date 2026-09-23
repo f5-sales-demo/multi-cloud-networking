@@ -131,6 +131,15 @@ require 'replace_triggered_by = [xcsh_securemesh_site_v2.onprem_kvm[0].id]' "$on
 reject_exact '    replace_triggered_by = [xcsh_securemesh_site_v2.onprem_kvm[0]]' "$onprem"
 require 'disable_ha                 = {}' "$onprem"
 reject 'enable_ha                  = {}' "$onprem"
+configured_node=$(sed -n '/dynamic "node_list"/,/^      }/p' "$onprem")
+grep -Fq 'site_local_inside_network = {}' <<<"$configured_node" ||
+  fail 'configured KVM node payload must declare the new SLI'
+! grep -Fq 'site_local_network = {}' <<<"$configured_node" ||
+  fail 'configured KVM node payload must not restate the immutable primary SLO'
+! grep -Fq 'node_list.value.slo_' <<<"$configured_node" ||
+  fail 'configured KVM node payload must keep SLO identity observation-only'
+! grep -Fq 'local.kvm_ce_nodes["01"].mac' <<<"$configured_node" ||
+  fail 'configured KVM node payload must not resend the realized SLO MAC'
 require 'docker_container.kvm_frr' "$onprem"
 require 'libvirt_domain.ce_node' "$onprem"
 require 'data "external" "kvm_network_interface"' "$onprem"

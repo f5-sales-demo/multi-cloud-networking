@@ -98,7 +98,7 @@ run "hardware_phase_declares_the_second_nic_only" {
   }
 }
 
-run "configured_phase_declares_one_slo_one_sli_and_inside_vip" {
+run "configured_phase_preserves_slo_hardware_and_declares_only_sli_to_xc" {
   command = plan
 
   variables {
@@ -150,13 +150,17 @@ run "configured_phase_declares_one_slo_one_sli_and_inside_vip" {
       length(libvirt_domain.ce_node["01"].network_interface) == 2 &&
       libvirt_domain.ce_node["01"].network_interface[0].mac == "52:54:00:10:00:11" &&
       libvirt_domain.ce_node["01"].network_interface[1].mac == "52:54:00:20:00:11" &&
+      length(xcsh_securemesh_site_v2.onprem_kvm[0].kvm.not_managed.node_list) == 1 &&
+      length(xcsh_securemesh_site_v2.onprem_kvm[0].kvm.not_managed.node_list[0].interface_list) == 1 &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].kvm.not_managed.node_list[0].interface_list[0].ethernet_interface.device == "ens4" &&
+      xcsh_securemesh_site_v2.onprem_kvm[0].kvm.not_managed.node_list[0].interface_list[0].ethernet_interface.mac == "52:54:00:20:00:11" &&
       length(xcsh_bgp.onprem_ebgp) == 1 &&
       xcsh_http_loadbalancer.kvm_lan[0].http.port == 80 &&
       xcsh_http_loadbalancer.kvm_lan[0].advertise_custom.advertise_where[0].port == 80 &&
       xcsh_http_loadbalancer.kvm_lan[0].advertise_custom.advertise_where[0].virtual_site_with_vip.ip == "192.0.2.10" &&
       xcsh_http_loadbalancer.kvm_lan[0].advertise_custom.advertise_where[0].virtual_site_with_vip.network == "SITE_NETWORK_SPECIFIED_VIP_INSIDE"
     )
-    error_message = "Configured KVM LAN must bind the exact site to a port-80 inside custom VIP and real LAN origin."
+    error_message = "Configured KVM LAN must preserve both guest NICs, send only the new SLI to XC, and bind the exact site to the inside VIP and real LAN origin."
   }
 }
 
