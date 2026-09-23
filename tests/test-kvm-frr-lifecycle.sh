@@ -38,6 +38,14 @@ require '"{{ .token }}"' "$kvm"
 require 'xcsh_token.kvm[0].uid' "$kvm"
 require 'data "xcsh_site_image" "kvm"' "$kvm"
 require 'provider_ref              = "kvm"' "$kvm"
+[ "$(grep -Ec 'site_name[[:space:]]*=[[:space:]]*local\.kvm_site_name' "$kvm")" -eq 2 ] ||
+  fail 'active KVM image and cloud-init lookups must use the stable canonical site name'
+[ "$(grep -Ec 'depends_on[[:space:]]*=[[:space:]]*\[xcsh_securemesh_site_v2\.onprem_kvm\]' "$kvm")" -eq 2 ] ||
+  fail 'active KVM lookups must retain explicit site creation ordering'
+[ "$(grep -Ec 'site_name[[:space:]]*=[[:space:]]*local\.kvm_site_name' "$module_kvm")" -eq 2 ] ||
+  fail 'module KVM image and cloud-init lookups must use the stable canonical site name'
+[ "$(grep -Ec 'depends_on[[:space:]]*=[[:space:]]*\[xcsh_securemesh_site_v2\.onprem_kvm\]' "$module_kvm")" -eq 2 ] ||
+  fail 'module KVM lookups must retain explicit site creation ordering'
 require 'resource "terraform_data" "kvm_ce_image_cache"' "$kvm"
 require 'triggers_replace = [data.xcsh_site_image.kvm[0].image_md5_sum]' "$kvm"
 reject 'triggers_replace = [data.xcsh_site_image.kvm[0].image_download_url' "$kvm"
