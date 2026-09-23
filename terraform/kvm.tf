@@ -168,6 +168,18 @@ resource "libvirt_domain" "ce_node" {
     wait_for_lease = false
   }
 
+  # libvirt 0.8.3 realizes added NICs only during domain creation. Enabling
+  # this block therefore requires the reviewed full-root replacement plan
+  # enforced by scripts/kvm-lan-plan-scope.py; an update-only plan is rejected.
+  dynamic "network_interface" {
+    for_each = var.enable_kvm_lan && var.kvm_lan != null ? [var.kvm_lan] : []
+    content {
+      bridge         = network_interface.value.bridge
+      mac            = network_interface.value.sli_mac
+      wait_for_lease = false
+    }
+  }
+
   disk {
     volume_id = libvirt_volume.ce_disk[each.key].id
   }

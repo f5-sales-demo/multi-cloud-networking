@@ -62,6 +62,7 @@ terraform/azure_ilb.tf -> terraform/azure_ilb.tf
 terraform/data.tf -> terraform/data.tf
 terraform/kvm.tf -> terraform/kvm.tf
 terraform/kvm_frr.tf -> terraform/kvm_frr.tf
+terraform/kvm_lan.tf -> terraform/kvm_lan.tf
 terraform/locals.tf -> terraform/locals.tf
 terraform/main.tf -> terraform/main.tf
 terraform/modules/azure-hub/main.tf -> terraform/modules/azure-hub/main.tf

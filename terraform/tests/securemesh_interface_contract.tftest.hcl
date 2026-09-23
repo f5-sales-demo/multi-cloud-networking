@@ -1,4 +1,4 @@
-# Contract-v1 must keep Secure Mesh topology logical and SLO-only.  These are
+# Azure contract-v1 must keep its Secure Mesh topology logical and SLO-only. These are
 # root-module plan tests with mocks, so they prove the preflight fails before
 # a live Azure or XC operation can be attempted.
 

@@ -85,6 +85,7 @@ class ResolveInterfaceTests(unittest.TestCase):
             "system",
             "mcn-ce-ha-smsv2-kvm",
             "52:54:00:10:00:11",
+            "slo",
             self.site,
             self.registrations,
             self.interfaces,
@@ -100,6 +101,7 @@ class ResolveInterfaceTests(unittest.TestCase):
                 "system",
                 "mcn-ce-ha-smsv2-kvm",
                 "52:54:00:10:00:11",
+                "slo",
                 self.site,
                 self.registrations,
                 self.interfaces,
@@ -112,6 +114,7 @@ class ResolveInterfaceTests(unittest.TestCase):
                 "system",
                 "mcn-ce-ha-smsv2-kvm",
                 "52:54:00:10:00:11",
+                "slo",
                 self.site,
                 self.registrations,
                 self.interfaces,
@@ -127,6 +130,56 @@ class ResolveInterfaceTests(unittest.TestCase):
                 "system",
                 "mcn-ce-ha-smsv2-kvm",
                 "52:54:00:10:00:11",
+                "slo",
+                self.site,
+                self.registrations,
+                self.interfaces,
+            )
+
+    def test_resolves_owned_inside_interface_for_sli(self):
+        self.registrations["items"][0]["get_spec"]["infra"]["hw_info"][
+            "network"
+        ].append({"name": "ens4", "mac_address": "52:54:00:20:00:11"})
+        owned = self.interfaces["items"][1]
+        owned["name"] = "ves-io-owned-sli-interface"
+        ethernet = owned["get_spec"]["ethernet_interface"]
+        ethernet["device"] = "ens4"
+        ethernet.pop("site_local_network")
+        ethernet["site_local_inside_network"] = {}
+
+        result = MODULE.resolve_interface(
+            "system",
+            "mcn-ce-ha-smsv2-kvm",
+            "52:54:00:20:00:11",
+            "sli",
+            self.site,
+            self.registrations,
+            self.interfaces,
+        )
+        self.assertEqual(result["interface_name"], "ves-io-owned-sli-interface")
+        self.assertEqual(result["hostname"], "onprem-ce-01-674f7")
+        self.assertEqual(result["device"], "ens4")
+        self.assertEqual(result["role"], "sli")
+
+    def test_rejects_slo_interface_when_sli_is_required(self):
+        with self.assertRaises(MODULE.DiscoveryPendingError):
+            MODULE.resolve_interface(
+                "system",
+                "mcn-ce-ha-smsv2-kvm",
+                "52:54:00:10:00:11",
+                "sli",
+                self.site,
+                self.registrations,
+                self.interfaces,
+            )
+
+    def test_rejects_unknown_role(self):
+        with self.assertRaises(ValueError):
+            MODULE.resolve_interface(
+                "system",
+                "mcn-ce-ha-smsv2-kvm",
+                "52:54:00:10:00:11",
+                "management",
                 self.site,
                 self.registrations,
                 self.interfaces,
