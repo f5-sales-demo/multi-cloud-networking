@@ -25,8 +25,9 @@ generation_block=$(sed -n '/variable "smsv2_site_generation" {/,/^}/p' "$variabl
 grep -Eq '^[[:space:]]*default[[:space:]]*=[[:space:]]*"smsv2"$' <<<"$generation_block" ||
   fail "smsv2_site_generation must use the documented smsv2 identity"
 require_text "$variables" 'smsv2_site_generation must be a DNS-style label'
-require_text "$locals_file" 'site_prefix = coalesce(var.site_prefix, "${var.component}-${var.smsv2_site_generation}")'
-require_text "$locals_file" 'aws_resource_prefix = local.site_prefix'
+require_text "$locals_file" 'site_prefix_base = coalesce(var.site_prefix, "${var.component}-${var.smsv2_site_generation}")'
+require_text "$locals_file" 'site_prefix      = local.deployment_is_production ? local.site_prefix_base : "mcn-${local.deployment_environment_key}"'
+require_text "$locals_file" 'aws_resource_prefix = local.deployment_is_production ? local.site_prefix : "mcn${local.deployment_short_suffix}"'
 require_text "$locals_file" '"mcn-deployment-generation" = var.smsv2_site_generation'
 
 if rg -n '\$\{var\.component\}-aws' "$aws_root" --glob '*.tf'; then

@@ -18,6 +18,11 @@ recovery_hcl="$repo_root/terraform/recovery/aws-smsv2-orphans/backend.hcl"
 backend_block="$bootstrap_dir/backend.generated.tf"
 profile=default
 requested_region=
+source_repository=f5-sales-demo/multi-cloud-networking
+source_ref=
+source_commit_sha=
+deployment_owner_id=
+deployment_actor_id=
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -31,13 +36,53 @@ while [ "$#" -gt 0 ]; do
     requested_region=$2
     shift 2
     ;;
-  *) fail "usage: $0 [--profile NAME] [--region REGION]" ;;
+  --source-repository)
+    [ "$#" -ge 2 ] || fail "--source-repository requires a value"
+    source_repository=$2
+    shift 2
+    ;;
+  --source-ref)
+    [ "$#" -ge 2 ] || fail "--source-ref requires a value"
+    source_ref=$2
+    shift 2
+    ;;
+  --source-commit-sha)
+    [ "$#" -ge 2 ] || fail "--source-commit-sha requires a value"
+    source_commit_sha=$2
+    shift 2
+    ;;
+  --deployment-owner-id)
+    [ "$#" -ge 2 ] || fail "--deployment-owner-id requires a value"
+    deployment_owner_id=$2
+    shift 2
+    ;;
+  --deployment-actor-id)
+    [ "$#" -ge 2 ] || fail "--deployment-actor-id requires a value"
+    deployment_actor_id=$2
+    shift 2
+    ;;
+  *) fail "usage: $0 [--profile NAME] [--region REGION] --source-ref REF --source-commit-sha SHA --deployment-owner-id ID --deployment-actor-id ID" ;;
   esac
 done
 
 [ -x "$wrapper" ] || fail "Terraform AWS SSO wrapper is not executable"
+[ -n "$source_ref" ] || fail "--source-ref is required"
+[ -n "$source_commit_sha" ] || fail "--source-commit-sha is required"
+[ -n "$deployment_owner_id" ] || fail "--deployment-owner-id is required"
+[ -n "$deployment_actor_id" ] || fail "--deployment-actor-id is required"
 command -v jq >/dev/null || fail "jq is unavailable"
 aws_bin=$(command -v aws) || fail "AWS CLI is unavailable"
+identity_json=$(
+  "$repo_root/scripts/deployment-identity.py" \
+    --repository "$source_repository" \
+    --source-ref "$source_ref" \
+    --source-commit "$source_commit_sha" \
+    --owner-id "$deployment_owner_id" \
+    --actor-id "$deployment_actor_id"
+) || fail "deployment identity is invalid"
+showcase_backend_key=$(jq -er '.stateKey' <<<"$identity_json") || fail "showcase backend key is missing"
+recovery_backend_key=$(jq -er '.recoveryStateKey' <<<"$identity_json") || fail "recovery backend key is missing"
+unset identity_json
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/mcn-backend-config.XXXXXX")
 trap 'rm -rf "$work"' EXIT
@@ -109,8 +154,8 @@ write_backend_hcl() {
 }
 
 write_backend_hcl "$bootstrap_hcl" "$key"
-write_backend_hcl "$aws_hcl" "mcn-ce-ha-smsv2/showcase.tfstate"
-write_backend_hcl "$recovery_hcl" "mcn-ce-ha-smsv2/recovery/smsv2-orphans.tfstate"
+write_backend_hcl "$aws_hcl" "$showcase_backend_key"
+write_backend_hcl "$recovery_hcl" "$recovery_backend_key"
 
 temporary_block=$(mktemp "${backend_block}.tmp.XXXXXX")
 chmod 600 "$temporary_block"
@@ -135,5 +180,4 @@ jq -e \
   "$metadata" >/dev/null || fail "Terraform backend metadata does not match the generated configuration"
 
 printf 'AWS backend configured: verified_identity=true region=%s bucket=%s bootstrap_key=%s showcase_key=%s recovery_key=%s\n' \
-  "$region" "$bucket" "$key" "mcn-ce-ha-smsv2/showcase.tfstate" \
-  "mcn-ce-ha-smsv2/recovery/smsv2-orphans.tfstate"
+  "$region" "$bucket" "$key" "$showcase_backend_key" "$recovery_backend_key"

@@ -1,6 +1,65 @@
 # General variables. Domain-specific inputs live in variables_azure.tf,
 # variables_xc.tf and variables_ce.tf.
 
+variable "source_repository" {
+  description = "Canonical GitHub repository identity of the reviewed source. Only this repository can produce a deployment identity."
+  type        = string
+
+  validation {
+    condition     = var.source_repository == "f5-sales-demo/multi-cloud-networking"
+    error_message = "source_repository must be exactly f5-sales-demo/multi-cloud-networking."
+  }
+}
+
+variable "source_ref" {
+  description = "Exact trusted branch ref of the reviewed source. PR merge refs and abbreviated branch names are rejected."
+  type        = string
+
+  validation {
+    condition = (
+      can(regex("^refs/heads/[^[:cntrl:][:space:]~^:?*\\\\\\[]+$", var.source_ref)) &&
+      !strcontains(var.source_ref, "..") &&
+      !strcontains(var.source_ref, "@{") &&
+      !strcontains(var.source_ref, "//") &&
+      !can(regex("(^refs/heads/|/)\\.", var.source_ref)) &&
+      !can(regex("(\\.|\\.lock)(/|$)", var.source_ref)) &&
+      var.source_ref != "refs/heads/@" &&
+      !endswith(var.source_ref, "/")
+    )
+    error_message = "source_ref must be a valid exact refs/heads/* ref, never refs/pull/* or an abbreviated branch."
+  }
+}
+
+variable "source_commit_sha" {
+  description = "Immutable lowercase 40-hex commit that was reviewed and used to create the saved plan."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{40}$", var.source_commit_sha))
+    error_message = "source_commit_sha must be an immutable lowercase 40-hex Git commit."
+  }
+}
+
+variable "deployment_owner_id" {
+  description = "Non-personal stable identifier for the team or service that owns the deployment."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{2,62}$", var.deployment_owner_id))
+    error_message = "deployment_owner_id must be a 3-63 character lowercase non-personal identifier."
+  }
+}
+
+variable "deployment_actor_id" {
+  description = "Non-personal stable identifier for the automation actor that applies the deployment."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{2,62}$", var.deployment_actor_id))
+    error_message = "deployment_actor_id must be a 3-63 character lowercase non-personal identifier."
+  }
+}
+
 variable "component" {
   description = "Component name used in tags."
   type        = string

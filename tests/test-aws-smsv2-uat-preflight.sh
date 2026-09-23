@@ -164,6 +164,11 @@ common=(
   --expected-xc-tenant f5-sales-demo
   --creator-id tester@example.com
   --deployment-generation gen-01
+  --source-repository f5-sales-demo/multi-cloud-networking
+  --source-ref refs/heads/main
+  --source-commit-sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  --deployment-owner-id showcase-team
+  --deployment-actor-id github-actions
   --lifecycle-phase configured
   --expected-site mcn-ce-ha-aws-ap-northeast-1-01
   --expected-site mcn-ce-ha-aws-ap-northeast-1-02
@@ -177,6 +182,11 @@ bootstrap_common=(
   --expected-xc-tenant f5-sales-demo
   --creator-id tester@example.com
   --deployment-generation gen-01
+  --source-repository f5-sales-demo/multi-cloud-networking
+  --source-ref refs/heads/main
+  --source-commit-sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  --deployment-owner-id showcase-team
+  --deployment-actor-id github-actions
   --lifecycle-phase bootstrap
   --expected-site mcn-ce-ha-aws-ap-northeast-1-01-bootstrap
   --expected-site mcn-ce-ha-aws-ap-northeast-1-02-bootstrap
@@ -390,6 +400,11 @@ single_site=(
   --expected-xc-tenant f5-sales-demo
   --creator-id tester@example.com
   --deployment-generation gen-01
+  --source-repository f5-sales-demo/multi-cloud-networking
+  --source-ref refs/heads/main
+  --source-commit-sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  --deployment-owner-id showcase-team
+  --deployment-actor-id github-actions
   --lifecycle-phase configured
   --expected-site mcn-ce-ha-aws-ap-northeast-1-01
 )
@@ -536,6 +551,11 @@ retirement_sites=(
   --expected-aws-account 111122223333 --expected-aws-region ap-northeast-1
   --expected-xc-tenant f5-sales-demo --creator-id tester@example.com
   --deployment-generation gen-01 --lifecycle-phase bootstrap_retirement
+  --source-repository f5-sales-demo/multi-cloud-networking
+  --source-ref refs/heads/main
+  --source-commit-sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  --deployment-owner-id showcase-team
+  --deployment-actor-id github-actions
   --expected-site mcn-ce-ha-aws-ap-northeast-1-01-bootstrap
   --expected-site mcn-ce-ha-aws-ap-northeast-1-02-bootstrap
   --expected-site mcn-ce-ha-aws-ap-northeast-1-03-bootstrap

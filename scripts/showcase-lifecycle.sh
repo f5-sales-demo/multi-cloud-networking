@@ -17,6 +17,11 @@ GENERATION=""
 MODE=full
 PRIVATE_ROOT=""
 CREATOR_ID=$(git -C "$REPO_ROOT" config user.email 2>/dev/null || true)
+SOURCE_REPOSITORY=f5-sales-demo/multi-cloud-networking
+SOURCE_REF=""
+SOURCE_COMMIT_SHA=""
+DEPLOYMENT_OWNER_ID=""
+DEPLOYMENT_ACTOR_ID=""
 
 usage() {
   cat <<'EOF'
@@ -29,6 +34,11 @@ Options:
   --private-root PATH       Empty directory outside the repository for plans.
   --aws-profile NAME        AWS SSO profile (default: sso).
   --creator-id EMAIL        Expected XC object creator.
+  --source-repository NAME  Canonical source repository.
+  --source-ref REF          Exact reviewed refs/heads/* source ref.
+  --source-commit-sha SHA   Exact reviewed 40-hex source commit.
+  --deployment-owner-id ID  Non-personal deployment owner identifier.
+  --deployment-actor-id ID  Non-personal automation actor identifier.
 
 full performs clean teardown when state exists, build/verify, controlled ENI
 tag drift repair, reviewed full teardown, absence proof, and a second build.
@@ -71,6 +81,26 @@ while [ "$#" -gt 0 ]; do
     CREATOR_ID=${2:?}
     shift 2
     ;;
+  --source-repository)
+    SOURCE_REPOSITORY=${2:?}
+    shift 2
+    ;;
+  --source-ref)
+    SOURCE_REF=${2:?}
+    shift 2
+    ;;
+  --source-commit-sha)
+    SOURCE_COMMIT_SHA=${2:?}
+    shift 2
+    ;;
+  --deployment-owner-id)
+    DEPLOYMENT_OWNER_ID=${2:?}
+    shift 2
+    ;;
+  --deployment-actor-id)
+    DEPLOYMENT_ACTOR_ID=${2:?}
+    shift 2
+    ;;
   -h | --help)
     usage
     exit 0
@@ -84,9 +114,31 @@ for command_name in aws curl getent jq stat sudo systemctl terraform sha256sum v
   command -v "$command_name" >/dev/null 2>&1 || die "required command is unavailable: $command_name"
 done
 [ -n "$CREATOR_ID" ] || die "Git user.email is required for ownership checks"
+[ -n "$SOURCE_REF" ] || die "--source-ref is required"
+[ -n "$SOURCE_COMMIT_SHA" ] || die "--source-commit-sha is required"
+[ -n "$DEPLOYMENT_OWNER_ID" ] || die "--deployment-owner-id is required"
+[ -n "$DEPLOYMENT_ACTOR_ID" ] || die "--deployment-actor-id is required"
 [ -r "$TFVARS" ] || die "tfvars file is unavailable"
 [ -r "$BACKEND_CONFIG" ] || die "backend configuration is unavailable"
 [ -r "$CREDENTIAL_FILE" ] || die "XC credential file is unavailable"
+
+checked_out_commit=$(git -C "$REPO_ROOT" rev-parse --verify HEAD) || die "cannot resolve checked-out commit"
+[ "$checked_out_commit" = "$SOURCE_COMMIT_SHA" ] || die "source commit does not match the checked-out commit"
+checked_out_ref="refs/heads/$(git -C "$REPO_ROOT" symbolic-ref --short HEAD)" || die "lifecycle requires a named source branch"
+[ "$checked_out_ref" = "$SOURCE_REF" ] || die "source ref does not match the checked-out branch"
+identity_json=$(
+  "$REPO_ROOT/scripts/deployment-identity.py" \
+    --repository "$SOURCE_REPOSITORY" --source-ref "$SOURCE_REF" \
+    --source-commit "$SOURCE_COMMIT_SHA" --owner-id "$DEPLOYMENT_OWNER_ID" \
+    --actor-id "$DEPLOYMENT_ACTOR_ID"
+) || die "deployment identity is invalid"
+DEPLOYMENT_ENVIRONMENT_KEY=$(jq -er '.environmentKey' <<<"$identity_json") || die "environment key is missing"
+SHOWCASE_BACKEND_KEY=$(jq -er '.stateKey' <<<"$identity_json") || die "state key is missing"
+ARTIFACT_SCOPE=$(jq -er '.artifactScope' <<<"$identity_json") || die "artifact scope is missing"
+unset identity_json checked_out_commit checked_out_ref
+configured_backend_key=$(sed -n 's/^[[:space:]]*key[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$BACKEND_CONFIG")
+[ "$configured_backend_key" = "$SHOWCASE_BACKEND_KEY" ] || die "backend key does not match the reviewed deployment environment"
+unset configured_backend_key
 
 credential_owner=$(stat -c %U "$CREDENTIAL_FILE")
 credential_mode=$(stat -c %a "$CREDENTIAL_FILE")
@@ -123,7 +175,7 @@ export XCSH_API_TOKEN="$XCSH_API_TOKEN_VALUE"
 unset XCSH_API_URL_VALUE XCSH_API_TOKEN_VALUE credential_line credential_value
 
 if [ -z "$PRIVATE_ROOT" ]; then
-  PRIVATE_ROOT="/home/$(id -un)/.local/state/multi-cloud-networking/showcase-$(date -u +%Y%m%dT%H%M%SZ)"
+  PRIVATE_ROOT="/home/$(id -un)/.local/state/multi-cloud-networking/${ARTIFACT_SCOPE}/showcase-$(date -u +%Y%m%dT%H%M%SZ)"
 fi
 case "$(realpath -m "$PRIVATE_ROOT")/" in "$REPO_ROOT"/*) die "private root must be outside the repository" ;; esac
 mkdir -p "$PRIVATE_ROOT"
@@ -133,6 +185,16 @@ umask 077
 TF_RUNNER=("$REPO_ROOT/scripts/terraform-with-aws-sso.sh" --profile "$AWS_PROFILE" --region "$AWS_REGION" --)
 tf() {
   "${TF_RUNNER[@]}" -chdir="$TERRAFORM_DIR" "$@"
+}
+IDENTITY_TF_ARGS=(
+  -var="source_repository=$SOURCE_REPOSITORY"
+  -var="source_ref=$SOURCE_REF"
+  -var="source_commit_sha=$SOURCE_COMMIT_SHA"
+  -var="deployment_owner_id=$DEPLOYMENT_OWNER_ID"
+  -var="deployment_actor_id=$DEPLOYMENT_ACTOR_ID"
+)
+tf_plan() {
+  tf plan "${IDENTITY_TF_ARGS[@]}" "$@"
 }
 
 terraform_version=$(terraform version -json | jq -r .terraform_version)
@@ -144,11 +206,33 @@ caller_account=$(AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_SDK_LOAD_CONFIG=1 \
 unset caller_account
 
 tf init -reconfigure -input=false -lockfile=readonly -backend-config="$BACKEND_CONFIG"
-generation_json=$(printf '%s\n' 'var.smsv2_site_generation' | tf console -var-file="$TFVARS") ||
+existing_provenance=$(tf output -json deployment_provenance 2>/dev/null || true)
+if [ -n "$existing_provenance" ] && [ "$existing_provenance" != null ]; then
+  jq -e \
+    --arg repository "$SOURCE_REPOSITORY" \
+    --arg source_ref "$SOURCE_REF" \
+    --arg environment_key "$DEPLOYMENT_ENVIRONMENT_KEY" \
+    --arg owner_id "$DEPLOYMENT_OWNER_ID" \
+    '.repository == $repository and .source_ref == $source_ref and
+     .environment_key == $environment_key and .owner_id == $owner_id' \
+    <<<"$existing_provenance" >/dev/null ||
+    die "cross-environment state ownership mismatch"
+fi
+unset existing_provenance
+generation_json=$(printf '%s\n' 'var.smsv2_site_generation' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS") ||
   die "cannot resolve smsv2_site_generation from tfvars"
 GENERATION=$(jq -er 'select(type == "string" and test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"))' <<<"$generation_json") ||
   die "smsv2_site_generation is not a DNS-style label"
 unset generation_json
+site_prefix_json=$(printf '%s\n' 'local.site_prefix' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS") ||
+  die "cannot resolve environment-scoped site prefix"
+SITE_PREFIX=$(jq -er 'select(type == "string" and test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"))' <<<"$site_prefix_json") ||
+  die "environment-scoped site prefix is not a DNS-style label"
+aws_resource_prefix_json=$(printf '%s\n' 'local.aws_resource_prefix' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS") ||
+  die "cannot resolve environment-scoped AWS prefix"
+AWS_RESOURCE_PREFIX=$(jq -er 'select(type == "string" and test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"))' <<<"$aws_resource_prefix_json") ||
+  die "environment-scoped AWS prefix is not a DNS-style label"
+unset site_prefix_json aws_resource_prefix_json
 
 libvirt_unit=""
 for candidate in libvirtd.service virtqemud.service; do
@@ -165,8 +249,8 @@ systemctl is-active --quiet docker.service || sudo -n systemctl enable --now doc
 final_sites=()
 bootstrap_sites=()
 for key in 01 02 03; do
-  final_sites+=("${COMPONENT}-${GENERATION}-aws-${AWS_REGION}-${key}")
-  bootstrap_sites+=("${COMPONENT}-${GENERATION}-aws-${AWS_REGION}-${key}-bootstrap")
+  final_sites+=("${SITE_PREFIX}-aws-${AWS_REGION}-${key}")
+  bootstrap_sites+=("${SITE_PREFIX}-aws-${AWS_REGION}-${key}-bootstrap")
 done
 
 common_phase_args=(
@@ -177,6 +261,13 @@ common_phase_args=(
   --creator-id "$CREATOR_ID"
   --deployment-generation "$GENERATION"
   --component "$COMPONENT"
+  --source-repository "$SOURCE_REPOSITORY"
+  --source-ref "$SOURCE_REF"
+  --source-commit-sha "$SOURCE_COMMIT_SHA"
+  --deployment-owner-id "$DEPLOYMENT_OWNER_ID"
+  --deployment-actor-id "$DEPLOYMENT_ACTOR_ID"
+  --deployment-environment-key "$DEPLOYMENT_ENVIRONMENT_KEY"
+  --backend-key "$SHOWCASE_BACKEND_KEY"
 )
 
 phase_paths() {
@@ -216,7 +307,7 @@ wait_for_approvals() {
     args+=(-var="aws_smsv2_device_mapping_file=$MAPPING_FILE")
   fi
   while ((SECONDS < deadline)); do
-    if tf plan "${args[@]}" -out="$probe" >/dev/null 2>&1; then
+    if tf_plan "${args[@]}" -out="$probe" >/dev/null 2>&1; then
       read -r aws_count kvm_count < <(tf show -json "$probe" | jq -r '
         [([.resource_changes[]? | select(.type == "xcsh_registration_approval" and .name == "aws" and .change.actions == ["create"])] | length),
          ([.resource_changes[]? | select(.type == "xcsh_registration_approval" and .name == "kvm" and .change.actions == ["create"])] | length)] | @tsv')
@@ -263,6 +354,9 @@ verify_configured() {
       --expected-aws-account "$AWS_ACCOUNT" --expected-aws-region "$AWS_REGION" \
       --expected-xc-tenant "$XC_TENANT" --creator-id "$CREATOR_ID" \
       --deployment-generation "$GENERATION" --component "$COMPONENT" \
+      --source-repository "$SOURCE_REPOSITORY" --source-ref "$SOURCE_REF" \
+      --source-commit-sha "$SOURCE_COMMIT_SHA" --deployment-owner-id "$DEPLOYMENT_OWNER_ID" \
+      --deployment-actor-id "$DEPLOYMENT_ACTOR_ID" \
       --expected-site "${final_sites[0]}" --expected-site "${final_sites[1]}" \
       --expected-site "${final_sites[2]}" --execute-uat
   fi
@@ -293,7 +387,7 @@ build_cycle() {
 destroy_all() {
   local cycle=$1 require_kvm=${2:-false}
   phase_paths "$cycle" full_destroy reviewed
-  tf plan -destroy -input=false -no-color -var-file="$TFVARS" \
+  tf_plan -destroy -input=false -no-color -var-file="$TFVARS" \
     -var='aws_site_configuration_phase=bootstrap' -var='enable_aws_tgw_connect=false' \
     -var='enable_kvm=false' -out="$PLAN_FILE"
   DESTROY_JSON=$(tf show -json "$PLAN_FILE")
@@ -312,10 +406,16 @@ destroy_all() {
     --expected-aws-account "$AWS_ACCOUNT" --expected-aws-region "$AWS_REGION" \
     --expected-xc-tenant "$XC_TENANT" --creator-id "$CREATOR_ID" \
     --deployment-generation "$GENERATION" --component "$COMPONENT" \
+    --source-repository "$SOURCE_REPOSITORY" --source-ref "$SOURCE_REF" \
+    --source-commit-sha "$SOURCE_COMMIT_SHA" --deployment-owner-id "$DEPLOYMENT_OWNER_ID" \
+    --deployment-actor-id "$DEPLOYMENT_ACTOR_ID" \
     --expected-site "${final_sites[0]}" --expected-site "${final_sites[1]}" --expected-site "${final_sites[2]}"
   plan_sha256="sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')"
   jq -n --arg phase full_destroy --arg plan_sha256 "$plan_sha256" \
-    '{phase:$phase,plan_sha256:$plan_sha256}' >"$EVIDENCE_DIR/plan-receipt.json"
+    --arg environment_key "$DEPLOYMENT_ENVIRONMENT_KEY" --arg source_commit "$SOURCE_COMMIT_SHA" \
+    --arg backend_key "$SHOWCASE_BACKEND_KEY" \
+    '{phase:$phase,plan_sha256:$plan_sha256,environment_key:$environment_key,source_commit:$source_commit,backend_key:$backend_key}' \
+    >"$EVIDENCE_DIR/plan-receipt.json"
   tf apply -input=false -no-color "$PLAN_FILE"
   rm -f -- "$PLAN_FILE"
   [ -z "$(tf state list)" ] || die "Terraform state is not empty after destroy"
@@ -323,7 +423,7 @@ destroy_all() {
 
 verify_absence() {
   local response_file="$PRIVATE_ROOT/xc-absence.json" status site
-  for site in "${final_sites[@]}" "${bootstrap_sites[@]}" "${COMPONENT}-${GENERATION}-kvm"; do
+  for site in "${final_sites[@]}" "${bootstrap_sites[@]}" "${SITE_PREFIX}-kvm"; do
     status=$(printf 'header = "Authorization: APIToken %s"\n' "$XCSH_API_TOKEN" |
       curl -sS --connect-timeout 10 --max-time 30 --config - --output "$response_file" --write-out '%{http_code}' \
         "$XCSH_API_URL/api/config/namespaces/system/securemesh_site_v2s/$site") || die "XC absence query failed"
@@ -342,7 +442,7 @@ observe_refresh_only_drift() {
   local cycle=$1 step=$2 expected_address=$3 drift_kind=$4 expected_value=$5 observed_value=$6
   local drift_json plan_sha256
   phase_paths "$cycle" refresh_only "$step"
-  tf plan -refresh-only -input=false -no-color -var-file="$TFVARS" \
+  tf_plan -refresh-only -input=false -no-color -var-file="$TFVARS" \
     -var='aws_site_configuration_phase=configured' -var='enable_aws_tgw_connect=true' \
     -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE"
   drift_json=$(tf show -json "$PLAN_FILE")
@@ -379,7 +479,9 @@ observe_refresh_only_drift() {
   plan_sha256="sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')"
   jq -n --arg phase refresh_only --arg drift_kind "$drift_kind" \
     --arg expected_address "$expected_address" --arg plan_sha256 "$plan_sha256" \
-    '{phase:$phase,drift_kind:$drift_kind,expected_address:$expected_address,plan_sha256:$plan_sha256}' \
+    --arg environment_key "$DEPLOYMENT_ENVIRONMENT_KEY" --arg source_commit "$SOURCE_COMMIT_SHA" \
+    --arg backend_key "$SHOWCASE_BACKEND_KEY" \
+    '{phase:$phase,drift_kind:$drift_kind,expected_address:$expected_address,plan_sha256:$plan_sha256,environment_key:$environment_key,source_commit:$source_commit,backend_key:$backend_key}' \
     >"$EVIDENCE_DIR/plan-receipt.json"
   chmod 600 "$EVIDENCE_DIR/plan-receipt.json"
   [ "$plan_sha256" = "sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')" ] ||
@@ -392,7 +494,7 @@ repair_eni_tag_drift() {
   local cycle=$1 eni_id drift_name expected_name repaired_name
   eni_id=$(tf state show -no-color 'aws_network_interface.slo[0]' | awk -F' = ' '$1 ~ /^[[:space:]]*id$/ {gsub(/\"/, "", $2); print $2; exit}')
   [ -n "$eni_id" ] || die "managed ENI identity is unavailable"
-  expected_name="${COMPONENT}-${GENERATION}-aws-ce-1-slo"
+  expected_name="${AWS_RESOURCE_PREFIX}-aws-ce-1-slo"
   drift_name="${expected_name}-drift-check"
   AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_SDK_LOAD_CONFIG=1 \
     aws ec2 create-tags --profile "$AWS_PROFILE" --region "$AWS_REGION" \
