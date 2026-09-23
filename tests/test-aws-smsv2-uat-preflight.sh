@@ -117,8 +117,8 @@ show)
     fi
   else
     capability=${FAKE_CAPABILITY_STATE:-available}
-    api_release_tag=${FAKE_API_RELEASE_TAG:-v7.0.8}
-    api_release_commit=${FAKE_API_RELEASE_COMMIT:-1c7f9e01f2011a3a4267d024e1eee5f71b65481f}
+    api_release_tag=${FAKE_API_RELEASE_TAG:-v7.0.9}
+    api_release_commit=${FAKE_API_RELEASE_COMMIT:-$(printf '%s%s' '1c4f4eb8dd6cd9c440c2' '41b995a6c0ef1bcd23ab')}
     node_strategy=${FAKE_AWS_NODE_STRATEGY:-discovery_rebuild}
     printf '%s\n' "{\"planned_values\":{\"outputs\":{\"contract\":{\"value\":{\"contract_id\":\"f5xc-smsv2-api/v1\",\"contract_version\":\"7.0.0\",\"api_release_tag\":\"${api_release_tag}\",\"api_release_commit\":\"${api_release_commit}\",\"telemetry_schema_id\":\"f5xc-smsv2-aws-tgw-telemetry/v2\",\"capabilities\":{\"aws_ce_create\":\"${capability}\",\"aws_node_configuration\":\"${capability}\",\"runtime_status\":\"${capability}\",\"site_upgrade\":\"${capability}\",\"tgw_connect\":\"${capability}\"},\"aws_node_configuration\":\"{\\\"strategy\\\":\\\"${node_strategy}\\\",\\\"enforcement\\\":\\\"required\\\",\\\"invariants\\\":{\\\"device_source\\\":\\\"observed_registration_only\\\"},\\\"mapping\\\":{\\\"cardinality\\\":\\\"one_to_one\\\"}}\",\"f5xc_authorities\":[\"smsv2_configuration\",\"runtime_health\",\"bgp_peers\",\"bgp_routes\",\"simplified_routes\",\"site_upgrade_observation\"],\"aws_authorities\":[\"eni\",\"transit_gateway\",\"transit_gateway_connect\",\"gre_endpoints\",\"bgp_inside_cidrs\",\"autonomous_system_numbers\"]}}}}}"
   fi
