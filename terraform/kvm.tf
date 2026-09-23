@@ -57,7 +57,7 @@ resource "libvirt_pool" "kvm" {
 
 resource "terraform_data" "kvm_ce_image_cache" {
   count            = var.enable_kvm ? 1 : 0
-  triggers_replace = [data.xcsh_site_image.kvm[0].image_download_url, data.xcsh_site_image.kvm[0].image_md5_sum]
+  triggers_replace = [data.xcsh_site_image.kvm[0].image_md5_sum]
   provisioner "local-exec" {
     command     = "../scripts/ensure-verified-kvm-image.sh --url \"$IMAGE_URL\" --digest \"md5:$IMAGE_MD5\" --destination \"$IMAGE_DESTINATION\""
     working_dir = path.root
