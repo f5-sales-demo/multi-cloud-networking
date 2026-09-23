@@ -121,7 +121,7 @@ resource "xcsh_token" "kvm" {
   name        = "${local.kvm_site_name}-registration"
   namespace   = "system"
   description = "Site-bound JWT for KVM SecureMesh site ${local.kvm_site_name}"
-  labels      = local.kvm_xc_labels
+  labels      = local.kvm_token_labels
   type        = 1
   site_name   = xcsh_securemesh_site_v2.onprem_kvm[0].name
 
