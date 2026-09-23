@@ -36,15 +36,17 @@ resource "terraform_data" "kvm_network_identity" {
 data "xcsh_site_image" "kvm" {
   count = var.enable_kvm ? 1 : 0
 
-  site_name = xcsh_securemesh_site_v2.onprem_kvm[0].name
+  site_name  = local.kvm_site_name
+  depends_on = [xcsh_securemesh_site_v2.onprem_kvm]
 }
 
 data "xcsh_site_cloud_init" "kvm" {
   count = var.enable_kvm ? 1 : 0
 
   provider_ref              = "kvm"
-  site_name                 = xcsh_securemesh_site_v2.onprem_kvm[0].name
+  site_name                 = local.kvm_site_name
   enable_management_network = false
+  depends_on                = [xcsh_securemesh_site_v2.onprem_kvm]
 }
 
 resource "libvirt_pool" "kvm" {
