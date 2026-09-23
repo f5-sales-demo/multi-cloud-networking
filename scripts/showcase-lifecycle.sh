@@ -163,7 +163,7 @@ if [ "$MODE" = kvm-lan-preflight ]; then
   receipt_tmp=$(mktemp "$receipt_parent/.kvm-lan-receipt.XXXXXX")
   trap 'rm -f -- "$plan_json" "$receipt_tmp"' EXIT
   chmod 600 "$plan_json" "$receipt_tmp"
-  terraform show -json "$KVM_LAN_PLAN" >"$plan_json"
+  terraform -chdir="$TERRAFORM_DIR" show -json "$KVM_LAN_PLAN" >"$plan_json"
   python3 "$REPO_ROOT/scripts/kvm-lan-plan-scope.py" \
     --stage "$KVM_LAN_STAGE" --plan-sha256 "$KVM_LAN_PLAN_SHA256" \
     --source-ref "$SOURCE_REF" --source-commit-sha "$SOURCE_COMMIT_SHA" \
