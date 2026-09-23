@@ -92,7 +92,9 @@ concurrency:
 env:
   TF_IN_AUTOMATION: 'true'
   TF_VAR_source_repository: f5-sales-demo/multi-cloud-networking
-  TF_VAR_source_ref: ${{ format('refs/heads/{0}', github.head_ref || github.ref_name) }}
+  # The general Terraform suite asserts stable production names. Dedicated
+  # deployment_provenance tests exercise preview refs explicitly.
+  TF_VAR_source_ref: refs/heads/main
   TF_VAR_source_commit_sha: ${{ github.event.pull_request.head.sha || github.sha }}
   TF_VAR_deployment_owner_id: showcase-team
   TF_VAR_deployment_actor_id: github-actions

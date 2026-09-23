@@ -9,6 +9,7 @@ outputs="$repo_root/terraform/outputs.tf"
 backend="$repo_root/scripts/configure-aws-state-backend.sh"
 lifecycle="$repo_root/scripts/showcase-lifecycle.sh"
 documentation="$repo_root/docs/en/demo/deployment-provenance.mdx"
+workflow="$repo_root/.github/workflows/terraform.yml"
 
 fail() {
   printf 'FAIL: %s\n' "$*" >&2
@@ -37,6 +38,8 @@ require 'showcase_backend_key' "$backend"
 require '--source-ref' "$lifecycle"
 require 'deployment-identity.py' "$lifecycle"
 require 'cross-environment' "$lifecycle"
+require 'TF_VAR_source_ref: refs/heads/main' "$workflow"
+require 'preview_site_prefix' "$locals_file"
 require 'refs/pull/' "$documentation"
 require 'feature/a' "$documentation"
 require 'feature-a' "$documentation"

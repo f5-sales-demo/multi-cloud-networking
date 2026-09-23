@@ -70,7 +70,11 @@ locals {
   # mcn-ce-ha-* generation has unrecoverable generic-name reservations in Sales
   # Demo, so a fresh complete showcase must never attempt to recreate it.
   site_prefix_base = coalesce(var.site_prefix, "${var.component}-${var.smsv2_site_generation}")
-  site_prefix      = local.deployment_is_production ? local.site_prefix_base : "mcn-${local.deployment_environment_key}"
+  # XC site names add the AWS region, node number, and optional `-bootstrap`.
+  # Bound the readable prefix so the longest validated name remains at the
+  # provider's 64-character limit while retaining the full identity in state.
+  preview_site_prefix = "mcn-${trimsuffix(substr(local.source_branch_slug, 0, 15), "-")}-${substr(local.source_ref_sha256, 0, 12)}"
+  site_prefix         = local.deployment_is_production ? local.site_prefix_base : local.preview_site_prefix
   # AWS has account-global names for key pairs, IAM identities, and ELBv2
   # objects. Keep them in the same immutable generation as the site names so
   # a clean deployment cannot collide with stale component-only resources.
