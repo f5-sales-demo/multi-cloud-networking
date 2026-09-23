@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Unit tests for deterministic deployment identity and provenance."""
 
 from __future__ import annotations
@@ -9,6 +8,7 @@ import pathlib
 import subprocess
 import sys
 import unittest
+from typing import Any, ClassVar
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "deployment-identity.py"
@@ -17,7 +17,8 @@ SCRIPT = ROOT / "scripts" / "deployment-identity.py"
 def load_module():
     spec = importlib.util.spec_from_file_location("deployment_identity", SCRIPT)
     if spec is None or spec.loader is None:
-        raise RuntimeError("cannot load deployment identity module")
+        message = "cannot load deployment identity module"
+        raise RuntimeError(message)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -25,6 +26,8 @@ def load_module():
 
 
 class DeploymentIdentityTests(unittest.TestCase):
+    module: ClassVar[Any]
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.module = load_module()
@@ -42,9 +45,7 @@ class DeploymentIdentityTests(unittest.TestCase):
         main = self.identity("refs/heads/main")
         self.assertTrue(main["production"])
         self.assertEqual(main["environmentKey"], "production")
-        self.assertEqual(
-            main["stateKey"], "mcn-ce-ha-smsv2/showcase.tfstate"
-        )
+        self.assertEqual(main["stateKey"], "mcn-ce-ha-smsv2/showcase.tfstate")
         for ref in (
             "refs/heads/Main",
             "refs/heads/prod",
@@ -106,28 +107,29 @@ class DeploymentIdentityTests(unittest.TestCase):
             ),
         )
         for repository, ref, commit in invalid:
-            with self.subTest(repository=repository, ref=ref, commit=commit):
-                with self.assertRaises(ValueError):
-                    self.module.build_identity(
-                        repository=repository,
-                        source_ref=ref,
-                        source_commit=commit,
-                        owner_id="showcase-team",
-                        actor_id="github-actions",
-                    )
+            with (
+                self.subTest(repository=repository, ref=ref, commit=commit),
+                self.assertRaises(ValueError),
+            ):
+                self.module.build_identity(
+                    repository=repository,
+                    source_ref=ref,
+                    source_commit=commit,
+                    owner_id="showcase-team",
+                    actor_id="github-actions",
+                )
         for unsafe in ("Robin Example", "person@example.com", "", "prod_owner"):
-            with self.subTest(unsafe=unsafe):
-                with self.assertRaises(ValueError):
-                    self.module.build_identity(
-                        repository="f5-sales-demo/multi-cloud-networking",
-                        source_ref="refs/heads/feature/a",
-                        source_commit="a" * 40,
-                        owner_id=unsafe,
-                        actor_id="github-actions",
-                    )
+            with self.subTest(unsafe=unsafe), self.assertRaises(ValueError):
+                self.module.build_identity(
+                    repository="f5-sales-demo/multi-cloud-networking",
+                    source_ref="refs/heads/feature/a",
+                    source_commit="a" * 40,
+                    owner_id=unsafe,
+                    actor_id="github-actions",
+                )
 
     def test_cli_emits_one_secret_free_json_document(self) -> None:
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             [
                 sys.executable,
                 str(SCRIPT),

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Derive the canonical MCN deployment identity from trusted source inputs."""
+# pylint: disable=invalid-name
 
 from __future__ import annotations
 
@@ -21,9 +22,8 @@ HASH_LENGTH = 12
 
 def _validated_identifier(name: str, value: str) -> str:
     if not IDENTIFIER.fullmatch(value) or "@" in value:
-        raise ValueError(
-            f"{name} must be a non-personal lowercase identifier using letters, digits and hyphens"
-        )
+        message = f"{name} must be a non-personal lowercase identifier using letters, digits and hyphens"
+        raise ValueError(message)
     return value
 
 
@@ -37,7 +37,8 @@ def _readable_slug(branch: str) -> str:
 def _validated_branch(source_ref: str) -> str:
     match = BRANCH_REF.fullmatch(source_ref)
     if not match:
-        raise ValueError("source_ref must be an exact refs/heads/* ref, never a PR merge ref")
+        message = "source_ref must be an exact refs/heads/* ref, never a PR merge ref"
+        raise ValueError(message)
     branch = match.group(1)
     components = branch.split("/")
     if (
@@ -46,15 +47,15 @@ def _validated_branch(source_ref: str) -> str:
         or "@{" in branch
         or "\\" in branch
         or any(character in branch for character in "~^:?*[")
-        or any(
-            not component
-            or component.startswith(".")
-            or component.endswith(".")
-            or component.endswith(".lock")
-            for component in components
-        )
     ):
-        raise ValueError("source_ref is not a valid Git branch ref")
+        message = "source_ref is not a valid Git branch ref"
+        raise ValueError(message)
+    if any(
+        not component or component.startswith(".") or component.endswith((".", ".lock"))
+        for component in components
+    ):
+        message = "source_ref contains an invalid Git branch component"
+        raise ValueError(message)
     return branch
 
 
@@ -78,10 +79,12 @@ def build_identity(
 ) -> dict[str, Any]:
     """Return a validated, deterministic identity with isolated state scopes."""
     if repository != CANONICAL_REPOSITORY:
-        raise ValueError(f"repository must be exactly {CANONICAL_REPOSITORY}")
+        message = f"repository must be exactly {CANONICAL_REPOSITORY}"
+        raise ValueError(message)
     branch = _validated_branch(source_ref)
     if not COMMIT.fullmatch(source_commit):
-        raise ValueError("source_commit must be an immutable lowercase 40-hex commit")
+        message = "source_commit must be an immutable lowercase 40-hex commit"
+        raise ValueError(message)
     owner_id = _validated_identifier("owner_id", owner_id)
     actor_id = _validated_identifier("actor_id", actor_id)
 
@@ -125,6 +128,7 @@ def build_identity(
 
 
 def main() -> int:
+    """Validate CLI arguments and emit one canonical JSON document."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", required=True)
     parser.add_argument("--source-ref", required=True)
