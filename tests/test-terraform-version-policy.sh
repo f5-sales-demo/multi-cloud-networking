@@ -110,6 +110,37 @@ else
   bad "expected two workflow path filters, found ${trigger_count}"
 fi
 
+echo "7. provider v10.1.0 uses one immutable API release identity"
+api_tag='v7.0.9'
+release_revision_left='1c4f4eb8dd6cd9c440c2'
+release_revision_right='41b995a6c0ef1bcd23ab'
+for relative in terraform/aws_tgw_connect.tf terraform/tests/aws_tgw_connect.tftest.hcl \
+  scripts/aws-smsv2-uat-preflight.sh tests/test-aws-smsv2-uat-preflight.sh \
+  docs/en/demo/deploy.mdx; do
+  if grep -Fq "$api_tag" "${REPO_ROOT}/${relative}"; then
+    ok "${relative} requires ${api_tag}"
+  else
+    bad "${relative} is missing ${api_tag}"
+  fi
+done
+for relative in terraform/aws_tgw_connect.tf terraform/tests/aws_tgw_connect.tftest.hcl \
+  scripts/aws-smsv2-uat-preflight.sh tests/test-aws-smsv2-uat-preflight.sh; do
+  if grep -Fq "$release_revision_left" "${REPO_ROOT}/${relative}" &&
+    grep -Fq "$release_revision_right" "${REPO_ROOT}/${relative}"; then
+    ok "${relative} requires the exact v7.0.9 commit"
+  else
+    bad "${relative} is missing the exact v7.0.9 commit"
+  fi
+done
+legacy_api_tag='v7''.''0''.''8'
+if grep -R -n -F "$legacy_api_tag" \
+  "${REPO_ROOT}/terraform" "${REPO_ROOT}/scripts" "${REPO_ROOT}/tests" \
+  "${REPO_ROOT}/docs/en"; then
+  bad "the previous immutable API release remains"
+else
+  ok "the previous immutable API release is absent"
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   echo "PASS: Terraform version policy"
 else
