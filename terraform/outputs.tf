@@ -359,6 +359,7 @@ output "kvm_runtime_status" {
 output "kvm_lan_contract" {
   description = "Secret-free staged KVM LAN ownership, addressing, and realized-interface summary; null while disabled."
   value = local.kvm_lan_enabled ? {
+    site_name          = local.kvm_site_name
     phase              = var.kvm_lan_configuration_phase
     bridge             = var.kvm_lan.bridge
     uplink             = var.kvm_lan.uplink
