@@ -16,8 +16,24 @@ resource "xcsh_securemesh_site_v2" "onprem_kvm" {
           hostname = node_list.value.hostname
           type     = "Control"
 
+          # XC requires the primary SLO in every node update, but rejects any
+          # attempt to alter its runtime-created identity. Preserve the exact
+          # registered shape: device-derived name, MTU 0, owned MAC, and DHCP.
           interface_list {
-            name = node_list.value.sli_interface_name
+            name = node_list.value.slo_device
+            mtu  = 0
+            ethernet_interface {
+              device = node_list.value.slo_device
+              mac    = local.kvm_ce_nodes["01"].mac
+            }
+            network_option {
+              site_local_network = {}
+            }
+            dhcp_client = {}
+          }
+
+          interface_list {
+            name = node_list.value.sli_device
             mtu  = var.kvm_lan.mtu
             ethernet_interface {
               device = node_list.value.sli_device
