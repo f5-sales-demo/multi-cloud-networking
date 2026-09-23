@@ -146,9 +146,10 @@ run "configured_phase_declares_one_slo_one_sli_and_inside_vip" {
       xcsh_origin_pool.kvm_lan[0].port == 8080 &&
       length(xcsh_http_loadbalancer.kvm_lan[0].domains) == 1 &&
       one(xcsh_http_loadbalancer.kvm_lan[0].domains) == "app.example.com" &&
-      local.kvm_lan_interface_contract_v1.node_count == 1 &&
-      local.kvm_lan_interface_contract_v1.roles == toset(["slo", "sli"]) &&
-      local.kvm_lan_interface_contract_v1.bgp_session_count == 1 &&
+      length(libvirt_domain.ce_node) == 1 &&
+      length(libvirt_domain.ce_node["01"].network_interface) == 2 &&
+      libvirt_domain.ce_node["01"].network_interface[0].mac == "52:54:00:10:00:11" &&
+      libvirt_domain.ce_node["01"].network_interface[1].mac == "52:54:00:20:00:11" &&
       length(xcsh_bgp.onprem_ebgp) == 1 &&
       xcsh_http_loadbalancer.kvm_lan[0].http.port == 80 &&
       xcsh_http_loadbalancer.kvm_lan[0].advertise_custom.advertise_where[0].port == 80 &&

@@ -5,12 +5,6 @@ locals {
   kvm_lan_enabled    = var.enable_kvm && var.enable_kvm_lan && var.kvm_lan != null
   kvm_lan_configured = local.kvm_lan_enabled && var.kvm_lan_configuration_phase == "configured" && var.kvm_lan_observed_node != null
   kvm_lan_name_stem  = "${substr(local.kvm_site_name, 0, 43)}-${substr(sha256(local.kvm_site_name), 0, 8)}"
-  kvm_lan_interface_contract_v1 = {
-    version           = "1.0.0"
-    node_count        = 1
-    roles             = toset(["slo", "sli"])
-    bgp_session_count = 1
-  }
 }
 
 check "kvm_lan_prerequisites" {

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate one full-root saved plan for the staged KVM LAN rollout."""
+# pylint: disable=invalid-name
 # ruff: noqa: D103, EM101, EM102, PLR2004, S603, TRY003, TRY004, TRY300, TRY301
 
 from __future__ import annotations
@@ -190,8 +191,10 @@ def verify_host_network(contract: dict[str, Any]) -> None:
     uplink_name = host.get("uplink")
     expected_mac = host.get("uplink_mac")
     expected_mtu = host.get("mtu")
-    if not all(
-        isinstance(value, str) for value in (bridge_name, uplink_name, expected_mac)
+    if (
+        not isinstance(bridge_name, str)
+        or not isinstance(uplink_name, str)
+        or not isinstance(expected_mac, str)
     ):
         raise ValueError("validated plan did not yield a host-network identity")
 
