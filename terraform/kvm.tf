@@ -35,31 +35,36 @@ resource "terraform_data" "kvm_network_identity" {
 # The Sales Demo tenant issues the currently supported KVM CE appliance as a
 # signed image URL. Never substitute a generic cloud OS: it has no VPM runtime.
 data "xcsh_site_image" "kvm" {
-  count = var.enable_kvm ? 1 : 0
+  count = var.enable_kvm && var.kvm_lan_configuration_phase != "configured" ? 1 : 0
 
+  site_name  = local.kvm_site_name
+  depends_on = [xcsh_securemesh_site_v2.onprem_kvm]
+}
+
+data "xcsh_site_image" "kvm_configured" {
+  count     = var.enable_kvm && var.kvm_lan_configuration_phase == "configured" ? 1 : 0
   site_name = local.kvm_site_name
-
-  lifecycle {
-    precondition {
-      condition     = xcsh_securemesh_site_v2.onprem_kvm[0].id != ""
-      error_message = "KVM image lookup requires the owned site identity."
-    }
-  }
 }
 
 data "xcsh_site_cloud_init" "kvm" {
-  count = var.enable_kvm ? 1 : 0
+  count = var.enable_kvm && var.kvm_lan_configuration_phase != "configured" ? 1 : 0
 
   provider_ref              = "kvm"
   site_name                 = local.kvm_site_name
   enable_management_network = false
+  depends_on                = [xcsh_securemesh_site_v2.onprem_kvm]
+}
 
-  lifecycle {
-    precondition {
-      condition     = xcsh_securemesh_site_v2.onprem_kvm[0].id != ""
-      error_message = "KVM cloud-init lookup requires the owned site identity."
-    }
-  }
+data "xcsh_site_cloud_init" "kvm_configured" {
+  count                     = var.enable_kvm && var.kvm_lan_configuration_phase == "configured" ? 1 : 0
+  provider_ref              = "kvm"
+  site_name                 = local.kvm_site_name
+  enable_management_network = false
+}
+
+locals {
+  kvm_site_image      = var.enable_kvm ? (var.kvm_lan_configuration_phase == "configured" ? data.xcsh_site_image.kvm_configured[0] : data.xcsh_site_image.kvm[0]) : null
+  kvm_site_cloud_init = var.enable_kvm ? (var.kvm_lan_configuration_phase == "configured" ? data.xcsh_site_cloud_init.kvm_configured[0] : data.xcsh_site_cloud_init.kvm[0]) : null
 }
 
 resource "libvirt_pool" "kvm" {
@@ -71,14 +76,14 @@ resource "libvirt_pool" "kvm" {
 
 resource "terraform_data" "kvm_ce_image_cache" {
   count            = var.enable_kvm ? 1 : 0
-  triggers_replace = [data.xcsh_site_image.kvm[0].image_md5_sum]
+  triggers_replace = [local.kvm_site_image.image_md5_sum]
   provisioner "local-exec" {
     command     = "../scripts/ensure-verified-kvm-image.sh --url \"$IMAGE_URL\" --digest \"md5:$IMAGE_MD5\" --destination \"$IMAGE_DESTINATION\""
     working_dir = path.root
     environment = {
-      IMAGE_URL         = data.xcsh_site_image.kvm[0].image_download_url
-      IMAGE_MD5         = data.xcsh_site_image.kvm[0].image_md5_sum
-      IMAGE_DESTINATION = "${local.kvm_image_cache_dir}/f5xc-${data.xcsh_site_image.kvm[0].image_md5_sum}.qcow2"
+      IMAGE_URL         = local.kvm_site_image.image_download_url
+      IMAGE_MD5         = local.kvm_site_image.image_md5_sum
+      IMAGE_DESTINATION = "${local.kvm_image_cache_dir}/f5xc-${local.kvm_site_image.image_md5_sum}.qcow2"
     }
   }
 }
@@ -125,9 +130,9 @@ resource "libvirt_network" "ce_bgp_net" {
 resource "libvirt_volume" "base_cloud" {
   count = var.enable_kvm ? 1 : 0
 
-  name       = "f5xc-kvm-ce-${data.xcsh_site_image.kvm[0].image_md5_sum}.qcow2"
+  name       = "f5xc-kvm-ce-${local.kvm_site_image.image_md5_sum}.qcow2"
   pool       = libvirt_pool.kvm[0].name
-  source     = "${local.kvm_image_cache_dir}/f5xc-${data.xcsh_site_image.kvm[0].image_md5_sum}.qcow2"
+  source     = "${local.kvm_image_cache_dir}/f5xc-${local.kvm_site_image.image_md5_sum}.qcow2"
   format     = "qcow2"
   depends_on = [terraform_data.kvm_ce_image_cache]
 }
@@ -150,7 +155,7 @@ resource "libvirt_cloudinit_disk" "ce_cloudinit" {
   # The provider returns the modern /etc/vpm/user_data template. It has the
   # lowercase placeholder exactly once; this CE receives its own type-1 JWT.
   user_data = replace(
-    data.xcsh_site_cloud_init.kvm[0].cloud_init_config,
+    local.kvm_site_cloud_init.cloud_init_config,
     "{{ .token }}",
     xcsh_token.kvm[0].uid,
   )
