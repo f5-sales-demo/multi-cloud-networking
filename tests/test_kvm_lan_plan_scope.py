@@ -23,6 +23,15 @@ def plan(stage, changes, resources):
             "enable_kvm": {"value": True},
             "enable_kvm_lan": {"value": True},
             "kvm_lan_configuration_phase": {"value": stage},
+            "kvm_lan_observed_node": {
+                "value": {
+                    "hostname": "onprem-ce-01-674f7",
+                    "slo_device": "ens3",
+                    "sli_device": "ens4",
+                    "slo_interface_name": "ves-io-securemesh-site-v2-test-network-onprem-ce-01-674f7-ens3-0",
+                    "sli_interface_name": "ves-io-securemesh-site-v2-test-network-onprem-ce-01-674f7-ens4-0",
+                }
+            },
             "kvm_lan": {
                 "value": {
                     "bridge": "br-lan-demo",
@@ -178,9 +187,95 @@ class PlanScopeTests(unittest.TestCase):
     def test_configured_stage_requires_exact_owned_application_set(self):
         changes = [
             {
+                "address": 'xcsh_network_interface.kvm_lan_sli["sli"]',
+                "type": "xcsh_network_interface",
+                "name": "kvm_lan_sli",
+                "change": {
+                    "actions": ["update"],
+                    "importing": {
+                        "id": "system/ves-io-securemesh-site-v2-test-network-onprem-ce-01-674f7-ens4-0"
+                    },
+                },
+            },
+            *[
+                {
+                    "address": f"{resource_type}.kvm_lan[0]",
+                    "type": resource_type,
+                    "name": "kvm_lan",
+                    "change": {"actions": ["create"]},
+                }
+                for resource_type in (
+                    "xcsh_virtual_site",
+                    "xcsh_origin_pool",
+                    "xcsh_http_loadbalancer",
+                )
+            ],
+        ]
+        resources = [
+            {
+                "address": 'xcsh_network_interface.kvm_lan_sli["sli"]',
+                "values": {
+                    "name": "ves-io-securemesh-site-v2-test-network-onprem-ce-01-674f7-ens4-0",
+                    "namespace": "system",
+                    "ethernet_interface": {
+                        "device": "ens4",
+                        "node": "onprem-ce-01-674f7",
+                        "mtu": 1500,
+                        "site_local_inside_network": {},
+                        "no_ipv6_address": {},
+                        "untagged": {},
+                        "not_primary": {},
+                        "dhcp_client": None,
+                        "static_ip": {"node_static_ip": {"ip_address": "192.0.2.2/24"}},
+                    },
+                },
+            }
+        ]
+        receipt = MODULE.validate_plan(
+            plan("configured", changes, resources), "configured"
+        )
+        self.assertEqual(receipt["change_count"], 4)
+        self.assertEqual(receipt["stage"], "configured")
+        self.assertEqual(
+            receipt["interface_import_id"],
+            "system/ves-io-securemesh-site-v2-test-network-onprem-ce-01-674f7-ens4-0",
+        )
+
+    def test_configured_stage_rejects_missing_origin(self):
+        changes = [
+            {
+                "address": 'xcsh_network_interface.kvm_lan_sli["sli"]',
+                "type": "xcsh_network_interface",
+                "name": "kvm_lan_sli",
+                "change": {
+                    "actions": ["update"],
+                    "importing": {
+                        "id": "system/ves-io-securemesh-site-v2-test-network-onprem-ce-01-674f7-ens4-0"
+                    },
+                },
+            }
+        ]
+        with self.assertRaisesRegex(ValueError, "missing"):
+            MODULE.validate_plan(plan("configured", changes, []), "configured")
+
+    def test_configured_stage_rejects_site_update(self):
+        changes = [
+            {
                 "address": "xcsh_securemesh_site_v2.onprem_kvm[0]",
                 "type": "xcsh_securemesh_site_v2",
                 "name": "onprem_kvm",
+                "change": {"actions": ["update"]},
+            }
+        ]
+        with self.assertRaisesRegex(ValueError, "outside"):
+            MODULE.validate_plan(plan("configured", changes, []), "configured")
+
+    def test_configured_stage_rejects_unimported_interface_update(self):
+        changes = [
+            {
+                "address": 'xcsh_network_interface.kvm_lan_sli["sli"]',
+                "type": "xcsh_network_interface",
+                "name": "kvm_lan_sli",
                 "change": {"actions": ["update"]},
             },
             *[
@@ -197,20 +292,7 @@ class PlanScopeTests(unittest.TestCase):
                 )
             ],
         ]
-        receipt = MODULE.validate_plan(plan("configured", changes, []), "configured")
-        self.assertEqual(receipt["change_count"], 4)
-        self.assertEqual(receipt["stage"], "configured")
-
-    def test_configured_stage_rejects_missing_origin(self):
-        changes = [
-            {
-                "address": "xcsh_securemesh_site_v2.onprem_kvm[0]",
-                "type": "xcsh_securemesh_site_v2",
-                "name": "onprem_kvm",
-                "change": {"actions": ["update"]},
-            }
-        ]
-        with self.assertRaisesRegex(ValueError, "required"):
+        with self.assertRaisesRegex(ValueError, "must import"):
             MODULE.validate_plan(plan("configured", changes, []), "configured")
 
 
