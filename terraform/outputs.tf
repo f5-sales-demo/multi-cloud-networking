@@ -356,6 +356,35 @@ output "kvm_runtime_status" {
   } : null
 }
 
+output "kvm_lan_contract" {
+  description = "Secret-free staged KVM LAN ownership, addressing, and realized-interface summary; null while disabled."
+  value = local.kvm_lan_enabled ? {
+    phase              = var.kvm_lan_configuration_phase
+    bridge             = var.kvm_lan.bridge
+    uplink             = var.kvm_lan.uplink
+    ownership          = var.kvm_lan.ownership
+    vlan_mode          = var.kvm_lan.vlan_mode
+    vlan_id            = var.kvm_lan.vlan_id
+    mtu                = var.kvm_lan.mtu
+    sli_mac            = var.kvm_lan.sli_mac
+    sli_cidr           = var.kvm_lan.sli_cidr
+    vip                = var.kvm_lan.vip
+    vip_reservation    = var.kvm_lan.vip_reservation
+    backend_ip         = var.kvm_lan.backend_ip
+    backend_port       = var.kvm_lan.backend_port
+    backend_owner      = var.kvm_lan.backend_owner
+    http_domain        = var.kvm_lan.http_domain
+    access_scope       = var.kvm_lan.access_scope
+    observed_hostname  = try(var.kvm_lan_observed_node.hostname, null)
+    observed_slo       = try(var.kvm_lan_observed_node.slo_device, null)
+    observed_sli       = try(var.kvm_lan_observed_node.sli_device, null)
+    realized_sli       = try(data.external.kvm_lan_network_interface[0].result.interface_name, null)
+    virtual_site_name  = try(xcsh_virtual_site.kvm_lan[0].name, null)
+    origin_pool_name   = try(xcsh_origin_pool.kvm_lan[0].name, null)
+    load_balancer_name = try(xcsh_http_loadbalancer.kvm_lan[0].name, null)
+  } : null
+}
+
 output "aws_tgw_id" {
   description = "AWS Transit Gateway identity."
   value       = try(module.aws_tgw_connect[0].transit_gateway_id, null)

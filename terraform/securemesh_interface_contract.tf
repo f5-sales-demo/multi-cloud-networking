@@ -1,4 +1,4 @@
-# Secure Mesh interface contract v1 is deliberately SLO-only. The artifact
+# The Azure Secure Mesh interface contract v1 is deliberately SLO-only. The artifact
 # captured by scripts/capture_ce_interface_evidence.py may diagnose Azure NIC
 # identities, but it cannot make external or SLI configurable without a later
 # immutable contract revision that publishes their F5 control-plane mappings.

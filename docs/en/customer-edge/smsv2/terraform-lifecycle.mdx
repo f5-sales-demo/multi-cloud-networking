@@ -89,6 +89,54 @@ node. Stage membership controls JWT issuance and routing dependencies as well as
 Cloud-init records remain stable for all sites; admission does not delete their records.
 Targeted plans are recovery tools; they do not replace the final complete plan.
 
+## Stage the optional KVM physical-LAN SLI
+
+The active Terraform root can add one physical-LAN Site Local Inside (SLI) NIC to
+the existing single-node KVM CE. It is default-off: `enable_kvm_lan = false`
+leaves the released one-NIC Site Local Outside (SLO) topology unchanged. The root
+does not create, enslave, readdress, or delete the host bridge or physical uplink.
+Only an explicitly inventoried `preprovisioned-shared` bridge is supported.
+Trunk mode is rejected until guest VLAN tagging has its own implementation and
+acceptance evidence.
+
+Treat this as a two-plan rebuild, not a hot-add. Libvirt provider 0.8.3 does not
+realize an added NIC through its domain Update path:
+
+1. Record the bridge and uplink owner, exact uplink MAC, access VLAN behavior, MTU,
+   IPv4 and IPv6 users, switch multi-MAC/anti-spoof approval, duplicate-address
+   checks, reserved VIP, real HTTP origin owner, local DNS name, and access scope.
+2. Set `enable_kvm_lan = true`, set `kvm_lan_configuration_phase = "hardware"`,
+   and supply the complete `kvm_lan` object. Leave `kvm_lan_observed_node = null`.
+3. Create a full-root saved plan with
+   `-replace='libvirt_domain.ce_node["01"]'`. Do not use `-target`. The plan must
+   replace only the owned CE domain, keep SLO first, and create the bridged SLI
+   second. Review its SHA-256 with `showcase-lifecycle.sh --mode kvm-lan-preflight`.
+4. Apply that reviewed plan through the normal saved-plan path. After the rebuilt
+   CE registers, correlate both devices to the Terraform-owned MACs. Do not guess
+   `ethX` or reuse a prior registration suffix.
+5. Set `kvm_lan_configuration_phase = "configured"` and supply the exact staged
+   hostname, devices, and interface names in `kvm_lan_observed_node`. Review a
+   second full-root plan. It may update only the owned site and create the owned
+   KVM LAN virtual site, origin pool, and HTTP load balancer.
+6. Apply the reviewed plan, then prove the CE is online, the original single BGP
+   peer remains established, exactly one SLO and one SLI exist, and an independent
+   LAN client reaches the real origin through the inside custom VIP on port 80.
+   Finish with a refresh-enabled zero-change plan.
+
+The preflight mode checks the exact saved-plan digest, rejects AWS, Azure, shared,
+or other unrelated actions, and observes that the declared bridge/uplink/MAC/MTU
+already match the host. It exits before credential loading, service enablement,
+Terraform initialization, or apply/destroy. Receipts are written mode `0600`
+outside the repository. It does not prove the switch VLAN, IP reservation, local
+DNS, origin service, ARP/neighbor behavior, return route, or client traffic; those
+remain mandatory live acceptance evidence.
+
+Disabling the feature removes only Terraform-owned XC application objects and
+the CE's declared SLI topology. The shared bridge, uplink, physical LAN, local DNS,
+and real origin are external prerequisites and must survive teardown. Review that
+teardown as its own full-root saved plan; never infer authorization from this
+documentation or run the unified lifecycle's destructive modes for inspection.
+
 ## Decide between upgrade and replacement
 
 HA and registered SLO identity have platform immutability constraints. Review actual

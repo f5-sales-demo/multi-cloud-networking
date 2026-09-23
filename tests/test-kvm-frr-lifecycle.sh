@@ -11,6 +11,7 @@ workload="$repo_root/terraform/onprem_workload.tf"
 variables="$repo_root/terraform/variables.tf"
 resolver="$repo_root/terraform/scripts/xc-kvm-network-interface.py"
 observer="$repo_root/terraform/scripts/xc-kvm-bgp-observer.py"
+plan_scope="$repo_root/scripts/kvm-lan-plan-scope.py"
 
 fail() {
   printf 'FAIL: %s\n' "$*" >&2
@@ -106,8 +107,12 @@ reject 'name      = "eth0"' "$onprem"
 require 'owner.get("uid")' "$resolver"
 require 'infra.get("provider")' "$resolver"
 require 'network.get("mac_address")' "$resolver"
-require '"site_local_network" not in ethernet' "$resolver"
+require 'required_network_key' "$resolver"
+require 'role must be slo or sli' "$resolver"
 require 'hmac.compare_digest(expected_hash, actual_hash)' "$resolver"
+require 'mcn.kvm-lan-preflight/v1' "$plan_scope"
+require 'hardware plan must use KVM domain replacement' "$plan_scope"
+require 'configured plan is missing required owned site/application actions' "$plan_scope"
 require 'hmac.compare_digest(' "$observer"
 require 'expected BGP peer state is' "$observer"
 require 'expected imported route has no path from the exact BGP peer' "$observer"
@@ -116,5 +121,6 @@ require 'no KVM image lookup occurs while disabled' "$variables"
 
 python3 "$repo_root/tests/test_xc_kvm_network_interface.py"
 python3 "$repo_root/tests/test_xc_kvm_bgp_observer.py"
+python3 "$repo_root/tests/test_kvm_lan_plan_scope.py"
 
 printf 'PASS: KVM CE identity and FRR lifecycle are Terraform-owned\n'

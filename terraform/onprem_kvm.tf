@@ -8,7 +8,45 @@ resource "xcsh_securemesh_site_v2" "onprem_kvm" {
   labels      = local.kvm_xc_labels
 
   kvm {
-    not_managed {}
+    not_managed {
+      dynamic "node_list" {
+        for_each = var.enable_kvm_lan && var.kvm_lan_configuration_phase == "configured" && var.kvm_lan != null && var.kvm_lan_observed_node != null ? [var.kvm_lan_observed_node] : []
+
+        content {
+          hostname = node_list.value.hostname
+          type     = "Control"
+
+          interface_list {
+            name = node_list.value.slo_interface_name
+            mtu  = var.kvm_lan.mtu
+            ethernet_interface {
+              device = node_list.value.slo_device
+              mac    = local.kvm_ce_nodes["01"].mac
+            }
+            network_option {
+              site_local_network = {}
+            }
+            dhcp_client = {}
+          }
+
+          interface_list {
+            name = node_list.value.sli_interface_name
+            mtu  = var.kvm_lan.mtu
+            ethernet_interface {
+              device = node_list.value.sli_device
+              mac    = var.kvm_lan.sli_mac
+            }
+            network_option {
+              site_local_inside_network = {}
+            }
+            static_ip {
+              ip_address = var.kvm_lan.sli_cidr
+            }
+            no_ipv6_address = {}
+          }
+        }
+      }
+    }
   }
 
   disable_ha                 = {}
@@ -160,6 +198,7 @@ data "external" "kvm_network_interface" {
     namespace             = "system"
     site_name             = xcsh_securemesh_site_v2.onprem_kvm[0].name
     expected_mac          = local.kvm_ce_nodes["01"].mac
+    role                  = "slo"
     timeout_seconds       = "7200"
     poll_interval_seconds = "10"
     resolver_sha256       = filesha256("${path.module}/scripts/xc-kvm-network-interface.py")
@@ -174,8 +213,43 @@ data "external" "kvm_network_interface" {
         self.result.hostname != "" &&
         self.result.device != "" &&
         lower(self.result.mac) == lower(local.kvm_ce_nodes["01"].mac)
+        && self.result.role == "slo"
       )
       error_message = "KVM BGP requires one live XC network_interface correlated by current site ownership, observed registration hostname/device, and the Terraform-owned CE MAC."
+    }
+  }
+}
+
+# Post-configuration proof is deliberately separate from the staged hardware
+# mapping input. Depending on an SLI runtime object before declaring SLI would
+# create a bootstrap cycle and encourage guessed guest device names.
+data "external" "kvm_lan_network_interface" {
+  count = var.enable_kvm_lan && var.kvm_lan_configuration_phase == "configured" && var.kvm_lan != null && var.kvm_lan_observed_node != null ? 1 : 0
+
+  program = ["python3", "${path.module}/scripts/xc-kvm-network-interface.py"]
+  query = {
+    api_url               = local.xc_api_url
+    namespace             = "system"
+    site_name             = xcsh_securemesh_site_v2.onprem_kvm[0].name
+    expected_mac          = var.kvm_lan.sli_mac
+    role                  = "sli"
+    timeout_seconds       = "7200"
+    poll_interval_seconds = "10"
+    resolver_sha256       = filesha256("${path.module}/scripts/xc-kvm-network-interface.py")
+  }
+
+  depends_on = [xcsh_securemesh_site_v2.onprem_kvm, libvirt_domain.ce_node]
+
+  lifecycle {
+    postcondition {
+      condition = (
+        self.result.interface_name != "" &&
+        self.result.hostname == var.kvm_lan_observed_node.hostname &&
+        self.result.device == var.kvm_lan_observed_node.sli_device &&
+        lower(self.result.mac) == lower(var.kvm_lan.sli_mac) &&
+        self.result.role == "sli"
+      )
+      error_message = "KVM LAN requires one live owned SLI interface matching the staged hostname, device, and Terraform-owned SLI MAC."
     }
   }
 }

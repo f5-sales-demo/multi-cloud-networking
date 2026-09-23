@@ -51,11 +51,21 @@ def resolve_interface(
     namespace: str,
     site_name: str,
     expected_mac: str,
+    role: str,
     site: dict[str, object],
     registrations: dict[str, object],
     interfaces: dict[str, object],
 ) -> dict[str, str]:
     """Require a unique site-owner -> node -> device -> MAC correlation."""
+    if role not in {"slo", "sli"}:
+        message = "role must be slo or sli"
+        raise ValueError(message)
+    required_network_key = (
+        "site_local_network" if role == "slo" else "site_local_inside_network"
+    )
+    forbidden_network_key = (
+        "site_local_inside_network" if role == "slo" else "site_local_network"
+    )
     site_uid = _text(_mapping(site.get("system_metadata")).get("uid"))
     if not site_uid:
         message = "the Secure Mesh v2 site UID is not available"
@@ -113,10 +123,7 @@ def resolve_interface(
             or _text(ethernet.get("device")) != device
         ):
             continue
-        if (
-            "site_local_network" not in ethernet
-            or "site_local_inside_network" in ethernet
-        ):
+        if required_network_key not in ethernet or forbidden_network_key in ethernet:
             continue
         name = _text(interface.get("name"))
         if _text(interface.get("namespace")) == namespace and name:
@@ -124,7 +131,7 @@ def resolve_interface(
 
     if len(object_matches) != 1:
         message = (
-            "expected one owned SLO network_interface for the observed node and device; "
+            f"expected one owned {role.upper()} network_interface for the observed node and device; "
             f"observed {len(object_matches)}"
         )
         raise DiscoveryPendingError(message)
@@ -133,6 +140,7 @@ def resolve_interface(
         "hostname": hostname,
         "device": device,
         "mac": expected_mac,
+        "role": role,
     }
 
 
@@ -157,7 +165,7 @@ def _get_json(api_url: str, path: str, token: str) -> dict[str, object]:
     return value
 
 
-def _validated_query() -> tuple[str, str, str, str, int, float]:
+def _validated_query() -> tuple[str, str, str, str, str, int, float]:
     query = json.load(sys.stdin)
     if not isinstance(query, dict):
         message = "external query must be a JSON object"
@@ -179,6 +187,10 @@ def _validated_query() -> tuple[str, str, str, str, int, float]:
         message = "namespace must be system and site_name must be non-empty"
         raise ValueError(message)
     expected_mac = _mac(query.get("expected_mac"))
+    role = _text(query.get("role"))
+    if role not in {"slo", "sli"}:
+        message = "role must be slo or sli"
+        raise ValueError(message)
     timeout_seconds = int(_text(query.get("timeout_seconds")))
     poll_interval_seconds = float(_text(query.get("poll_interval_seconds")))
     if (
@@ -200,6 +212,7 @@ def _validated_query() -> tuple[str, str, str, str, int, float]:
         namespace,
         site_name,
         expected_mac,
+        role,
         timeout_seconds,
         poll_interval_seconds,
     )
@@ -225,6 +238,7 @@ def main() -> int:
             namespace,
             site_name,
             expected_mac,
+            role,
             timeout_seconds,
             poll_interval_seconds,
         ) = _validated_query()
@@ -242,7 +256,7 @@ def main() -> int:
             try:
                 documents = [_get_json(api_url, path, token) for path in paths]
                 result = resolve_interface(
-                    namespace, site_name, expected_mac, *documents
+                    namespace, site_name, expected_mac, role, *documents
                 )
             except DiscoveryPendingError as error:
                 last_reason = str(error)

@@ -22,10 +22,14 @@ SOURCE_REF=""
 SOURCE_COMMIT_SHA=""
 DEPLOYMENT_OWNER_ID=""
 DEPLOYMENT_ACTOR_ID=""
+KVM_LAN_PLAN=""
+KVM_LAN_PLAN_SHA256=""
+KVM_LAN_STAGE=""
+KVM_LAN_RECEIPT=""
 
 usage() {
   cat <<'EOF'
-Usage: showcase-lifecycle.sh [--mode full|build|verify|destroy] [options]
+Usage: showcase-lifecycle.sh [--mode full|build|verify|destroy|kvm-lan-preflight] [options]
 
 Options:
   --tfvars PATH             Ignored unified-root variables file.
@@ -39,6 +43,10 @@ Options:
   --source-commit-sha SHA   Exact reviewed 40-hex source commit.
   --deployment-owner-id ID  Non-personal deployment owner identifier.
   --deployment-actor-id ID  Non-personal automation actor identifier.
+  --kvm-lan-plan PATH       Existing full-root saved plan for LAN preflight.
+  --kvm-lan-plan-sha256 ID  Reviewed sha256:<64-hex> digest of that plan.
+  --kvm-lan-stage STAGE     Reviewed hardware or configured stage.
+  --kvm-lan-receipt PATH    New mode-0600 preflight receipt outside the repo.
 
 full performs clean teardown when state exists, build/verify, controlled ENI
 tag drift repair, reviewed full teardown, absence proof, and a second build.
@@ -101,6 +109,22 @@ while [ "$#" -gt 0 ]; do
     DEPLOYMENT_ACTOR_ID=${2:?}
     shift 2
     ;;
+  --kvm-lan-plan)
+    KVM_LAN_PLAN=${2:?}
+    shift 2
+    ;;
+  --kvm-lan-plan-sha256)
+    KVM_LAN_PLAN_SHA256=${2:?}
+    shift 2
+    ;;
+  --kvm-lan-stage)
+    KVM_LAN_STAGE=${2:?}
+    shift 2
+    ;;
+  --kvm-lan-receipt)
+    KVM_LAN_RECEIPT=${2:?}
+    shift 2
+    ;;
   -h | --help)
     usage
     exit 0
@@ -108,7 +132,49 @@ while [ "$#" -gt 0 ]; do
   *) die "unknown argument: $1" ;;
   esac
 done
-case "$MODE" in full | build | verify | destroy) ;; *) die "invalid --mode" ;; esac
+case "$MODE" in full | build | verify | destroy | kvm-lan-preflight) ;; *) die "invalid --mode" ;; esac
+
+# KVM LAN preflight is read-only with respect to infrastructure. It runs before
+# credential loading, service enablement, Terraform initialization, or any
+# apply/destroy path. The scope checker proves shared bridge/uplink resources survive
+# because no host-network resource or unrelated cloud action is allowed.
+if [ "$MODE" = kvm-lan-preflight ]; then
+  for command_name in git ip python3 realpath sha256sum terraform; do
+    command -v "$command_name" >/dev/null 2>&1 || die "required command is unavailable: $command_name"
+  done
+  [ -r "$KVM_LAN_PLAN" ] || die "--kvm-lan-plan must name a readable saved plan"
+  case "$(realpath "$KVM_LAN_PLAN")" in "$REPO_ROOT"/*) die "KVM LAN saved plan must be outside the repository" ;; esac
+  [[ "$KVM_LAN_PLAN_SHA256" =~ ^sha256:[0-9a-f]{64}$ ]] || die "--kvm-lan-plan-sha256 is invalid"
+  case "$KVM_LAN_STAGE" in hardware | configured) ;; *) die "--kvm-lan-stage must be hardware or configured" ;; esac
+  [ -n "$KVM_LAN_RECEIPT" ] || die "--kvm-lan-receipt is required"
+  [ ! -e "$KVM_LAN_RECEIPT" ] || die "KVM LAN receipt already exists"
+  case "$(realpath -m "$KVM_LAN_RECEIPT")" in "$REPO_ROOT"/*) die "KVM LAN receipt must be outside the repository" ;; esac
+  [ -n "$SOURCE_REF" ] || die "--source-ref is required"
+  [ -n "$SOURCE_COMMIT_SHA" ] || die "--source-commit-sha is required"
+  checked_out_commit=$(git -C "$REPO_ROOT" rev-parse --verify HEAD) || die "cannot resolve checked-out commit"
+  [ "$checked_out_commit" = "$SOURCE_COMMIT_SHA" ] || die "source commit does not match the checked-out commit"
+  checked_out_ref="refs/heads/$(git -C "$REPO_ROOT" symbolic-ref --short HEAD)" || die "lifecycle requires a named source branch"
+  [ "$checked_out_ref" = "$SOURCE_REF" ] || die "source ref does not match the checked-out branch"
+  actual_plan_sha256="sha256:$(sha256sum "$KVM_LAN_PLAN" | awk '{print $1}')"
+  [ "$actual_plan_sha256" = "$KVM_LAN_PLAN_SHA256" ] || die "saved plan digest does not match the reviewed digest"
+  receipt_parent=$(dirname "$KVM_LAN_RECEIPT")
+  [ -d "$receipt_parent" ] || die "KVM LAN receipt directory does not exist"
+  plan_json=$(mktemp "$receipt_parent/.kvm-lan-plan.XXXXXX")
+  receipt_tmp=$(mktemp "$receipt_parent/.kvm-lan-receipt.XXXXXX")
+  trap 'rm -f -- "$plan_json" "$receipt_tmp"' EXIT
+  chmod 600 "$plan_json" "$receipt_tmp"
+  terraform show -json "$KVM_LAN_PLAN" >"$plan_json"
+  python3 "$REPO_ROOT/scripts/kvm-lan-plan-scope.py" \
+    --stage "$KVM_LAN_STAGE" --plan-sha256 "$KVM_LAN_PLAN_SHA256" \
+    --source-ref "$SOURCE_REF" --source-commit-sha "$SOURCE_COMMIT_SHA" \
+    --verify-host-network <"$plan_json" >"$receipt_tmp"
+  chmod 600 "$receipt_tmp"
+  mv "$receipt_tmp" "$KVM_LAN_RECEIPT"
+  trap - EXIT
+  rm -f -- "$plan_json"
+  printf 'showcase-lifecycle: mode=kvm-lan-preflight status=passed receipt=%s\n' "$KVM_LAN_RECEIPT"
+  exit 0
+fi
 
 for command_name in aws curl getent jq stat sudo systemctl terraform sha256sum virsh; do
   command -v "$command_name" >/dev/null 2>&1 || die "required command is unavailable: $command_name"
