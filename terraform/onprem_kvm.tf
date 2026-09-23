@@ -126,7 +126,7 @@ resource "xcsh_token" "kvm" {
   site_name   = xcsh_securemesh_site_v2.onprem_kvm[0].name
 
   lifecycle {
-    replace_triggered_by = [xcsh_securemesh_site_v2.onprem_kvm[0]]
+    replace_triggered_by = [xcsh_securemesh_site_v2.onprem_kvm[0].id]
   }
 }
 
@@ -339,7 +339,7 @@ resource "xcsh_bgp" "onprem_ebgp" {
   }
 
   lifecycle {
-    replace_triggered_by = [xcsh_securemesh_site_v2.onprem_kvm[0]]
+    replace_triggered_by = [xcsh_securemesh_site_v2.onprem_kvm[0].id]
   }
 
   # Do not redirect the F5-side peer until both the Terraform-owned router and

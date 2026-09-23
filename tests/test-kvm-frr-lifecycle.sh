@@ -12,6 +12,7 @@ variables="$repo_root/terraform/variables.tf"
 resolver="$repo_root/terraform/scripts/xc-kvm-network-interface.py"
 observer="$repo_root/terraform/scripts/xc-kvm-bgp-observer.py"
 plan_scope="$repo_root/scripts/kvm-lan-plan-scope.py"
+lifecycle="$repo_root/scripts/showcase-lifecycle.sh"
 
 fail() {
   printf 'FAIL: %s\n' "$*" >&2
@@ -19,6 +20,7 @@ fail() {
 }
 require() { grep -Fq "$1" "$2" || fail "missing $1 in $2"; }
 reject() { ! grep -Fq "$1" "$2" || fail "unexpected $1 in $2"; }
+reject_exact() { ! grep -Fxq "$1" "$2" || fail "unexpected exact line $1 in $2"; }
 
 require 'kvm_ce_nodes' "$kvm"
 require 'kvm_enabled_nodes' "$kvm"
@@ -92,6 +94,10 @@ reject '/data/services/frr-router' "$frr"
 reject 'name = "frr-router"' "$frr"
 require 'address = "10.100.0.2"' "$onprem"
 require 'count = var.enable_kvm ? 1 : 0' "$onprem"
+require 'replace_triggered_by = [xcsh_securemesh_site_v2.onprem_kvm[0].id]' "$onprem"
+[ "$(grep -Fc 'replace_triggered_by = [xcsh_securemesh_site_v2.onprem_kvm[0].id]' "$onprem")" -eq 2 ] ||
+  fail 'KVM token and BGP replacement triggers must both follow site identity only'
+reject_exact '    replace_triggered_by = [xcsh_securemesh_site_v2.onprem_kvm[0]]' "$onprem"
 require 'disable_ha                 = {}' "$onprem"
 reject 'enable_ha                  = {}' "$onprem"
 require 'docker_container.kvm_frr' "$onprem"
@@ -113,6 +119,7 @@ require 'hmac.compare_digest(expected_hash, actual_hash)' "$resolver"
 require 'mcn.kvm-lan-preflight/v1' "$plan_scope"
 require 'hardware plan must use KVM domain replacement' "$plan_scope"
 require 'configured plan is missing required owned site/application actions' "$plan_scope"
+require 'terraform -chdir="$TERRAFORM_DIR" show -json "$KVM_LAN_PLAN"' "$lifecycle"
 require 'hmac.compare_digest(' "$observer"
 require 'expected BGP peer state is' "$observer"
 require 'expected imported route has no path from the exact BGP peer' "$observer"
