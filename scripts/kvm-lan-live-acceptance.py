@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Collect and verify read-only KVM physical-LAN acceptance evidence."""
-# pylint: disable=invalid-name,too-many-branches,too-many-locals,too-many-statements
+# pylint: disable=invalid-name,too-many-branches,too-many-lines,too-many-locals,too-many-statements
 # ruff: noqa: ANN001, ANN202, D103, EM101, EM102, PERF401, PLR2004, S314, S603, SIM105, TRY003, TRY004, TRY301
 
 from __future__ import annotations
@@ -489,7 +489,7 @@ def _network_inventory() -> dict[str, Any]:
         name = _text(item.get("ifname"))
         if not name:
             continue
-        values = {"ipv4": [], "ipv6": []}
+        values: dict[str, list[str]] = {"ipv4": [], "ipv6": []}
         for raw_address in _items(item.get("addr_info")):
             address = _mapping(raw_address)
             family = address.get("family")
