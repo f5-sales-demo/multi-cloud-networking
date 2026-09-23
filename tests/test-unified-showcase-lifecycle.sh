@@ -63,6 +63,7 @@ require 'managed KVM domain autostart drift was not repaired' "$lifecycle"
 require 'kvm-lan-preflight' "$lifecycle"
 require 'KVM LAN preflight is read-only' "$lifecycle"
 require 'kvm-lan-plan-scope.py' "$lifecycle"
+test -x "$repo_root/scripts/kvm-lan-live-acceptance.py" || fail 'KVM LAN live acceptance driver is missing'
 require 'shared bridge/uplink resources survive' "$lifecycle"
 require 'exercise_managed_drift first' "$lifecycle"
 require 'exercise_managed_drift second' "$lifecycle"

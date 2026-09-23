@@ -1,0 +1,129 @@
+---
+title: KVM LAN live acceptance
+description: Read-only, source-bound acceptance for the physical-LAN SLI and inside HTTP VIP.
+---
+
+The KVM LAN acceptance driver turns the final verification stage into one
+repeatable, fail-closed receipt. It does not create a bridge, move an uplink,
+change an address, apply or destroy Terraform, mutate F5 Distributed Cloud (XC),
+or start and stop unrelated workloads.
+
+A healthy Site Local Outside (SLO) Border Gateway Protocol (BGP) peer is not a
+physical-LAN result. Acceptance requires the approved Site Local Inside (SLI),
+the inside virtual IP (VIP), and an independent client on that LAN.
+
+## Inventory before allocation
+
+Run inventory from the Ubuntu host before selecting a port or bridge. The receipt
+is intentionally `blocked` until a separately reviewed configuration exists:
+
+```bash
+scripts/kvm-lan-live-acceptance.py \
+  --mode inventory \
+  --receipt /private/evidence/kvm-lan-inventory.json
+```
+
+The script records address counts rather than treating an interface with no IPv4
+address as unused. Existing IPv6, a management route, a bridge owner, or any other
+user remains a conflict until it appears in the approved ownership contract.
+Receipts are created atomically with mode `0600`; an existing receipt is never
+overwritten.
+
+## Reviewed verification configuration
+
+Store the configuration outside the repository with mode `0600`. Do not put an
+XC token, private key, password, AWS credential, or Terraform variable secret in
+it. SSH uses an agent or the path named by `identity_file`; the file content is
+never copied into the receipt.
+
+```json
+{
+  "schema_version": "mcn.kvm-lan-live-acceptance.config/v1",
+  "source": {
+    "ref": "refs/heads/feature/1230-kvm-live-acceptance",
+    "commit_sha": "REVIEWED_40_HEX_COMMIT",
+    "directory": "/path/to/reviewed/worktree"
+  },
+  "plan": {
+    "path": "/private/evidence/configured.tfplan",
+    "sha256": "sha256:REVIEWED_64_HEX_DIGEST",
+    "preflight_receipt": "/private/evidence/configured-preflight.json",
+    "preflight_schema": "mcn.kvm-lan-preflight/v1"
+  },
+  "host": {
+    "bridge": "REVIEWED_BRIDGE",
+    "uplink": "REVIEWED_UPLINK",
+    "uplink_mac": "REVIEWED_MAC",
+    "mtu": 1500,
+    "management_interface": "REVIEWED_MANAGEMENT_INTERFACE",
+    "default_gateway4": "REVIEWED_GATEWAY",
+    "allowed_uplink_ipv4": [],
+    "allowed_uplink_ipv6": []
+  },
+  "vm": {
+    "domain": "onprem-ce-01",
+    "vcpus": 8,
+    "memory_kib": 33554432,
+    "disk_min_bytes": 107374182400,
+    "slo_mac": "52:54:00:10:00:11",
+    "sli_mac": "REVIEWED_SLI_MAC",
+    "dhcp_ipv4": "10.100.0.11"
+  },
+  "xc": {
+    "site_name": "REVIEWED_SITE_NAME",
+    "imported_route": "REVIEWED_IMPORTED_CIDR",
+    "bgp_peer": "10.100.0.11"
+  },
+  "frr": {
+    "container": "mcn-kvm-frr-router",
+    "peer": "10.100.0.11",
+    "advertised_routes": ["REVIEWED_IMPORTED_CIDR"],
+    "received_routes": []
+  },
+  "client": {
+    "ssh_host": "REVIEWED_INDEPENDENT_CLIENT",
+    "ssh_user": "REVIEWED_USER",
+    "ssh_port": 22,
+    "identity_file": "/private/path/to/key",
+    "known_hosts_file": "/private/path/to/known_hosts",
+    "timeout_seconds": 15,
+    "http_domain": "app.example.com",
+    "vip": "REVIEWED_VIP",
+    "http_status": 200,
+    "response_sha256": "REVIEWED_64_HEX_BODY_DIGEST"
+  },
+  "terraform": {
+    "directory": "/path/to/reviewed/worktree/terraform",
+    "argv_prefix": ["../scripts/terraform-with-aws-sso.sh", "--profile", "REVIEWED_PROFILE", "--"],
+    "plan_args": ["-var-file=/private/path/to/reviewed.tfvars"],
+    "timeout_seconds": 1800
+  }
+}
+```
+
+Every placeholder must be replaced by a reviewed value. The configured-stage
+preflight receipt must bind the same saved-plan digest, source ref, and commit.
+The Terraform state provenance must match that identity as well.
+
+## Run live verification
+
+```bash
+scripts/kvm-lan-live-acceptance.py \
+  --mode verify \
+  --config /private/evidence/kvm-lan-acceptance.json \
+  --receipt /private/evidence/kvm-lan-acceptance-receipt.json
+```
+
+The driver observes the bridge, uplink, management route, libvirt domain, ordered
+MAC addresses, DHCP identity, XC outputs, FRR peer and routes, and an HTTP request
+from the independent client. The client must resolve the approved name to the VIP,
+connect to that VIP, send the exact Host header, and return the reviewed body hash.
+It then runs a refresh-enabled full-root plan and passes only when the detailed
+exit code is zero. Options that disable refresh or narrow, replace, or destroy the
+graph are rejected.
+
+`--observations` replays a captured versioned observation document for testing or
+review. A replay is not new live evidence. A collection error still creates a
+sanitized failed receipt when the requested path is available. Attach a receipt to
+an issue only after reviewing it; plans, state, configuration, credentials, and
+raw command output remain private.
