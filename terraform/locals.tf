@@ -147,6 +147,10 @@ locals {
   kvm_xc_labels = merge(local.xc_labels, {
     "mcn-topology" = "${local.site_prefix}-kvm"
   })
+  kvm_token_labels = {
+    for key, value in local.kvm_xc_labels : key => value
+    if key != "mcn-source-commit"
+  }
 
   # --- SSH public key material, read once at the root ---
   # When ssh_public_key material is supplied (e.g. by the plan tests) it wins and

@@ -7,6 +7,9 @@ module_kvm="$repo_root/terraform/modules/kvm/kvm.tf"
 frr="$repo_root/terraform/kvm_frr.tf"
 module_frr="$repo_root/terraform/modules/kvm/kvm_frr.tf"
 onprem="$repo_root/terraform/onprem_kvm.tf"
+locals="$repo_root/terraform/locals.tf"
+module_onprem="$repo_root/terraform/modules/kvm/onprem_kvm.tf"
+module_locals="$repo_root/terraform/modules/kvm/locals.tf"
 workload="$repo_root/terraform/onprem_workload.tf"
 variables="$repo_root/terraform/variables.tf"
 resolver="$repo_root/terraform/scripts/xc-kvm-network-interface.py"
@@ -54,6 +57,16 @@ require 'option_name  = "dhcp-host"' "$kvm"
 require 'option_value = "${options.value.mac},${options.value.address}"' "$kvm"
 require 'resource "terraform_data" "kvm_network_identity"' "$kvm"
 require 'replace_triggered_by = [terraform_data.kvm_network_identity[0]]' "$kvm"
+require 'kvm_token_labels = {' "$locals"
+require 'if key != "mcn-source-commit"' "$locals"
+require 'kvm_token_labels = {' "$module_locals"
+require 'if key != "mcn-source-commit"' "$module_locals"
+root_token=$(sed -n '/resource "xcsh_token" "kvm"/,/^}/p' "$onprem")
+module_token=$(sed -n '/resource "xcsh_token" "kvm"/,/^}/p' "$module_onprem")
+grep -Fq 'labels      = local.kvm_token_labels' <<<"$root_token" ||
+  fail 'root KVM token must use stable deployment labels'
+grep -Fq 'labels      = local.kvm_token_labels' <<<"$module_token" ||
+  fail 'module KVM token must use stable deployment labels'
 reject 'network_config' "$kvm"
 reject '/etc/netplan/60-mcn-ce-static.yaml' "$kvm"
 require 'libvirt_cloudinit_disk.ce_cloudinit[each.key]' "$kvm"
