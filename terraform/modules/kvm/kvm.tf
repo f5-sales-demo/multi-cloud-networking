@@ -36,8 +36,14 @@ resource "terraform_data" "kvm_network_identity" {
 data "xcsh_site_image" "kvm" {
   count = var.enable_kvm ? 1 : 0
 
-  site_name  = local.kvm_site_name
-  depends_on = [xcsh_securemesh_site_v2.onprem_kvm]
+  site_name = local.kvm_site_name
+
+  lifecycle {
+    precondition {
+      condition     = xcsh_securemesh_site_v2.onprem_kvm[0].id != ""
+      error_message = "KVM image lookup requires the owned site identity."
+    }
+  }
 }
 
 data "xcsh_site_cloud_init" "kvm" {
@@ -46,7 +52,13 @@ data "xcsh_site_cloud_init" "kvm" {
   provider_ref              = "kvm"
   site_name                 = local.kvm_site_name
   enable_management_network = false
-  depends_on                = [xcsh_securemesh_site_v2.onprem_kvm]
+
+  lifecycle {
+    precondition {
+      condition     = xcsh_securemesh_site_v2.onprem_kvm[0].id != ""
+      error_message = "KVM cloud-init lookup requires the owned site identity."
+    }
+  }
 }
 
 resource "libvirt_pool" "kvm" {
