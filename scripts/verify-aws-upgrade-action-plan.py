@@ -44,8 +44,9 @@ def validate(
         receipt.get("environment_key") == args.environment_key, "environment mismatch"
     )
     require(
-        args.backend_key.startswith("mcn-ce-ha-smsv2/qualification/1255/")
-        and args.backend_key.endswith(".tfstate"),
+        args.environment_key.startswith("qualify-1255-")
+        and args.backend_key
+        == f"mcn-ce-ha-smsv2/environments/{args.environment_key}/showcase.tfstate",
         "shared or ambiguous backend key",
     )
     require(

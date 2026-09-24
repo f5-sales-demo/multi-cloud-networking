@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 CHECKER = ROOT / "scripts/verify-aws-upgrade-action-plan.py"
 VALIDATE = runpy.run_path(str(CHECKER))["validate"]
 COMMIT = "a" * 40
-KEY = "mcn-ce-ha-smsv2/qualification/1255/unique.tfstate"
-ENVIRONMENT = "mcn-1255-unique"
+ENVIRONMENT = "qualify-1255-v11-abcdefabcdef"
+KEY = f"mcn-ce-ha-smsv2/environments/{ENVIRONMENT}/showcase.tfstate"
 SITE = "mcn-1255-unique-aws-ce-01"
 SOFTWARE = "crt-20260201-0180"
 OS = "9.2026.18"
@@ -120,6 +120,10 @@ class UpgradePlanTest(unittest.TestCase):
             "sha256:" + hashlib.sha256(self.saved.read_bytes()).hexdigest()
         )
         self.plan["variables"].pop("deployment_owner_id")
+        self.assertNotEqual(self.check().returncode, 0)
+
+    def test_shared_backend_key_is_rejected(self):
+        self.receipt["backend_key"] = "mcn-ce-ha-smsv2/showcase.tfstate"
         self.assertNotEqual(self.check().returncode, 0)
 
     def test_reapply_and_destroy_have_no_actions(self):
