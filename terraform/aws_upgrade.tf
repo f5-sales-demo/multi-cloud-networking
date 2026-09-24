@@ -6,7 +6,7 @@ action "xcsh_site_upgrade_sw" "aws" {
 
   config {
     site             = each.value.name
-    software_version = var.aws_software_version
+    software_version = coalesce(var.aws_upgrade_software_version, var.aws_software_version)
   }
 }
 
@@ -15,7 +15,7 @@ action "xcsh_site_upgrade_os" "aws" {
 
   config {
     site       = each.value.name
-    os_version = var.aws_os_version
+    os_version = coalesce(var.aws_upgrade_os_version, var.aws_os_version)
   }
 }
 
@@ -26,8 +26,8 @@ data "xcsh_site_upgrade_status" "aws" {
   }
 
   site                      = xcsh_securemesh_site_v2.aws[each.key].name
-  expected_software_version = var.aws_software_version
-  expected_os_version       = var.aws_os_version
+  expected_software_version = coalesce(var.aws_upgrade_software_version, var.aws_software_version)
+  expected_os_version       = coalesce(var.aws_upgrade_os_version, var.aws_os_version)
   wait                      = var.aws_upgrade_wait
   timeout_seconds           = var.aws_upgrade_timeout_seconds
   poll_interval_seconds     = var.aws_upgrade_poll_interval_seconds
@@ -65,8 +65,8 @@ output "aws_site_upgrade_status" {
 output "aws_upgrade_convergence" {
   description = "Aggregate configured runtime identities and current convergence for the AWS sites."
   value = var.enable_aws ? {
-    software      = var.aws_software_version
-    os            = var.aws_os_version
+    software      = coalesce(var.aws_upgrade_software_version, var.aws_software_version)
+    os            = coalesce(var.aws_upgrade_os_version, var.aws_os_version)
     all_ready     = alltrue([for status in values(data.xcsh_site_upgrade_status.aws) : status.ready])
     all_converged = alltrue([for status in values(data.xcsh_site_upgrade_status.aws) : status.target_converged])
   } : null

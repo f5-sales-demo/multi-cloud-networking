@@ -221,6 +221,23 @@ variable "aws_os_version" {
   default     = "9.2026.17"
 }
 
+variable "aws_upgrade_software_version" {
+  description = "Advertised software action target; null observes the create-time software version. Does not change first-boot settings."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.aws_upgrade_software_version == null || can(regex("^crt-[0-9]{8}-[0-9]{4}$", var.aws_upgrade_software_version))
+    error_message = "aws_upgrade_software_version must be an explicit F5XC software build."
+  }
+}
+
+variable "aws_upgrade_os_version" {
+  description = "Advertised OS action target; null observes the create-time OS version. Does not change first-boot settings."
+  type        = string
+  default     = null
+}
+
 variable "aws_upgrade_wait" {
   description = "Wait for every supplied upgrade target to be installed and for each site to return ONLINE."
   type        = bool

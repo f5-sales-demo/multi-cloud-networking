@@ -154,7 +154,11 @@ not a general support guarantee: the [current F5 FAQ](https://docs.cloud.f5.com/
 says not to reuse a deleted site name within 30 days. Use fresh names for new deployments
 and reconcile that support constraint before adapting the historical replacement procedure.
 
-Create-time software settings are separate from upgrade actions. Provider v8 exposes
+Create-time software settings (`aws_software_version` and `aws_os_version`) are separate
+from action targets (`aws_upgrade_software_version` and `aws_upgrade_os_version`). Action
+targets default to create-time values; select newer targets only from a healthy site's
+advertised eligible versions. Changing an action target never edits first-boot settings.
+Provider v11 exposes
 `xcsh_site_upgrade_sw`, `xcsh_site_upgrade_os`, and `xcsh_site_upgrade_status`; MCN's
 `aws_upgrade.tf` applies the operational pattern one site at a time. Verify installed
 versions and readiness after each action before moving on. Historical Azure API/disk

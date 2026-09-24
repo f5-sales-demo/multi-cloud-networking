@@ -20,7 +20,7 @@ reject_text() {
 }
 
 require_text terraform/versions.tf 'required_version = "= 1.16.3"'
-require_text terraform/versions.tf 'version = "= 10.1.0"'
+require_text terraform/versions.tf 'version = "= 11.0.0"'
 require_text terraform/aws_xc.tf 'disable_ha                 = {}'
 require_text terraform/aws_xc.tf 'cluster_size = 1'
 ## A ground-up CE must request the field-proven runtime pair on its first boot.
@@ -165,24 +165,28 @@ require_text docs/en/demo/deploy.mdx 'aws-smsv2-owned-collision-preflight.sh'
 require_text docs/en/demo/deploy.mdx '--candidate-provider-binary'
 require_text docs/en/demo/deploy.mdx 'terraform-provider-xcsh'
 require_text terraform/aws_upgrade.tf 'action "xcsh_site_upgrade_sw" "aws"'
+require_text terraform/aws_upgrade.tf 'software_version = coalesce(var.aws_upgrade_software_version, var.aws_software_version)'
+require_text terraform/aws_upgrade.tf 'os_version = coalesce(var.aws_upgrade_os_version, var.aws_os_version)'
+require_text terraform/aws_upgrade.tf 'expected_software_version = coalesce(var.aws_upgrade_software_version, var.aws_software_version)'
+require_text terraform/aws_upgrade.tf 'expected_os_version       = coalesce(var.aws_upgrade_os_version, var.aws_os_version)'
 require_text terraform/aws_upgrade.tf 'action "xcsh_site_upgrade_os" "aws"'
 require_text terraform/aws_upgrade.tf 'data "xcsh_site_upgrade_status" "aws"'
 sw_action=$(sed -n '/action "xcsh_site_upgrade_sw" "aws" {/,/^}/p' terraform/aws_upgrade.tf)
 grep -Fq 'site             = each.value.name' <<<"$sw_action" || {
-  printf 'software upgrade action must use the v10 site field\n' >&2
+  printf 'software upgrade action must use the v11 site field\n' >&2
   exit 1
 }
-grep -Fq 'software_version = var.aws_software_version' <<<"$sw_action" || {
-  printf 'software upgrade action must use the v10 software_version field\n' >&2
+grep -Fq 'software_version = coalesce(var.aws_upgrade_software_version, var.aws_software_version)' <<<"$sw_action" || {
+  printf 'software upgrade action must use its independent target field\n' >&2
   exit 1
 }
 os_action=$(sed -n '/action "xcsh_site_upgrade_os" "aws" {/,/^}/p' terraform/aws_upgrade.tf)
 grep -Fq 'site       = each.value.name' <<<"$os_action" || {
-  printf 'OS upgrade action must use the v10 site field\n' >&2
+  printf 'OS upgrade action must use the v11 site field\n' >&2
   exit 1
 }
-grep -Fq 'os_version = var.aws_os_version' <<<"$os_action" || {
-  printf 'OS upgrade action must use the v10 os_version field\n' >&2
+grep -Fq 'os_version = coalesce(var.aws_upgrade_os_version, var.aws_os_version)' <<<"$os_action" || {
+  printf 'OS upgrade action must use its independent target field\n' >&2
   exit 1
 }
 reject_text terraform/aws_upgrade.tf 'namespace                 = "system"'
@@ -190,6 +194,8 @@ require_text terraform/aws_upgrade.tf 'output "aws_site_upgrade_status"'
 require_text terraform/aws_upgrade.tf 'target_converged'
 require_text terraform/variables_aws.tf 'variable "aws_software_version"'
 require_text terraform/variables_aws.tf 'variable "aws_os_version"'
+require_text terraform/variables_aws.tf 'variable "aws_upgrade_software_version"'
+require_text terraform/variables_aws.tf 'variable "aws_upgrade_os_version"'
 require_text terraform/variables_aws.tf 'default     = "crt-20260201-0179"'
 require_text terraform/variables_aws.tf 'default     = "9.2026.17"'
 reject_text terraform/variables_aws.tf 'variable "aws_baseline_software_version"'

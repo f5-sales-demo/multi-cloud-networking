@@ -6,7 +6,7 @@ terraform {
   required_providers {
     xcsh = {
       source  = "f5-sales-demo/xcsh"
-      version = "= 10.1.0"
+      version = "= 11.0.0"
     }
     azapi = {
       source  = "Azure/azapi"

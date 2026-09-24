@@ -31,6 +31,9 @@ on:
       - 'tests/test-aws-smsv2-orphan-recovery.sh'
       - 'tests/test-aws-root-owned-resource-tags.sh'
       - 'tests/test-aws-upgrade-showcase.sh'
+      - 'tests/test-provider-v11-qualification.sh'
+      - 'tests/test_aws_upgrade_action_plan.py'
+      - 'scripts/verify-aws-upgrade-action-plan.py'
       - 'tests/test-azure-ilb-no-route-server.sh'
       - 'tests/test-kvm-frr-lifecycle.sh'
       - 'tests/test-aws-state-backend.sh'
@@ -66,6 +69,9 @@ on:
       - 'tests/test-aws-smsv2-orphan-recovery.sh'
       - 'tests/test-aws-root-owned-resource-tags.sh'
       - 'tests/test-aws-upgrade-showcase.sh'
+      - 'tests/test-provider-v11-qualification.sh'
+      - 'tests/test_aws_upgrade_action_plan.py'
+      - 'scripts/verify-aws-upgrade-action-plan.py'
       - 'tests/test-azure-ilb-no-route-server.sh'
       - 'tests/test-kvm-frr-lifecycle.sh'
       - 'tests/test-aws-state-backend.sh'
@@ -152,6 +158,12 @@ jobs:
         working-directory: .
         run: bash tests/test-aws-upgrade-showcase.sh
 
+      - name: Provider v11 qualification and action-plan scope
+        working-directory: .
+        run: |
+          bash tests/test-provider-v11-qualification.sh
+          python3 -m unittest discover -s tests -p test_aws_upgrade_action_plan.py
+
       - name: Azure ILB and Route Server boundary
         working-directory: .
         run: bash tests/test-azure-ilb-no-route-server.sh
@@ -223,7 +235,7 @@ jobs:
   # xcsh provider, so the provider's own schema validators fire at plan with no XC API call.
   # This job resolves f5-sales-demo/xcsh from the public registry, so it only turns green once
   # the exact clean-break provider version required by
-  # `coverage/smsv2/versions.tf` (`= 10.1.0`) is published in the registry. Locally the same tests run
+  # `coverage/smsv2/versions.tf` (`= 11.0.0`) is published in the registry. Locally the same tests run
   # against the dev_overrides build via verify.sh.
   coverage-smsv2:
     name: coverage-smsv2
