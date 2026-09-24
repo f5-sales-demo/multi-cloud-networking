@@ -109,7 +109,7 @@ uses the F5-issued KVM appliance URL from `xcsh_site_image`, never a generic clo
 OS image.
 
 <Aside type="caution" title="KVM image resolution">
-The pinned `xcsh` v11.0.1 provider resolves the appliance from exactly one Site UID
+The pinned `xcsh` v11.0.2 provider resolves the appliance from exactly one Site UID
 owned by the named Secure Mesh Site v2 configuration. It checks the exact UID response
 from `/api/maurice/software_os_version`, the empty error status, HTTPS image URL,
 MD5, and ownership again before use. An ambiguous owner or incomplete mapping stops
@@ -250,7 +250,7 @@ Tenant, app namespace, load balancer, origin pool and the VIP.
 
 ### `terraform/versions.tf`
 
-Terraform floor and provider constraints. The xcsh provider is pinned exactly to the v11.0.1 release; the unified root lock file is committed and CI uses it read-only.
+Terraform floor and provider constraints. The xcsh provider is pinned exactly to the v11.0.2 release; the unified root lock file is committed and CI uses it read-only.
 
 <Code code={versions} lang="hcl" title="terraform/versions.tf" />
 
