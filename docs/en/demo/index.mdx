@@ -16,7 +16,7 @@ in a single Terraform plan:
 1. **Rest of World (ROW)**: Serves `mcn-ce-ha.f5-sales-demo.com` via CEs in `eastus` with global public RE advertisement.
 2. **Canada Regional Path**: Serves `mcn-ce-ha.f5-sales-demo.ca` strictly within Canada via CEs in `canadacentral`, a Canadian Regional Edge Virtual Site targeting Toronto and Montreal PoPs (`ves.io/city in (toronto, montreal)`), and an Azure Internal Load Balancer (`enable_canada_ilb`).
 3. **AWS Customer Edge Extension**: Serves `aws.mcn-ce-ha.f5-sales-demo.com` via 3 EC2 CEs (`m5.2xlarge`) in AWS VPC (`10.150.0.0/16`) in `ap-northeast-1` with dual NICs and eBGP/ECMP active/active routing.
-4. **On-Premise KVM Extension**: Serves on-premise workloads via 3 KVM CEs (`onprem-ce-01`, `02`, `03`) on local libvirt network `ce-bgp-net` (`10.100.0.0/24`) peering eBGP (CE ASN `64512`) with a containerized FRR ToR BGP Router (`10.100.0.1`, ASN `65515`) configured with `maximum-paths 4` ECMP.
+4. **On-Premise KVM Extension**: One CE (`onprem-ce-01`, `10.100.0.11`) peers with Terraform-owned FRR (`10.100.0.2`, ASN `65515`) on the local libvirt network (`10.100.0.0/24`); the NAT gateway is `10.100.0.1` and the workload is `10.100.0.100`. One BGP peer imports `198.51.100.0/24`; this is not a KVM ECMP demonstration.
 
 Azure US and Canada use Standard Internal Load Balancers to verify supported CE health
 and Site Console traffic. Azure Route Server remains deferred because F5 has not published
@@ -61,9 +61,9 @@ Observed 2026-08-05. The three-path hybrid architecture:
 | On-Premise KVM CEs | 3 KVM Customer Edge nodes (`onprem-ce-01`, `02`, `03`) on local libvirt network `ce-bgp-net` (`10.100.0.0/24`) |
 | Canadian Virtual Sites | `xcsh_virtual_site.canada_re` (Toronto & Montreal REs) and `xcsh_virtual_site.canada_ce` (Canadian CEs) |
 | AWS Virtual Site | `mcn-ce-ha-aws-vsite`, selecting sites `mcn-ce-ha-aws-ap-northeast-1-01` through `03` |
-| Route exchange | Azure Route Servers in `eastus` and `canadacentral` (ASN `var.rs_asn`), AWS Transit Gateway Connect (ASN `var.aws_tgw_asn`), FRR ToR BGP Router for KVM (ASN `65515`, `10.100.0.1`) |
+| Route exchange | Azure Route Servers in `eastus` and `canadacentral` (ASN `var.rs_asn`), AWS Transit Gateway Connect (ASN `var.aws_tgw_asn`), FRR ToR BGP Router for KVM (ASN `65515`, `10.100.0.2`) |
 | Peerings | eBGP peerings per CE, CE ASN `var.ce_asn` (`64512`) |
-| Advertised VIPs | `var.vip` (`10.250.0.10`) for ROW; `var.ca_vip` (`10.250.1.10`) for Canada; internal AWS NLB `var.aws_vip` (`10.151.1.10`) fronts three BGP-routed SMSv2 site listeners; `10.100.0.10` for On-Prem KVM |
+| Advertised VIPs | `var.vip` (`10.250.0.10`) for ROW; `var.ca_vip` (`10.250.1.10`) for Canada; internal AWS NLB `var.aws_vip` (`10.151.1.10`) fronts three BGP-routed SMSv2 site listeners. KVM does not advertise a VIP in this topology. |
 | Load balancers | `var.lb_domain` (`f5-sales-demo.com`) for ROW; `var.ca_lb_domain` (`f5-sales-demo.ca`) for Canada; `var.aws_lb_domain` (`aws.mcn-ce-ha.f5-sales-demo.com`) for AWS |
 | Test clients | Client VMs in each regional VNet, AWS VPC, and local test environment for driving traffic at the VIPs |
 
