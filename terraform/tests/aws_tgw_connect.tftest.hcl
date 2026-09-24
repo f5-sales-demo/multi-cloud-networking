@@ -26,8 +26,8 @@ override_data {
   values = {
     contract_id         = "f5xc-smsv2-api/v1"
     contract_version    = "7.0.0"
-    api_release_tag     = "v7.0.9"
-    api_release_commit  = format("%s%s", "1c4f4eb8dd6cd9c440c2", "41b995a6c0ef1bcd23ab")
+    api_release_tag     = "v8.0.0"
+    api_release_commit  = format("%s%s", "64ef458aad9d4f149b18", "0214ee7cc7954e40112d")
     telemetry_schema_id = "f5xc-smsv2-aws-tgw-telemetry/v2"
     capabilities = {
       aws_ce_create          = "available"
@@ -144,6 +144,12 @@ run "plans_three_sites_six_peers_and_workload_attachment" {
   assert {
     condition     = length(xcsh_bgp.aws_tgw) == 3 && alltrue([for bgp in values(xcsh_bgp.aws_tgw) : length(bgp.peers) == 4])
     error_message = "Every site must configure both AWS BGP endpoints on each of its two Connect peers."
+  }
+  assert {
+    condition = alltrue([for site_key, bgp in xcsh_bgp.aws_tgw :
+      bgp.name == "${local.aws_resource_prefix}-aws-tgw-bgp-${site_key}" && length(bgp.name) <= 64
+    ])
+    error_message = "Preview BGP names must remain unique and within the XC 64-character limit."
   }
   assert {
     condition     = alltrue(flatten([for bgp in values(xcsh_bgp.aws_tgw) : [for peer in bgp.peers : peer.external.external_connector == null]]))

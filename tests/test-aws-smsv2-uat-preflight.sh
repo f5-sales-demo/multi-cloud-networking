@@ -122,8 +122,8 @@ show)
     fi
   else
     capability=${FAKE_CAPABILITY_STATE:-available}
-    api_release_tag=${FAKE_API_RELEASE_TAG:-v7.0.9}
-    api_release_commit=${FAKE_API_RELEASE_COMMIT:-$(printf '%s%s' '1c4f4eb8dd6cd9c440c2' '41b995a6c0ef1bcd23ab')}
+    api_release_tag=${FAKE_API_RELEASE_TAG:-v8.0.0}
+    api_release_commit=${FAKE_API_RELEASE_COMMIT:-$(printf '%s%s' '64ef458aad9d4f149b18' '0214ee7cc7954e40112d')}
     node_strategy=${FAKE_AWS_NODE_STRATEGY:-discovery_rebuild}
     printf '%s\n' "{\"planned_values\":{\"outputs\":{\"contract\":{\"value\":{\"contract_id\":\"f5xc-smsv2-api/v1\",\"contract_version\":\"7.0.0\",\"api_release_tag\":\"${api_release_tag}\",\"api_release_commit\":\"${api_release_commit}\",\"telemetry_schema_id\":\"f5xc-smsv2-aws-tgw-telemetry/v2\",\"capabilities\":{\"aws_ce_create\":\"${capability}\",\"aws_node_configuration\":\"${capability}\",\"runtime_status\":\"${capability}\",\"site_upgrade\":\"${capability}\",\"tgw_connect\":\"${capability}\"},\"aws_node_configuration\":\"{\\\"strategy\\\":\\\"${node_strategy}\\\",\\\"enforcement\\\":\\\"required\\\",\\\"invariants\\\":{\\\"device_source\\\":\\\"observed_registration_only\\\"},\\\"mapping\\\":{\\\"cardinality\\\":\\\"one_to_one\\\"}}\",\"f5xc_authorities\":[\"smsv2_configuration\",\"runtime_health\",\"bgp_peers\",\"bgp_routes\",\"simplified_routes\",\"site_upgrade_observation\"],\"aws_authorities\":[\"eni\",\"transit_gateway\",\"transit_gateway_connect\",\"gre_endpoints\",\"bgp_inside_cidrs\",\"autonomous_system_numbers\"]}}}}}"
   fi
@@ -267,7 +267,7 @@ if FAKE_API_RELEASE_TAG=v7.0.2 FAKE_API_RELEASE_COMMIT="$obsolete_api_commit" \
   fail "obsolete immutable contract binding must be rejected"
 fi
 [ "$(jq -r .status "$evidence/summary.json")" = blocked ] || fail "obsolete contract status not recorded"
-[ "$(jq -r .reason "$evidence/summary.json")" = v9_contract_identity_mismatch ] || fail "obsolete contract reason not recorded"
+[ "$(jq -r .reason "$evidence/summary.json")" = v11_contract_identity_mismatch ] || fail "obsolete contract reason not recorded"
 assert_sanitized "$evidence" "$output"
 echo "ok - obsolete immutable contract binding is rejected before plan review"
 
@@ -591,7 +591,7 @@ output="${TMP_ROOT}/unavailable.out"
 if FAKE_CAPABILITY_STATE=unavailable "$SCRIPT" --evidence-dir "$evidence" "${common[@]}" >"$output" 2>&1; then
   fail "unavailable capabilities must block"
 fi
-[ "$(jq -r .reason "$evidence/summary.json")" = v9_capabilities_unavailable ] || fail "capability blocker not recorded"
+[ "$(jq -r .reason "$evidence/summary.json")" = v11_capabilities_unavailable ] || fail "capability blocker not recorded"
 assert_sanitized "$evidence" "$output"
 echo "ok - unavailable capabilities fail closed"
 
@@ -601,7 +601,7 @@ output="${TMP_ROOT}/wrong-node-strategy.out"
 if FAKE_AWS_NODE_STRATEGY=same_site_replace "$SCRIPT" --evidence-dir "$evidence" "${common[@]}" >"$output" 2>&1; then
   fail "a direct same-site node strategy must block"
 fi
-[ "$(jq -r .reason "$evidence/summary.json")" = v9_aws_node_configuration_contract_mismatch ] || fail "node strategy blocker not recorded"
+[ "$(jq -r .reason "$evidence/summary.json")" = v11_aws_node_configuration_contract_mismatch ] || fail "node strategy blocker not recorded"
 assert_sanitized "$evidence" "$output"
 echo "ok - non-rebuild AWS node strategy fails closed"
 
