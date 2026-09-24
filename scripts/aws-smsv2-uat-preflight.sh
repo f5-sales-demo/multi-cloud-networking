@@ -469,6 +469,12 @@ jq -e '
     select((.address | test("^(aws_|module\\.aws_tgw_connect|module\\.kvm_registration_mapping\\.terraform_data\\.gate|libvirt_|docker_|terraform_data\\.deployment_identity_guard$|terraform_data\\.(aws|kvm)|xcsh_token\\.(aws|ce)|xcsh_securemesh_site_v2\\.(aws|onprem_kvm)|xcsh_site_cloud_init\\.aws|xcsh_registration_approval\\.(aws|kvm)|xcsh_virtual_site\\.aws|xcsh_origin_pool\\.aws|xcsh_http_loadbalancer\\.aws|xcsh_external_connector\\.aws_tgw|xcsh_bgp\\.(aws_tgw|onprem_ebgp))")) | not)
   ] | length == 0' <<<"$DEPLOYMENT_PLAN" >/dev/null || block plan_resource_outside_showcase_allowlist
 EXPECTED_SITES_JSON=$(printf '%s\n' "${EXPECTED_SITES[@]}" | jq -Rsc 'split("\n") | map(select(length > 0)) | sort')
+jq -e --argjson sites "$EXPECTED_SITES_JSON" '
+  all($sites[]; length <= 63) and
+  all(.resource_changes[]? |
+    select(.type == "xcsh_securemesh_site_v2" and .change.actions == ["create"]);
+    (.change.after.name | type == "string" and length <= 63))' \
+  <<<"$DEPLOYMENT_PLAN" >/dev/null || block site_name_exceeds_dns1035_limit
 case "$LIFECYCLE_PHASE" in
 bootstrap)
   jq -e --argjson sites "$EXPECTED_SITES_JSON" '

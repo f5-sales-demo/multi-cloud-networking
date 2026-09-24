@@ -26,7 +26,7 @@ grep -Eq '^[[:space:]]*default[[:space:]]*=[[:space:]]*"smsv2"$' <<<"$generation
   fail "smsv2_site_generation must use the documented smsv2 identity"
 require_text "$variables" 'smsv2_site_generation must be a DNS-style label'
 require_text "$locals_file" 'site_prefix_base = coalesce(var.site_prefix, "${var.component}-${var.smsv2_site_generation}")'
-require_text "$locals_file" 'preview_site_prefix = "mcn-${trimsuffix(substr(local.source_branch_slug, 0, 15), "-")}-${substr(local.source_ref_sha256, 0, 12)}"'
+require_text "$locals_file" 'preview_site_prefix = "mcn-${trimsuffix(substr(local.source_branch_slug, 0, 14), "-")}-${substr(local.source_ref_sha256, 0, 12)}"'
 require_text "$locals_file" 'site_prefix         = local.deployment_is_production ? local.site_prefix_base : local.preview_site_prefix'
 require_text "$locals_file" 'aws_resource_prefix = local.deployment_is_production ? local.site_prefix : "mcn${local.deployment_short_suffix}"'
 require_text "$locals_file" '"mcn-deployment-generation" = var.smsv2_site_generation'
