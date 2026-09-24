@@ -240,6 +240,36 @@ jq -e '
   ([.collisions[].name] | sort) == ["mcn-ce-ha-gen-01-aws-tgw-peer-01-sli", "mcn-ce-ha-gen-01-bgp", "mcn-ce-ha-gen-01-connector", "mcn-ce-ha-gen-01-eip-aws_eip.ce[0]", "mcn-ce-ha-gen-01-key", "mcn-ce-ha-gen-01-site", "mcn-ce-ha-gen-01-vsite"]
 ' "$manifest" >/dev/null || fail "manifest must retain the exact verified collision inventory"
 
+guard_plan="$scratch/guard-plan.json"
+jq '
+  .resource_changes += [{address:"terraform_data.deployment_identity_guard",type:"terraform_data",
+    change:{actions:["create"],after:{input:"preview-owned"}}}] |
+  .variables.source_commit_sha.value = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" |
+  .variables.deployment_owner_id.value = "showcase-team" |
+  .planned_values.outputs.deployment_provenance.value = {
+    environment_key:"preview-owned",source_commit:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",owner_id:"showcase-team"
+  }' "$plan" >"$guard_plan"
+guard_manifest="$scratch/guard-manifest.json"
+if ! FAKE_ABSENT=true PATH="$fake_bin:$PATH" CURL_BIN="$fake_bin/curl" \
+  XCSH_API_URL=https://f5-sales-demo.console.ves.volterra.io XCSH_API_TOKEN=test-token \
+  "$script" --plan-json "$guard_plan" --aws-region ap-northeast-1 --xc-tenant f5-sales-demo \
+  --aws-account-id 123456789012 --deployment-generation gen-01 \
+  --component mcn-ce-ha --creator-id tester@example.test --manifest "$guard_manifest" >/dev/null; then
+  fail "an exact plan-bound deployment identity guard must be accepted"
+fi
+jq -e '.status == "ready" and .collisions == []' "$guard_manifest" >/dev/null ||
+  fail "the exact identity guard must not masquerade as an external collision"
+
+jq '.planned_values.outputs.deployment_provenance.value.environment_key = "wrong-preview"' \
+  "$guard_plan" >"$scratch/guard-mismatch.json"
+if FAKE_ABSENT=true PATH="$fake_bin:$PATH" CURL_BIN="$fake_bin/curl" \
+  XCSH_API_URL=https://f5-sales-demo.console.ves.volterra.io XCSH_API_TOKEN=test-token \
+  "$script" --plan-json "$scratch/guard-mismatch.json" --aws-region ap-northeast-1 --xc-tenant f5-sales-demo \
+  --aws-account-id 123456789012 --deployment-generation gen-01 \
+  --component mcn-ce-ha --creator-id tester@example.test --manifest "$scratch/guard-mismatch-manifest.json" >/dev/null 2>&1; then
+  fail "a mismatched identity guard must be rejected"
+fi
+
 empty_manifest="$scratch/empty-manifest.json"
 if ! FAKE_ABSENT=true PATH="$fake_bin:$PATH" CURL_BIN="$fake_bin/curl" \
   XCSH_API_URL=https://f5-sales-demo.console.ves.volterra.io XCSH_API_TOKEN=test-token \

@@ -89,8 +89,17 @@ show)
   if [ "$chdir" = "$FAKE_TF_DIR" ]; then
     printf() {
       command printf "$@" | jq --arg origin "${FAKE_PLAN_ORIGIN_DNS_NAME:-httpbin.org}" \
+        --arg guard_environment "${FAKE_GUARD_ENVIRONMENT:-}" \
         '.variables.aws_origin_dns_name.value = $origin |
-         .planned_values.outputs.aws_origin_dns_name.value = $origin'
+         .planned_values.outputs.aws_origin_dns_name.value = $origin |
+         if $guard_environment == "" then . else
+           .planned_values.outputs.deployment_provenance.value = {
+             environment_key:$guard_environment,source_commit:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+             owner_id:"showcase-team"
+           } |
+           .variables.source_commit_sha.value = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" |
+           .variables.deployment_owner_id.value = "showcase-team"
+         end'
     }
     plan_vip=${FAKE_PLAN_AWS_VIP_JSON:-'"10.151.1.10"'}
     plan_listeners=${FAKE_PLAN_SITE_LISTENERS_JSON:-'{"01":"10.150.11.10","02":"10.150.12.10","03":"10.150.13.10"}'}
@@ -281,6 +290,29 @@ fi
 [ "$(jq -r .status "$evidence/summary.json")" = ready ] || fail "no-change status not recorded"
 assert_sanitized "$evidence" "$output"
 echo "ok - no-change plan is accepted for the exact configured sites"
+
+guard_change=',{"address":"terraform_data.deployment_identity_guard","type":"terraform_data","change":{"actions":["create"],"after":{"input":"preview-owned"}}}'
+evidence="${TMP_ROOT}/owned-identity-guard"
+mkdir "$evidence"
+output="${TMP_ROOT}/owned-identity-guard.out"
+if ! FAKE_GUARD_ENVIRONMENT=preview-owned FAKE_EXTRA_CHANGE="$guard_change" \
+  "$SCRIPT" --evidence-dir "$evidence" "${common[@]}" >"$output" 2>&1; then
+  cat "$output" >&2
+  fail "the exact task-owned identity guard must pass preflight"
+fi
+assert_sanitized "$evidence" "$output"
+
+evidence="${TMP_ROOT}/mismatched-identity-guard"
+mkdir "$evidence"
+output="${TMP_ROOT}/mismatched-identity-guard.out"
+if FAKE_GUARD_ENVIRONMENT=wrong-preview FAKE_EXTRA_CHANGE="$guard_change" \
+  "$SCRIPT" --evidence-dir "$evidence" "${common[@]}" >"$output" 2>&1; then
+  fail "the identity guard must reject mismatched planned provenance"
+fi
+[ "$(jq -r .reason "$evidence/summary.json")" = collision_preflight_failed ] ||
+  fail "mismatched identity guard reason not recorded"
+assert_sanitized "$evidence" "$output"
+echo "ok - the identity guard is allowed only with matching planned provenance"
 
 evidence="${TMP_ROOT}/isolated-data-dir"
 mkdir "$evidence"
