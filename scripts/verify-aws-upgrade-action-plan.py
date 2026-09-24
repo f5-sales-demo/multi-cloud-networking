@@ -42,6 +42,21 @@ def expected_environment_key(source_ref: str) -> str:
     return f"{branch_slug[:19].rstrip('-')}-{ref_digest}"
 
 
+def aws_owned_address(address: str) -> bool:
+    """Restrict destroy candidates to the active AWS root, not Azure/KVM XC."""
+    if address.startswith(("aws_", "module.aws_tgw_connect[", "terraform_data.aws")):
+        return True
+    return (
+        re.fullmatch(
+            r"xcsh_(?:token|securemesh_site_v2|site_cloud_init|registration_approval|"
+            r"virtual_site|origin_pool|http_loadbalancer)\.aws(?:\[.*\])?"
+            r"|xcsh_(?:external_connector|bgp)\.aws_tgw(?:\[.*\])?",
+            address,
+        )
+        is not None
+    )
+
+
 def validate(
     args: argparse.Namespace, document: dict[str, Any], receipt: dict[str, Any]
 ) -> dict[str, Any]:
@@ -113,12 +128,7 @@ def validate(
             "destroy plan contains non-delete resource changes",
         )
         require(
-            all(
-                entry["address"].startswith(
-                    ("aws_", "module.aws_tgw_connect", "xcsh_", "terraform_data.aws")
-                )
-                for entry in mutations
-            ),
+            all(aws_owned_address(entry["address"]) for entry in mutations),
             "destroy plan contains Azure/KVM changes",
         )
     else:

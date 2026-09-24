@@ -162,6 +162,18 @@ class UpgradePlanTest(unittest.TestCase):
         self.plan["resource_changes"][0]["change"]["actions"] = ["create"]
         self.assertNotEqual(self.check("destroy").returncode, 0)
 
+    def test_destroy_excludes_kvm_and_azure_xc_resources(self):
+        """Reject foreign XC resources even when their change is delete-only."""
+        self.plan["action_invocations"] = []
+        for address in (
+            'xcsh_securemesh_site_v2.onprem_kvm["01"]',
+            'xcsh_securemesh_site_v2.azure["01"]',
+        ):
+            self.plan["resource_changes"] = [
+                {"address": address, "change": {"actions": ["delete"]}}
+            ]
+            self.assertNotEqual(self.check("destroy").returncode, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
