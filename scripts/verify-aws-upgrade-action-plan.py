@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fail closed on one task-owned, immutable AWS three-site qualification plan."""
 # ruff: noqa: S603, S607
+# pylint: disable=invalid-name
 
 import argparse
 import hashlib
@@ -30,6 +31,17 @@ def variable(document: dict[str, Any], name: str) -> Any:
     return entry["value"]
 
 
+def expected_environment_key(source_ref: str) -> str:
+    """Derive the canonical preview environment for one source ref."""
+    branch_slug = re.sub(
+        r"[^a-z0-9]+", "-", source_ref.removeprefix("refs/heads/")
+    ).strip("-")
+    ref_digest = hashlib.sha256(
+        (f"mcn.deployment-identity/v1\0{SOURCE_REPOSITORY}\0{source_ref}").encode()
+    ).hexdigest()[:12]
+    return f"{branch_slug[:19].rstrip('-')}-{ref_digest}"
+
+
 def validate(
     args: argparse.Namespace, document: dict[str, Any], receipt: dict[str, Any]
 ) -> dict[str, Any]:
@@ -51,15 +63,8 @@ def validate(
         and re.fullmatch(r"refs/heads/qualify/1255-[a-z0-9-]+", source_ref) is not None,
         "plan is not bound to the task-owned preview source ref",
     )
-    branch_slug = re.sub(
-        r"[^a-z0-9]+", "-", source_ref.removeprefix("refs/heads/")
-    ).strip("-")
-    ref_digest = hashlib.sha256(
-        (f"mcn.deployment-identity/v1\0{SOURCE_REPOSITORY}\0{source_ref}").encode()
-    ).hexdigest()[:12]
-    expected_environment = f"{branch_slug[:19].rstrip('-')}-{ref_digest}"
     require(
-        args.environment_key == expected_environment
+        args.environment_key == expected_environment_key(source_ref)
         and args.backend_key
         == f"mcn-ce-ha-smsv2/environments/{args.environment_key}/showcase.tfstate",
         "shared or ambiguous backend key",
