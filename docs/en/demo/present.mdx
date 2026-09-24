@@ -79,13 +79,13 @@ front of an audience is hard to walk back from even though nothing is wrong.
    - **ROW (`eastus`)**: Azure Standard ILB (`enable_azure_ilb`)
    - **Canada (`canadacentral`)**: Azure Standard ILB (`enable_canada_ilb`) and Canadian Regional Edge Virtual Site (`f5-sales-demo.ca`)
    - **AWS (`ap-northeast-1`)**: AWS VPC + EC2 CEs (`m5.2xlarge`) (`aws.mcn-ce-ha.f5-sales-demo.com`)
-   - **On-Premise KVM**: Local libvirt bridge + FRR ToR BGP router (`10.100.0.1`, ASN `65515`, `maximum-paths 4`)
+   - **On-Premise KVM**: One CE (`10.100.0.11`) and FRR ToR BGP router (`10.100.0.2`, ASN `65515`) on a local libvirt bridge; NAT gateway `10.100.0.1`, workload `10.100.0.100`.
 2. **Show the advertisement side.** Loop the peerings ([check 2](../verify/)) — each CE
    advertising the same prefix with its own next hop, all with the same AS path, so none is
    preferred.
 3. **Show what Azure, AWS, and FRR did with it.**
    - In Azure: Effective route table showing one prefix with $N$ next hops (`type: VirtualNetworkGateway`).
-   - In On-Premise FRR: `vtysh -c "show ip bgp 10.100.0.10/32"` showing multiple `*=` multipath entries, and `ip route show 10.100.0.10/32` in Linux kernel showing ECMP multipath next hops.
+   - In On-Premise FRR: `vtysh -c "show ip bgp summary"` showing one Established CE peer, and `vtysh -c "show ip bgp 198.51.100.0/24"` showing the imported route. This one-node KVM deployment makes no ECMP claim.
 4. **Show regional data sovereignty & traffic localization.** Demonstrate how `xcsh_virtual_site.canada_re` uses `ves.io/city in (toronto, montreal)` to restrict ingress, egress, and TLS decryption for `f5-sales-demo.ca` strictly within Canadian Regional Edges.
 5. **Show Canadian ILB Architecture Variation (when `enable_canada_ilb = true`).** Show how Azure Standard ILB (`azurerm_lb.ca_ilb`) uses HA Ports (`protocol = "All"`) and Health Probes (`Tcp/65500`) to distribute traffic across Canadian CE management NICs without BGP.
 6. **Show it serving.** The `curl` commands, sending Host headers for `mcn-ce-ha.f5-sales-demo.com`, `mcn-ce-ha.f5-sales-demo.ca`, and `aws.mcn-ce-ha.f5-sales-demo.com`.

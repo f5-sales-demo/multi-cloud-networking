@@ -11,6 +11,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+if git diff --cached --name-only | grep -qE '^(docs/en/demo/|tests/test-kvm-demo-docs\.sh$)'; then
+  bash tests/test-kvm-demo-docs.sh
+fi
+
 run() {
   printf '\n== %s\n' "$1"
   shift

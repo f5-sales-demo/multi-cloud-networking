@@ -23,7 +23,7 @@ its 2026-08-08 scope; final v8 acceptance did not re-prove Azure failover.
 
 This deployment demonstrates both primary HA patterns in a single multi-cloud environment:
 
-1. **Dynamic BGP / ECMP Routing (Azure Route Server / AWS Transit Gateway Connect / FRR ToR)**: Used for the Rest of World (`eastus`), AWS (`ap-northeast-1`), and On-Premise KVM paths.
+1. **Dynamic BGP / ECMP Routing (Azure Route Server / AWS Transit Gateway Connect)**: Used for the Rest of World (`eastus`) and AWS (`ap-northeast-1`) paths. On-Premise KVM has one CE and one FRR BGP peer; it imports `198.51.100.0/24` without ECMP.
 2. **Azure Internal Load Balancer (ILB) with HA Ports**: Used as the Canadian regional demonstration variation (`enable_canada_ilb = true`).
 
 ---
@@ -181,7 +181,7 @@ Observed output from healthy Canadian Azure ILB deployment:
 | **Strict BGP-Free Network Policy** | **Azure ILB** | Many enterprise cloud landing zones prohibit BGP peering with Azure Route Server or virtual network gateways. |
 | **Cost Optimization** | **Azure ILB** | Replaces ~$430/month Azure Route Server standing charge with ~$18/month Standard ILB. |
 | **Subnet Constrained Environment** | **Azure ILB** | Does not require carving out a dedicated `/27` `RouteServerSubnet`. |
-| **Multi-Cloud Consistency (AWS & Azure)** | **BGP / ECMP** | Uses identical BGP host route advertisement mechanics across AWS VPC, Azure ARS, and On-Premise ToR routers. |
+| **Multi-Cloud Consistency (AWS & Azure)** | **BGP / ECMP** | Uses BGP host route advertisement across AWS VPC and Azure ARS. The one-node KVM FRR path has one peer, not ECMP. |
 | **Native routed ingress** | **BGP / ECMP** | Packets route to a CE next hop without an intermediate Azure load-balancer rule. This row does not claim Direct Server Return behavior. |
 
 ---

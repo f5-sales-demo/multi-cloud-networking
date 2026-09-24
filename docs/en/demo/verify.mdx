@@ -333,10 +333,10 @@ bash scripts/capture-sitecli.sh --check \
 
 Only run this after Terraform has completed a saved KVM plan and F5 reports the
 site `ONLINE`. A running libvirt domain alone is not a successful CE deployment.
-The Sales Demo tenant prerequisite is exactly one valid `maurice_config`; when
-`xcsh` v9.2.2 reports `External tenant prerequisite unavailable`, stop before
-apply and request repair of that tenant-owned prerequisite before retrying the
-same saved-plan sequence.
+The pinned provider resolves the image from the uniquely owned Site UID, with an
+exact UID response, HTTPS URL, MD5 check, and ownership recheck. Stop on any
+ambiguous ownership or failed integrity check; never overwrite another site or
+apply a plan other than the one reviewed.
 
 For a controlled KVM teardown, set `enable_kvm = false` and create a saved destroy
 plan. This removes only Terraform-owned KVM resources without evaluating the
@@ -350,29 +350,27 @@ When the On-Premise KVM extension is deployed, verify hypervisor domain state, T
    virsh list --all
    ```
 
-   Confirm all three KVM Customer Edge nodes (`onprem-ce-01`, `onprem-ce-02`, `onprem-ce-03`) are in `running` state.
+   Confirm the one KVM Customer Edge node (`onprem-ce-01`, `10.100.0.11`) is running and registered to the owned site.
 
-2. **Verify FRR ToR BGP Router peering status and ECMP multipath routes**:
+2. **Verify the single FRR BGP peering and imported route**:
 
    ```bash
    docker exec mcn-kvm-frr-router vtysh -c "show ip bgp summary"
-   docker exec mcn-kvm-frr-router vtysh -c "show ip bgp 10.100.0.10/32"
-   docker exec mcn-kvm-frr-router ip route show 10.100.0.10/32
+   docker exec mcn-kvm-frr-router vtysh -c "show ip bgp 198.51.100.0/24"
    ```
 
-   Confirm active eBGP sessions with all three On-Prem CEs (ASN `64512`) on the generated local bridge network, showing established prefixes.
-   The `show ip bgp 10.100.0.10/32` command verifies BGP multipath (`*=` entries) installed by `maximum-paths 4`, and `ip route show` confirms ECMP multipath next hops installed in the Linux kernel.
+   Confirm one Established peer between the CE (`10.100.0.11`, ASN `64512`) and FRR (`10.100.0.2`, ASN `65515`). Verify the imported route `198.51.100.0/24`; one peer cannot demonstrate multipath.
 
 3. **Verify network reachability**:
 
    ```bash
    ping -c 3 10.100.0.2
-   for ip in 10.100.0.10 10.100.0.11 10.100.0.12; do
+   for ip in 10.100.0.1 10.100.0.11 10.100.0.100; do
      ping -c 2 "$ip"
    done
    ```
 
-   Confirm local ICMP reachability to the FRR router interface (`10.100.0.2`) and On-Prem CE node IP addresses.
+   Confirm local ICMP reachability to FRR (`10.100.0.2`), NAT gateway (`10.100.0.1`), CE (`10.100.0.11`), and workload (`10.100.0.100`). Local LAN reachability and workload traffic still require independent live acceptance (#1227); do not infer them from BGP status.
 
 ## AWS Customer Edge Verification
 
