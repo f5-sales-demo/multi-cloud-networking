@@ -13,7 +13,13 @@ ROOT = Path(__file__).resolve().parents[1]
 CHECKER = ROOT / "scripts/verify-aws-upgrade-action-plan.py"
 VALIDATE = runpy.run_path(str(CHECKER))["validate"]
 COMMIT = "a" * 40
-ENVIRONMENT = "qualify-1255-v11-abcdefabcdef"
+REF = "refs/heads/qualify/1255-v11-live"
+ENVIRONMENT = (
+    "qualify-1255-v11-li-"
+    + hashlib.sha256(
+        f"mcn.deployment-identity/v1\0f5-sales-demo/multi-cloud-networking\0{REF}".encode()
+    ).hexdigest()[:12]
+)
 KEY = f"mcn-ce-ha-smsv2/environments/{ENVIRONMENT}/showcase.tfstate"
 SITE = "mcn-1255-unique-aws-ce-01"
 SOFTWARE = "crt-20260201-0180"
@@ -30,6 +36,8 @@ class UpgradePlanTest(unittest.TestCase):
         self.plan = {
             "variables": {
                 "source_commit_sha": {"value": COMMIT},
+                "source_repository": {"value": "f5-sales-demo/multi-cloud-networking"},
+                "source_ref": {"value": REF},
                 "enable_aws": {"value": True},
                 "enable_azure": {"value": False},
                 "enable_kvm": {"value": False},
@@ -124,6 +132,10 @@ class UpgradePlanTest(unittest.TestCase):
 
     def test_shared_backend_key_is_rejected(self):
         self.receipt["backend_key"] = "mcn-ce-ha-smsv2/showcase.tfstate"
+        self.assertNotEqual(self.check().returncode, 0)
+
+    def test_production_ref_with_preview_backend_is_rejected(self):
+        self.plan["variables"]["source_ref"]["value"] = "refs/heads/main"
         self.assertNotEqual(self.check().returncode, 0)
 
     def test_reapply_and_destroy_have_no_actions(self):

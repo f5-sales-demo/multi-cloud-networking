@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 AWS_SITE_COUNT = 3
+SOURCE_REPOSITORY = "f5-sales-demo/multi-cloud-networking"
 
 
 def require(condition: bool, message: str) -> None:
@@ -43,8 +44,22 @@ def validate(
     require(
         receipt.get("environment_key") == args.environment_key, "environment mismatch"
     )
+    source_ref = variable(document, "source_ref")
     require(
-        args.environment_key.startswith("qualify-1255-")
+        variable(document, "source_repository") == SOURCE_REPOSITORY
+        and isinstance(source_ref, str)
+        and re.fullmatch(r"refs/heads/qualify/1255-[a-z0-9-]+", source_ref) is not None,
+        "plan is not bound to the task-owned preview source ref",
+    )
+    branch_slug = re.sub(
+        r"[^a-z0-9]+", "-", source_ref.removeprefix("refs/heads/")
+    ).strip("-")
+    ref_digest = hashlib.sha256(
+        (f"mcn.deployment-identity/v1\0{SOURCE_REPOSITORY}\0{source_ref}").encode()
+    ).hexdigest()[:12]
+    expected_environment = f"{branch_slug[:19].rstrip('-')}-{ref_digest}"
+    require(
+        args.environment_key == expected_environment
         and args.backend_key
         == f"mcn-ce-ha-smsv2/environments/{args.environment_key}/showcase.tfstate",
         "shared or ambiguous backend key",
