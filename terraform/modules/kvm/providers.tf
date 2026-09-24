@@ -4,7 +4,7 @@ terraform {
   required_providers {
     xcsh = {
       source  = "f5-sales-demo/xcsh"
-      version = "= 11.0.0"
+      version = "= 11.0.1"
     }
     libvirt = { source = "dmacvicar/libvirt", version = "= 0.8.3" }
     docker  = { source = "kreuzwerker/docker", version = "~> 3.0" }
