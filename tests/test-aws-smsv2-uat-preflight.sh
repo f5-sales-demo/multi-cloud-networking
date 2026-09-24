@@ -87,6 +87,11 @@ show)
     printf '# changed\n' >>"$FAKE_CANDIDATE_BINARY"
   fi
   if [ "$chdir" = "$FAKE_TF_DIR" ]; then
+    printf() {
+      command printf "$@" | jq --arg origin "${FAKE_PLAN_ORIGIN_DNS_NAME:-httpbin.org}" \
+        '.variables.aws_origin_dns_name.value = $origin |
+         .planned_values.outputs.aws_origin_dns_name.value = $origin'
+    }
     plan_vip=${FAKE_PLAN_AWS_VIP_JSON:-'"10.151.1.10"'}
     plan_listeners=${FAKE_PLAN_SITE_LISTENERS_JSON:-'{"01":"10.150.11.10","02":"10.150.12.10","03":"10.150.13.10"}'}
     site_01_actions=${FAKE_SITE_01_ACTIONS:-${FAKE_SITE_ACTIONS:-'"create"'}}
@@ -126,7 +131,7 @@ show)
 output)
   case "$*" in
   *'-raw aws_workload_instance_id'*) printf 'i-workload\n' ;;
-  *'-raw aws_origin_dns_name'*) printf 'httpbin.org\n' ;;
+  *'-raw aws_origin_dns_name'*) printf '%s\n' "${FAKE_LIVE_ORIGIN_DNS_NAME:-httpbin.org}" ;;
   *'-raw aws_vip'*) printf '%s\n' "${FAKE_LIVE_AWS_VIP:-10.151.1.10}" ;;
   *'-raw aws_lb_domain'*) printf 'aws.mcn-ce-ha.example.com\n' ;;
   *'-raw aws_smsv2_target_group_arn'*) printf 'arn:aws:elasticloadbalancing:ap-northeast-1:111122223333:targetgroup/test/0123456789abcdef\n' ;;
@@ -674,6 +679,29 @@ plan_listener_failure plan-listeners-missing null
 plan_listener_failure plan-listeners-duplicate '{"01":"10.150.11.10","02":"10.150.11.10","03":"10.150.13.10"}'
 plan_listener_failure plan-listeners-malformed '{"01":"10.150.11.10","02":"not-an-ip","03":"10.150.13.10"}'
 echo "ok - plan-bound listener identities require three distinct site addresses"
+
+evidence="${TMP_ROOT}/matching-origin-override"
+mkdir "$evidence"
+output="${TMP_ROOT}/matching-origin-override.out"
+if FAKE_PLAN_ORIGIN_DNS_NAME=internal.f5-sales-demo.com FAKE_LIVE_ORIGIN_DNS_NAME=internal.f5-sales-demo.com \
+  "$SCRIPT" --execute-uat --evidence-dir "$evidence" "${common[@]}" >"$output" 2>&1; then
+  fail "non-converged fake topology must stop origin override UAT"
+fi
+[ "$(jq -r .reason "$evidence/summary.json")" = topology_not_converged ] ||
+  fail "matching origin override did not reach topology validation"
+assert_sanitized "$evidence" "$output"
+
+evidence="${TMP_ROOT}/mismatched-origin-override"
+mkdir "$evidence"
+output="${TMP_ROOT}/mismatched-origin-override.out"
+if FAKE_PLAN_ORIGIN_DNS_NAME=internal.f5-sales-demo.com FAKE_LIVE_ORIGIN_DNS_NAME=httpbin.org \
+  "$SCRIPT" --execute-uat --evidence-dir "$evidence" "${common[@]}" >"$output" 2>&1; then
+  fail "plan/live origin mismatch must stop live UAT"
+fi
+[ "$(jq -r .reason "$evidence/summary.json")" = origin_identity_mismatch ] ||
+  fail "plan/live origin mismatch reason not recorded"
+assert_sanitized "$evidence" "$output"
+echo "ok - live UAT binds an authorized origin to the reviewed plan"
 
 evidence="${TMP_ROOT}/matching-vip-override"
 mkdir "$evidence"
