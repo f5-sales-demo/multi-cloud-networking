@@ -92,7 +92,7 @@ resource "xcsh_token" "aws" {
   for_each = local.aws_active_sites
 
   # XC validates token names as DNS-1035 labels, whose maximum length is 63.
-  name        = substr("${each.value.name}-registration", 0, 63)
+  name        = local.deployment_is_production ? substr("${each.value.name}-registration", 0, 63) : format("%s-aws-reg-%s-%s", local.aws_resource_prefix, each.key, var.aws_site_configuration_phase)
   namespace   = "system"
   description = "Registration token for independent AWS site ${each.value.name}"
   labels      = local.xc_labels

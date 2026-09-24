@@ -96,7 +96,7 @@ run "long_preview_site_names_reserve_provider_suffix_budget" {
   }
 
   assert {
-    condition     = length(local.site_prefix) <= 32 && length("${local.site_prefix}-aws-${var.aws_location}-01-bootstrap") <= 64
+    condition     = length(local.site_prefix) <= 31 && length("${local.site_prefix}-aws-${var.aws_location}-01-bootstrap") <= 63
     error_message = "Preview site prefixes must reserve room for the AWS region, node number, and bootstrap suffix."
   }
 }

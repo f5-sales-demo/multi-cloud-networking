@@ -230,6 +230,21 @@ assert_sanitized() {
   fi
 }
 
+overlong_site=$(printf 'a%.0s' {1..64})
+evidence="${TMP_ROOT}/overlong-site"
+mkdir "$evidence"
+output="${TMP_ROOT}/overlong-site.out"
+if "$SCRIPT" --evidence-dir "$evidence" "${bootstrap_common[@]:0:${#bootstrap_common[@]}-6}" \
+  --expected-site "$overlong_site" \
+  --expected-site mcn-ce-ha-aws-ap-northeast-1-02-bootstrap \
+  --expected-site mcn-ce-ha-aws-ap-northeast-1-03-bootstrap >"$output" 2>&1; then
+  fail "an overlong SecureMesh site name must fail before collision checks"
+fi
+[ "$(jq -r .reason "$evidence/summary.json")" = site_name_exceeds_dns1035_limit ] ||
+  fail "overlong SecureMesh site name did not report the API limit"
+assert_sanitized "$evidence" "$output"
+echo "ok - 64-character SecureMesh site name is rejected before mutation"
+
 evidence="${TMP_ROOT}/ready"
 mkdir "$evidence"
 output="${TMP_ROOT}/ready.out"

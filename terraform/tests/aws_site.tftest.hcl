@@ -296,6 +296,31 @@ run "aws_bootstrap_stage_uses_distinct_discovery_sites" {
   }
 }
 
+run "preview_bootstrap_names_fit_dns1035" {
+  command = plan
+
+  variables {
+    source_ref                    = "refs/heads/qualify/1255-v11-live"
+    aws_site_configuration_phase  = "bootstrap"
+    aws_smsv2_device_mapping_file = null
+  }
+
+  assert {
+    condition = alltrue([for site in values(xcsh_securemesh_site_v2.aws) :
+      length(site.name) <= 63 && endswith(site.name, "-bootstrap")
+    ])
+    error_message = "All three preview bootstrap site names must fit the XC 63-character limit."
+  }
+
+  assert {
+    condition = length(distinct([for token in values(xcsh_token.aws) : token.name])) == 3 && alltrue([
+      for token in values(xcsh_token.aws) :
+      length(token.name) <= 63 && can(regex("^[a-z]([-a-z0-9]*[a-z0-9])?$", token.name))
+    ])
+    error_message = "Preview registration tokens must remain distinct DNS-1035 labels."
+  }
+}
+
 run "aws_disabled_plans_no_aws_resources" {
   command = plan
 
