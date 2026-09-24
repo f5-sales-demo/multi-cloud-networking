@@ -269,6 +269,7 @@ chmod 700 "$EVIDENCE_DIR"
 umask 077
 SUMMARY="${EVIDENCE_DIR}/summary.json"
 SCRATCH=$(mktemp -d "${TMPDIR:-/tmp}/mcn-smsv2-preflight.XXXXXX")
+SCRATCH_TF_DATA_DIR="${SCRATCH}/tfdata"
 cleanup() {
   local exit_code=$? cleanup_command
   if [ "$FAILOVER_STOPPED" = true ] && [ -n "${FAILOVER_INSTANCE_ID:-}" ]; then
@@ -374,15 +375,15 @@ output "contract" {
 }
 TF
 
-TF_CLI_CONFIG_FILE="$REGISTRY_CLI_CONFIG" TF_VAR_api_url="$API_URL" XCSH_API_TOKEN="$API_TOKEN" \
+TF_DATA_DIR="$SCRATCH_TF_DATA_DIR" TF_CLI_CONFIG_FILE="$REGISTRY_CLI_CONFIG" TF_VAR_api_url="$API_URL" XCSH_API_TOKEN="$API_TOKEN" \
   terraform -chdir="$SCRATCH" init -backend=false -input=false -no-color >/dev/null 2>&1 || block v11_provider_install_failed
-PROVIDER_VERSION=$(TF_CLI_CONFIG_FILE="$SELECTED_CLI_CONFIG" terraform -chdir="$SCRATCH" version -json 2>/dev/null |
+PROVIDER_VERSION=$(TF_DATA_DIR="$SCRATCH_TF_DATA_DIR" TF_CLI_CONFIG_FILE="$SELECTED_CLI_CONFIG" terraform -chdir="$SCRATCH" version -json 2>/dev/null |
   jq -r '.provider_selections["registry.terraform.io/f5-sales-demo/xcsh"] // empty')
 [ "$PROVIDER_VERSION" = "11.0.0" ] || block v11_provider_resolution_mismatch
-TF_CLI_CONFIG_FILE="$SELECTED_CLI_CONFIG" TF_VAR_api_url="$API_URL" XCSH_API_TOKEN="$API_TOKEN" \
+TF_DATA_DIR="$SCRATCH_TF_DATA_DIR" TF_CLI_CONFIG_FILE="$SELECTED_CLI_CONFIG" TF_VAR_api_url="$API_URL" XCSH_API_TOKEN="$API_TOKEN" \
   terraform -chdir="$SCRATCH" plan -refresh=false -input=false -lock=false \
   -out=contract.tfplan -no-color >/dev/null 2>&1 || block v11_contract_query_failed
-CONTRACT=$(TF_CLI_CONFIG_FILE="$SELECTED_CLI_CONFIG" terraform -chdir="$SCRATCH" show -json contract.tfplan 2>/dev/null |
+CONTRACT=$(TF_DATA_DIR="$SCRATCH_TF_DATA_DIR" TF_CLI_CONFIG_FILE="$SELECTED_CLI_CONFIG" terraform -chdir="$SCRATCH" show -json contract.tfplan 2>/dev/null |
   jq -c '.planned_values.outputs.contract.value // empty')
 [ -n "$CONTRACT" ] || block v11_contract_query_failed
 

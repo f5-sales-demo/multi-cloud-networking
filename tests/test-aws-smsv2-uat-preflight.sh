@@ -71,7 +71,7 @@ token_state=unset
 [ -n "${XCSH_API_TOKEN:-}" ] && token_state=present
 api_url_state=unset
 [ -n "${XCSH_API_URL:-}" ] && api_url_state=present
-printf '%s\t%s\t%s\t%s\n' "$1" "${TF_CLI_CONFIG_FILE:-unset}" "$token_state" "$api_url_state" >>"$FAKE_TF_CALLS"
+printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "${TF_CLI_CONFIG_FILE:-unset}" "$token_state" "$api_url_state" "${TF_DATA_DIR:-unset}" "$chdir" >>"$FAKE_TF_CALLS"
 case "$1" in
 init)
   exit 0
@@ -281,6 +281,25 @@ fi
 [ "$(jq -r .status "$evidence/summary.json")" = ready ] || fail "no-change status not recorded"
 assert_sanitized "$evidence" "$output"
 echo "ok - no-change plan is accepted for the exact configured sites"
+
+evidence="${TMP_ROOT}/isolated-data-dir"
+mkdir "$evidence"
+output="${TMP_ROOT}/isolated-data-dir.out"
+: >"$TF_CALLS"
+if ! TF_DATA_DIR="${TMP_ROOT}/root-data" "$SCRIPT" --evidence-dir "$evidence" "${common[@]}" >"$output" 2>&1; then
+  cat "$output" >&2
+  fail "isolated root data directory must pass preflight"
+fi
+awk -F '\t' -v root="${TMP_ROOT}/root-data" -v terraform_dir="$TF_DIR" '
+  $6 == terraform_dir && $1 == "show" { root_seen=1; if ($5 != root) bad=1 }
+  $6 != terraform_dir && $1 ~ /^(init|version|plan|show)$/ {
+    scratch_seen=1
+    if ($5 == root || $5 !~ /mcn-smsv2-preflight\..*\/tfdata$/) bad=1
+  }
+  END { exit bad || !root_seen || !scratch_seen }
+' "$TF_CALLS" || fail "contract probe reused the root Terraform data directory"
+assert_sanitized "$evidence" "$output"
+echo "ok - contract probe isolates Terraform data from the root saved plan"
 
 evidence="${TMP_ROOT}/candidate-ready"
 mkdir "$evidence"
