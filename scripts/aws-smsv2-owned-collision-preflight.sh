@@ -443,6 +443,18 @@ while IFS= read -r item; do
   fi
   if [[ $type == terraform_data ]]; then
     case "$address" in
+    terraform_data.deployment_identity_guard)
+      jq -e --argjson after "$after" '
+        .planned_values.outputs.deployment_provenance.value as $provenance |
+        ($after.input | type == "string" and length > 0) and
+        $after.input == $provenance.environment_key and
+        $provenance.source_commit == .variables.source_commit_sha.value and
+        $provenance.owner_id == .variables.deployment_owner_id.value and
+        (.variables.source_commit_sha.value | type == "string" and length == 40) and
+        (.variables.deployment_owner_id.value | type == "string" and length > 0)' "$PLAN_JSON" >/dev/null ||
+        die "planned deployment identity guard does not match its provenance: $address"
+      continue
+      ;;
     terraform_data.aws_tgw_contract_gate[[]0[]] | terraform_data.aws_tgw_runtime_gate[[]0[]] | terraform_data.aws_tgw_site_route_gate[[]*[]] | module.kvm_registration_mapping.terraform_data.gate[[]0[]])
       continue
       ;;
