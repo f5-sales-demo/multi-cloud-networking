@@ -431,8 +431,14 @@ unset AWS_IDENTITY
 DEPLOYMENT_PLAN=$(TF_CLI_CONFIG_FILE="$SELECTED_CLI_CONFIG" terraform -chdir="$TERRAFORM_DIR" show -json "$PLAN_FILE" 2>/dev/null) || block deployment_plan_unreadable
 PLAN_AWS_VIP=""
 PLAN_SITE_LISTENERS=""
+PLAN_ORIGIN_DNS_NAME=""
 PLAN_COMPLETE=$(jq -r 'if .complete == false then "false" else "true" end' <<<"$DEPLOYMENT_PLAN") || block deployment_plan_unreadable
 if [ "$PLAN_MODE" != destroy ] && { [ "$PLAN_COMPLETE" = true ] || [ "$EXECUTE_UAT" = true ]; }; then
+  PLAN_ORIGIN_DNS_NAME=$(jq -er '
+    .variables.aws_origin_dns_name.value as $origin |
+    select($origin | type == "string" and test("^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}$")) |
+    select(.planned_values.outputs.aws_origin_dns_name.value == $origin) | $origin' \
+    <<<"$DEPLOYMENT_PLAN" 2>/dev/null) || block plan_origin_identity_unavailable
   PLAN_AWS_VIP=$(jq -er '(.planned_values.outputs.aws_vip.value // .prior_state.values.outputs.aws_vip.value) | select(type == "string" and length > 0)' \
     <<<"$DEPLOYMENT_PLAN" 2>/dev/null) || block plan_vip_identity_unavailable
   jq -en --arg vip "$PLAN_AWS_VIP" '
@@ -764,7 +770,7 @@ status_plan() {
 WORKLOAD_INSTANCE_ID=$(tf output -raw aws_workload_instance_id 2>/dev/null) || block workload_identity_unavailable
 [ -n "$WORKLOAD_INSTANCE_ID" ] || block workload_identity_unavailable
 ORIGIN_DNS_NAME=$(tf output -raw aws_origin_dns_name 2>/dev/null) || block origin_identity_unavailable
-[ "$ORIGIN_DNS_NAME" = "httpbin.org" ] || block origin_identity_mismatch
+[ "$ORIGIN_DNS_NAME" = "$PLAN_ORIGIN_DNS_NAME" ] || block origin_identity_mismatch
 AWS_VIP=$(tf output -raw aws_vip 2>/dev/null) || block vip_identity_unavailable
 [ "$AWS_VIP" = "$PLAN_AWS_VIP" ] || block vip_identity_mismatch
 AWS_LB_DOMAIN=$(tf output -raw aws_lb_domain 2>/dev/null) || block loadbalancer_domain_unavailable
