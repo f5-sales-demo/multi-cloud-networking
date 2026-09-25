@@ -2,6 +2,7 @@
 # ruff: noqa: INP001, I001, PT009, PT027, RUF005
 import importlib.util
 from pathlib import Path
+from typing import Any
 import unittest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/showcase-plan-scope.py"
@@ -224,7 +225,7 @@ class ShowcasePlanScopeTest(unittest.TestCase):
         address = "xcsh_bgp.onprem_ebgp[0]"
         document = prior(plan([(address, ["delete"])]), [address])
         document["resource_changes"][0]["type"] = "xcsh_bgp"
-        before = {
+        before: dict[str, Any] = {
             "name": "onprem-kvm-ebgp",
             "namespace": "system",
             "labels": {
