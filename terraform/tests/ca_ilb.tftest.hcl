@@ -46,8 +46,8 @@ run "canadian_ilb_plans_successfully" {
   }
 
   assert {
-    condition     = output.ca_ilb_frontend_ip == "10.200.1.10"
-    error_message = "Canada ILB frontend private IP should be 10.200.1.10."
+    condition     = output.ca_ilb_frontend_ip == "10.200.3.10"
+    error_message = "Canada ILB frontend private IP should be 10.200.3.10."
   }
 
   assert {
@@ -56,8 +56,8 @@ run "canadian_ilb_plans_successfully" {
   }
 
   assert {
-    condition     = length(azurerm_lb_rule.ca_ha_ports) == 1
-    error_message = "Canadian ILB HA Ports rule should be created."
+    condition     = length(azurerm_lb_rule.ca_application) == 1 && length(azurerm_lb_rule.ca_console) == 1
+    error_message = "Canadian ILB application and console rules should be created."
   }
 }
 

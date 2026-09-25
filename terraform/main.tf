@@ -72,19 +72,6 @@ resource "terraform_data" "deployment_identity_guard" {
   }
 }
 
-# Azure Route Server requires eBGP multihop, but the immutable SMSv2 contract
-# currently supplies no schema-valid request control for it.  Keeping this
-# requirement in a data source validates it during planning, before Terraform
-# can evaluate any Azure or F5 resource mutation.
-# tflint-ignore: terraform_unused_declarations
-data "xcsh_smsv2_contract" "azure_route_server" {
-  count = var.enable_azure && var.enable_bgp ? 1 : 0
-
-  # Provider configuration validation runs before count is expanded. Keep the
-  # unavailable Azure-only requirement absent in KVM/AWS-only plans as well.
-  required_capabilities = var.enable_azure && var.enable_bgp ? ["azure_route_server_ebgp_multihop"] : []
-}
-
 # Guard: the HA VIP MUST be outside every VNet CIDR, or Azure prefers the VNet
 # system route over the more-specific BGP /32. Masks the VIP to each CIDR's prefix
 # length and compares network addresses (a correct containment test for any prefix).
@@ -135,8 +122,8 @@ module "ce_topology" {
   site_prefix        = local.site_prefix
 }
 
-# Hub: RG, VNet, and CE subnets. Route Server is created only for the explicitly
-# requested (and currently rejected) BGP topology.
+# Hub: RG, VNet, and CE subnets. Route Server is created for the relay-backed
+# BGP topology when enabled.
 module "azure_hub" {
   source = "./modules/azure-hub"
   count  = var.enable_azure ? 1 : 0
@@ -247,9 +234,9 @@ module "xc_site" {
   # destroyed instance with it. Must be virtual_machine_id, not the ARM resource
   # id — the latter is name-derived and identical after a replacement.
   ce_vm_instance_id    = module.ce_node[each.key].vm_instance_id
-  rs_peer_ips          = module.azure_hub[0].rs_peer_ips
+  peer_ips             = try(module.azure_frr_us[0].peer_ips, [])
   ce_asn               = var.ce_asn
-  rs_asn               = var.rs_asn
+  peer_asn             = var.azure_frr_asn
   os_version           = var.ce_os_version
   sw_version           = var.ce_sw_version
   enable_bgp           = var.enable_bgp
@@ -257,15 +244,27 @@ module "xc_site" {
   labels               = local.azure_xc_labels
 }
 
-# The Azure side of each eBGP session (Route Server -> CE eth0/SLO IP).
-module "azure_route_server_bgp" {
-  source   = "./modules/azure-route-server-bgp"
-  for_each = var.enable_azure && var.enable_bgp ? module.ce_topology.ce_nodes : {}
+# Each CE peers with both local FRRs. The FRRs, and only the FRRs, peer
+# with Azure Route Server and export a CE-learned application VIP /32.
+module "azure_frr_us" {
+  count  = var.enable_azure && var.enable_bgp ? 1 : 0
+  source = "./modules/azure-frr"
 
-  name            = "${each.key}-bgp"
-  route_server_id = module.azure_hub[0].route_server_id
-  peer_asn        = var.ce_asn
-  peer_ip         = module.ce_node[each.key].mgmt_private_ip
+  name                = "${var.component}-us"
+  location            = module.azure_hub[0].location
+  resource_group_name = module.azure_hub[0].resource_group_name
+  mgmt_subnet_id      = module.azure_hub[0].management_subnet_id
+  mgmt_subnet_prefix  = var.mgmt_subnet_prefix
+  route_server_id     = module.azure_hub[0].route_server_id
+  rs_peer_ips         = module.azure_hub[0].rs_peer_ips
+  ce_ips              = [for key in sort(keys(module.ce_topology.ce_nodes)) : module.ce_node[key].mgmt_private_ip]
+  vip                 = var.vip
+  ce_asn              = var.ce_asn
+  frr_asn             = var.azure_frr_asn
+  rs_asn              = var.rs_asn
+  admin_username      = var.admin_username
+  ssh_public_key      = local.ssh_public_key
+  tags                = local.tags
 }
 
 # Test client in snet-hub-internal.
@@ -508,9 +507,9 @@ module "xc_site_ca" {
   interface_name       = each.value.interface_name
   mgmt_nic_mac         = module.ce_node_ca[each.key].mgmt_nic_mac
   ce_vm_instance_id    = module.ce_node_ca[each.key].vm_instance_id
-  rs_peer_ips          = try(module.azure_hub_ca[0].rs_peer_ips, [])
+  peer_ips             = try(module.azure_frr_ca[0].peer_ips, [])
   ce_asn               = var.ce_asn
-  rs_asn               = var.rs_asn
+  peer_asn             = var.azure_frr_asn
   os_version           = var.ce_os_version
   sw_version           = var.ce_sw_version
   enable_bgp           = var.enable_bgp
@@ -518,15 +517,25 @@ module "xc_site_ca" {
   labels               = local.ca_xc_labels
 }
 
-# Azure Route Server eBGP session for Canadian CEs.
-module "azure_route_server_bgp_ca" {
-  for_each = var.enable_bgp ? try(module.ce_topology_ca[0].ce_nodes, {}) : {}
-  source   = "./modules/azure-route-server-bgp"
+module "azure_frr_ca" {
+  count  = var.enable_azure && var.enable_canada && var.enable_bgp ? 1 : 0
+  source = "./modules/azure-frr"
 
-  name            = "${each.key}-bgp"
-  route_server_id = try(module.azure_hub_ca[0].route_server_id, null)
-  peer_asn        = var.ce_asn
-  peer_ip         = module.ce_node_ca[each.key].mgmt_private_ip
+  name                = "${var.component}-ca"
+  location            = module.azure_hub_ca[0].location
+  resource_group_name = module.azure_hub_ca[0].resource_group_name
+  mgmt_subnet_id      = module.azure_hub_ca[0].management_subnet_id
+  mgmt_subnet_prefix  = var.ca_mgmt_subnet_prefix
+  route_server_id     = module.azure_hub_ca[0].route_server_id
+  rs_peer_ips         = module.azure_hub_ca[0].rs_peer_ips
+  ce_ips              = [for key in sort(keys(module.ce_topology_ca[0].ce_nodes)) : module.ce_node_ca[key].mgmt_private_ip]
+  vip                 = var.ca_vip
+  ce_asn              = var.ce_asn
+  frr_asn             = var.azure_frr_asn
+  rs_asn              = var.rs_asn
+  admin_username      = var.admin_username
+  ssh_public_key      = local.ssh_public_key
+  tags                = local.tags
 }
 
 module "client_vm_ca" {

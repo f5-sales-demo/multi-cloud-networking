@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Drive the complete AWS + KVM showcase lifecycle from the unified Terraform
+# Drive the complete AWS + KVM + Azure showcase lifecycle from the unified Terraform
 # root. Every terraform plan is saved, checked, and applied by exact digest.
 set -euo pipefail
 
@@ -26,6 +26,8 @@ KVM_LAN_PLAN=""
 KVM_LAN_PLAN_SHA256=""
 KVM_LAN_STAGE=""
 KVM_LAN_RECEIPT=""
+PROVIDER_ZIP=""
+AZURE_SUBSCRIPTION=""
 
 usage() {
   cat <<'EOF'
@@ -48,9 +50,9 @@ Options:
   --kvm-lan-stage STAGE     Reviewed hardware or configured stage.
   --kvm-lan-receipt PATH    New mode-0600 preflight receipt outside the repo.
 
-full performs clean teardown when state exists, build/verify, controlled ENI
-tag drift repair, reviewed full teardown, absence proof, and a second build.
-The second verified AWS + KVM deployment is intentionally left online.
+full performs clean teardown when state exists, staged build/verify, controlled
+drift repair, reviewed full teardown, absence proof, and a second build.
+The second verified AWS + KVM + Azure deployment is intentionally left online.
 EOF
 }
 
@@ -176,7 +178,7 @@ if [ "$MODE" = kvm-lan-preflight ]; then
   exit 0
 fi
 
-for command_name in aws curl getent jq stat sudo systemctl terraform sha256sum virsh; do
+for command_name in aws az curl getent gh jq python3 stat sudo systemctl terraform sha256sum virsh; do
   command -v "$command_name" >/dev/null 2>&1 || die "required command is unavailable: $command_name"
 done
 [ -n "$CREATOR_ID" ] || die "Git user.email is required for ownership checks"
@@ -192,6 +194,8 @@ checked_out_commit=$(git -C "$REPO_ROOT" rev-parse --verify HEAD) || die "cannot
 [ "$checked_out_commit" = "$SOURCE_COMMIT_SHA" ] || die "source commit does not match the checked-out commit"
 checked_out_ref="refs/heads/$(git -C "$REPO_ROOT" symbolic-ref --short HEAD)" || die "lifecycle requires a named source branch"
 [ "$checked_out_ref" = "$SOURCE_REF" ] || die "source ref does not match the checked-out branch"
+[ -z "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=all)" ] ||
+  die "lifecycle source worktree must be clean and committed"
 identity_json=$(
   "$REPO_ROOT/scripts/deployment-identity.py" \
     --repository "$SOURCE_REPOSITORY" --source-ref "$SOURCE_REF" \
@@ -204,6 +208,11 @@ ARTIFACT_SCOPE=$(jq -er '.artifactScope' <<<"$identity_json") || die "artifact s
 unset identity_json checked_out_commit checked_out_ref
 configured_backend_key=$(sed -n 's/^[[:space:]]*key[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$BACKEND_CONFIG")
 [ "$configured_backend_key" = "$SHOWCASE_BACKEND_KEY" ] || die "backend key does not match the reviewed deployment environment"
+if [ "$SHOWCASE_BACKEND_KEY" = mcn-ce-ha-smsv2/showcase.tfstate ]; then
+  [ "$SOURCE_REF" = refs/heads/main ] || die "production backend requires merged main"
+  [ "$(git -C "$REPO_ROOT" rev-parse origin/main)" = "$SOURCE_COMMIT_SHA" ] ||
+    die "production backend requires the exact current origin/main commit"
+fi
 unset configured_backend_key
 
 credential_owner=$(stat -c %U "$CREDENTIAL_FILE")
@@ -272,6 +281,49 @@ caller_account=$(AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_SDK_LOAD_CONFIG=1 \
 unset caller_account
 
 tf init -reconfigure -input=false -lockfile=readonly -backend-config="$BACKEND_CONFIG"
+AZURE_SUBSCRIPTION=$(printf '%s\n' 'var.subscription_id' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS" | jq -er 'select(type == "string" and test("^[0-9a-fA-F-]{36}$"))') ||
+  die "configured Azure subscription is unavailable"
+az account show --subscription "$AZURE_SUBSCRIPTION" --query state --output tsv | grep -qx Enabled ||
+  die "configured Azure subscription is not enabled"
+showcase_flags=$(printf '%s\n' 'jsonencode({aws=var.enable_aws,tgw=var.enable_aws_tgw_connect,azure=var.enable_azure,canada=var.enable_canada,bgp=var.enable_bgp,us_ilb=var.enable_azure_ilb,ca_ilb=var.enable_canada_ilb,kvm=var.enable_kvm,kvm_lan=var.enable_kvm_lan})' |
+  tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS" | jq -r .) || die "cannot resolve showcase toggles"
+jq -e 'all(.[]; . == true)' <<<"$showcase_flags" >/dev/null || die "all showcase paths must be enabled in tfvars"
+unset showcase_flags
+latest_xcsh=$(gh release view --repo f5-sales-demo/terraform-provider-xcsh --json tagName --jq .tagName) || die "cannot check latest xcsh release"
+[ "$latest_xcsh" = v11.3.0 ] || die "xcsh release advanced beyond the pinned v11.3.0"
+PROVIDER_ZIP="$PRIVATE_ROOT/terraform-provider-xcsh_11.3.0_linux_amd64.zip"
+if [ ! -f "$PROVIDER_ZIP" ]; then
+  curl -fsSL --retry 3 --output "$PROVIDER_ZIP" \
+    'https://github.com/f5-sales-demo/terraform-provider-xcsh/releases/download/v11.3.0/terraform-provider-xcsh_11.3.0_linux_amd64.zip' ||
+    die "cannot download pinned xcsh provider artifact"
+fi
+[ "$(sha256sum "$PROVIDER_ZIP" | awk '{print $1}')" = 5dab6b26cbc2656bd7df2a8259564f238b1947d5cfdf9e9370243300c954d85d ] ||
+  die "xcsh release artifact digest mismatch"
+PREFLIGHT_DIR="$TERRAFORM_DIR/preflight/ce-egress"
+terraform -chdir="$PREFLIGHT_DIR" init -backend=false -input=false >/dev/null
+PREFLIGHT_PLAN="$PRIVATE_ROOT/ce-egress.tfplan"
+PREFLIGHT_JSON="$PRIVATE_ROOT/ce-egress-plan.json"
+terraform -chdir="$PREFLIGHT_DIR" plan -input=false -no-color \
+  -var="source_commit_sha=$SOURCE_COMMIT_SHA" -var="backend_key=$SHOWCASE_BACKEND_KEY" \
+  -out="$PREFLIGHT_PLAN" >/dev/null
+terraform -chdir="$PREFLIGHT_DIR" show -json "$PREFLIGHT_PLAN" >"$PREFLIGHT_JSON"
+jq -e --arg commit "$SOURCE_COMMIT_SHA" --arg key "$SHOWCASE_BACKEND_KEY" '
+  .planned_values.outputs.reviewed_identity.value.source_commit_sha == $commit and
+  .planned_values.outputs.reviewed_identity.value.backend_key == $key and
+  .configuration.provider_config.xcsh.full_name == "registry.terraform.io/f5-sales-demo/xcsh" and
+  (.configuration.provider_config.xcsh.version_constraint | . == "11.3.0" or . == "= 11.3.0") and
+  ([.resource_changes[]? | select(.change.actions != ["no-op"] and .change.actions != ["read"])] | length == 0) and
+  ((.action_invocations // []) | length == 0)' "$PREFLIGHT_JSON" >/dev/null ||
+  die "CE egress preflight plan identity or action scope failed"
+python3 "$REPO_ROOT/scripts/customer-edge-egress-preflight.py" \
+  --plan-json "$PREFLIGHT_JSON" --probe >"$PRIVATE_ROOT/ce-egress-receipt.json" ||
+  die "CE DNS/NTP/HTTPS egress preflight failed"
+jq -n --arg commit "$SOURCE_COMMIT_SHA" --arg key "$SHOWCASE_BACKEND_KEY" \
+  --arg digest "sha256:$(sha256sum "$PREFLIGHT_PLAN" | awk '{print $1}')" \
+  --arg provider "sha256:$(sha256sum "$PROVIDER_ZIP" | awk '{print $1}')" \
+  '{scope:"ce-egress-preflight",source_commit:$commit,backend_key:$key,plan_sha256:$digest,provider_artifact_sha256:$provider}' \
+  >"$PRIVATE_ROOT/ce-egress-plan-receipt.json"
+rm -f -- "$PREFLIGHT_PLAN" "$PREFLIGHT_JSON"
 existing_provenance=$(tf output -json deployment_provenance 2>/dev/null || true)
 if [ -n "$existing_provenance" ] && [ "$existing_provenance" != null ]; then
   jq -e \
@@ -299,6 +351,12 @@ aws_resource_prefix_json=$(printf '%s\n' 'local.aws_resource_prefix' | tf consol
 AWS_RESOURCE_PREFIX=$(jq -er 'select(type == "string" and test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"))' <<<"$aws_resource_prefix_json") ||
   die "environment-scoped AWS prefix is not a DNS-style label"
 unset site_prefix_json aws_resource_prefix_json
+LEGACY_DEPLOYER=$(printf '%s\n' 'local.deployer' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS" |
+  jq -er 'select(type == "string" and test("^[a-z0-9]+$"))') ||
+  die "legacy deployer identity is unavailable"
+LEGACY_ENVIRONMENT=$(printf '%s\n' 'var.environment' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS" |
+  jq -er 'select(type == "string" and test("^[a-z0-9-]+$"))') ||
+  die "legacy environment identity is unavailable"
 
 libvirt_unit=""
 for candidate in libvirtd.service virtqemud.service; do
@@ -345,6 +403,46 @@ phase_paths() {
   chmod 700 "$PHASE_DIR" "$EVIDENCE_DIR"
 }
 
+scope_plan() {
+  local scope=$1 receipt=$EVIDENCE_DIR/showcase-plan-receipt.json
+  if [ "$scope" = full-destroy ] && [ "${DESTROY_FALLBACK:-false}" = true ]; then
+    python3 "$REPO_ROOT/scripts/showcase-legacy-destroy-scope.py" \
+      --terraform-dir "$TERRAFORM_DIR" --state "$EVIDENCE_DIR/prior-state.json" \
+      --events "$EVIDENCE_DIR/destroy-events.jsonl" --plan "$PLAN_FILE" \
+      --provider-zip "$PROVIDER_ZIP" --backend-config "$BACKEND_CONFIG" \
+      --source-commit "$SOURCE_COMMIT_SHA" --backend-key "$SHOWCASE_BACKEND_KEY" \
+      --environment-key "$DEPLOYMENT_ENVIRONMENT_KEY" --owner-id "$DEPLOYMENT_OWNER_ID" \
+      --legacy-deployer "$LEGACY_DEPLOYER" --legacy-environment "$LEGACY_ENVIRONMENT" \
+      --legacy-generation "$GENERATION" --legacy-tenant "$XC_TENANT" \
+      >"$receipt" || die "legacy destroy plan failed exact ownership/action scope"
+  else
+    python3 "$REPO_ROOT/scripts/showcase-plan-scope.py" \
+      --terraform-dir "$TERRAFORM_DIR" --plan-file "$PLAN_FILE" \
+      --provider-zip "$PROVIDER_ZIP" --backend-config "$BACKEND_CONFIG" \
+      --scope "$scope" --source-commit "$SOURCE_COMMIT_SHA" \
+      --backend-key "$SHOWCASE_BACKEND_KEY" --environment-key "$DEPLOYMENT_ENVIRONMENT_KEY" \
+      --owner-id "$DEPLOYMENT_OWNER_ID" \
+      --legacy-deployer "$LEGACY_DEPLOYER" --legacy-environment "$LEGACY_ENVIRONMENT" \
+      --legacy-generation "$GENERATION" --legacy-tenant "$XC_TENANT" \
+      >"$receipt" || die "saved plan failed $scope scope"
+  fi
+  chmod 600 "$receipt"
+  jq -e --arg digest "sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')" \
+    '.plan_sha256 == $digest' "$receipt" >/dev/null || die "saved plan digest changed"
+}
+
+apply_scoped_plan() {
+  local scope=$1
+  scope_plan "$scope"
+  local digest
+  digest=$(jq -er .plan_sha256 "$EVIDENCE_DIR/showcase-plan-receipt.json")
+  [ "$digest" = "sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')" ] || die "saved plan digest changed before apply"
+  tf apply -input=false -no-color "$PLAN_FILE"
+  jq -n --arg scope "$scope" --arg digest "$digest" --arg completed_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{scope:$scope,plan_sha256:$digest,completed_at:$completed_at,status:"applied"}' >"$EVIDENCE_DIR/apply-receipt.json"
+  rm -f -- "$PLAN_FILE"
+}
+
 run_phase() {
   local cycle=$1 phase=$2 step=$3 configured_tgw=${4:-true}
   local -a args=("${common_phase_args[@]}" --phase "$phase") sites=()
@@ -360,7 +458,24 @@ run_phase() {
       --eni-projection "$ENI_PROJECTION" --configured-tgw "$configured_tgw")
   fi
   "$REPO_ROOT/scripts/aws-smsv2-lifecycle-plan.sh" "${args[@]}"
+  scope_plan aws-kvm-build
+  if [ "$phase" = bootstrap ] && [ "$step" = create ]; then
+    # The full saved plan is already scoped above. Inspect its owned KVM
+    # projection before first boot, with the same digest, and verify that
+    # the shared bridge/uplink still match the private allocation.
+    local plan_digest
+    plan_digest=$(jq -er .plan_sha256 "$EVIDENCE_DIR/showcase-plan-receipt.json")
+    tf show -json "$PLAN_FILE" |
+      jq '.resource_changes |= map(select(.address == "libvirt_domain.ce_node[\"01\"]"))' |
+      python3 "$REPO_ROOT/scripts/kvm-lan-plan-scope.py" --stage hardware \
+        --plan-sha256 "$plan_digest" --source-ref "$SOURCE_REF" \
+        --source-commit-sha "$SOURCE_COMMIT_SHA" --verify-host-network \
+        >"$EVIDENCE_DIR/kvm-host-network-receipt.json" ||
+      die "KVM hardware plan or shared host network preflight failed"
+  fi
   "$REPO_ROOT/scripts/aws-smsv2-lifecycle-plan.sh" "${args[@]}" --apply
+  jq -n --arg phase "$phase" --arg digest "$(jq -r .plan_sha256 "$EVIDENCE_DIR/showcase-plan-receipt.json")" \
+    '{phase:$phase,plan_sha256:$digest,status:"applied"}' >"$EVIDENCE_DIR/apply-receipt.json"
   rm -f -- "$PLAN_FILE"
 }
 
@@ -368,7 +483,10 @@ wait_for_approvals() {
   local phase=$1 expected_aws=$2 expected_kvm=$3 deadline=$((SECONDS + 5400))
   local probe="$PRIVATE_ROOT/registration-wait.tfplan" aws_count kvm_count
   local -a args=(-input=false -no-color -lock=false -var-file="$TFVARS"
-    -var="aws_site_configuration_phase=$phase" -var='enable_aws_tgw_connect=false')
+    -var="aws_site_configuration_phase=$phase" -var='enable_aws_tgw_connect=false'
+    -var='enable_azure=false' -var='enable_canada=false'
+    -var='enable_azure_ilb=false' -var='enable_canada_ilb=false'
+    -var='kvm_lan_configuration_phase=hardware')
   if [ "$phase" = configured ]; then
     args+=(-var="aws_smsv2_device_mapping_file=$MAPPING_FILE")
   fi
@@ -408,6 +526,7 @@ verify_configured() {
   args+=(--plan-file "$PLAN_FILE" --evidence-dir "$EVIDENCE_DIR")
   for site in "${final_sites[@]}"; do args+=(--expected-site "$site"); done
   "$REPO_ROOT/scripts/aws-smsv2-lifecycle-plan.sh" "${args[@]}"
+  scope_plan aws-kvm-zero
   tf show -json "$PLAN_FILE" | jq -e \
     '[.resource_changes[]? | select(.change.actions != ["no-op"] and .change.actions != ["read"])] | length == 0' >/dev/null ||
     die "configured verification plan is not zero-change"
@@ -448,48 +567,160 @@ build_cycle() {
   run_phase "$cycle" configured approvals false
   run_phase "$cycle" configured tgw true
   verify_configured "$cycle" healthy "$run_uat"
+  exercise_managed_drift "$cycle"
+  phase_paths "$cycle" kvm_configured inside-vip
+  tf_plan -input=false -no-color -var-file="$TFVARS" \
+    -var='enable_azure=false' -var='enable_canada=false' \
+    -var='enable_azure_ilb=false' -var='enable_canada_ilb=false' \
+    -var='kvm_lan_configuration_phase=configured' \
+    -var='aws_site_configuration_phase=configured' \
+    -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE"
+  apply_scoped_plan kvm-configured
+  python3 "$REPO_ROOT/scripts/verify-kvm-lan-client.py" \
+    --terraform-dir "$TERRAFORM_DIR" --evidence-dir "$CYCLE_DIR/kvm-client" \
+    --source-commit "$SOURCE_COMMIT_SHA"
+  phase_paths "$cycle" azure_build both-regions
+  tf_plan -input=false -no-color -var-file="$TFVARS" \
+    -var='kvm_lan_configuration_phase=configured' \
+    -var='aws_site_configuration_phase=configured' \
+    -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE"
+  apply_scoped_plan azure-build
+  wait_for_azure_approvals "$cycle"
+  wait_for_azure_online "$cycle"
+  settle_azure "$cycle"
+  verify_final "$cycle"
+}
+
+wait_for_azure_approvals() {
+  local cycle=$1 deadline=$((SECONDS + 5400)) approval_count
+  phase_paths "$cycle" azure_approval registered
+  while ((SECONDS < deadline)); do
+    if tf_plan -input=false -no-color -var-file="$TFVARS" \
+      -var='kvm_lan_configuration_phase=configured' \
+      -var='aws_site_configuration_phase=configured' \
+      -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE" \
+      >"$EVIDENCE_DIR/registration-plan.log" 2>&1; then
+      approval_count=$(tf show -json "$PLAN_FILE" |
+        jq '[.resource_changes[]? | select(.type == "xcsh_registration_approval" and .name == "this" and .change.actions == ["create"])] | length')
+      if [ "$approval_count" -eq 6 ]; then
+        apply_scoped_plan azure-approvals
+        return 0
+      fi
+    fi
+    rm -f -- "$PLAN_FILE"
+    sleep 30
+  done
+  die "six Azure CE registrations did not reach NEW before the bounded deadline"
+}
+
+wait_for_azure_online() {
+  local cycle=$1 deadline=$((SECONDS + 5400)) site state all_online
+  local -a sites=() canadian_sites=()
+  mapfile -t sites < <(tf output -json xc_site_names | jq -r '.[]')
+  mapfile -t canadian_sites < <(tf output -json ca_xc_site_names | jq -r '.[]')
+  sites+=("${canadian_sites[@]}")
+  [ "${#sites[@]}" -eq 6 ] || die "Azure online wait requires six owned sites"
+  while ((SECONDS < deadline)); do
+    all_online=true
+    for site in "${sites[@]}"; do
+      state=$(printf 'Authorization: APIToken %s\n' "$XCSH_API_TOKEN" |
+        curl -fsS --connect-timeout 10 --max-time 30 -H @- \
+          "$XCSH_API_URL/api/config/namespaces/system/sites/$site" 2>/dev/null |
+        jq -r '.spec.site_state // .get_spec.site_state // empty') || state=""
+      if [ "$state" != ONLINE ]; then
+        all_online=false
+        break
+      fi
+    done
+    if [ "$all_online" = true ]; then
+      jq -n --arg checked_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '{checked_at:$checked_at,online_sites:6,status:"passed"}' \
+        >"$PRIVATE_ROOT/$cycle-azure-online-receipt.json"
+      return 0
+    fi
+    sleep 30
+  done
+  die "six Azure CEs did not become ONLINE before the bounded deadline"
+}
+
+settle_azure() {
+  local cycle=$1 attempt active_count
+  for attempt in 1 2 3 4; do
+    phase_paths "$cycle" azure_converge "$attempt"
+    tf_plan -input=false -no-color -refresh=true -var-file="$TFVARS" \
+      -var='kvm_lan_configuration_phase=configured' \
+      -var='aws_site_configuration_phase=configured' \
+      -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE"
+    active_count=$(tf show -json "$PLAN_FILE" |
+      jq '[.resource_changes[]? | select(.change.actions != ["no-op"] and .change.actions != ["read"])] | length')
+    if [ "$active_count" -eq 0 ]; then
+      scope_plan zero-change
+      rm -f -- "$PLAN_FILE"
+      return 0
+    fi
+    [ "$attempt" -lt 4 ] || die "Azure registration labels or provider read-back did not converge after three reviewed plans"
+    apply_scoped_plan azure-converge
+  done
+}
+
+verify_final() {
+  local cycle=$1
+  phase_paths "$cycle" final refresh-zero-change
+  "$REPO_ROOT/scripts/verify-deployment.sh" --terraform-dir "$TERRAFORM_DIR" \
+    --evidence-dir "$PHASE_DIR/azure-uat" --subscription "$AZURE_SUBSCRIPTION" --skip-console
+  if [ "$cycle" != verify ]; then
+    "$REPO_ROOT/scripts/verify-azure-failover.sh" --terraform-dir "$TERRAFORM_DIR" \
+      --evidence-dir "$PHASE_DIR/azure-failover" --subscription "$AZURE_SUBSCRIPTION" \
+      --source-commit "$SOURCE_COMMIT_SHA"
+  fi
+  tf_plan -input=false -no-color -refresh=true -var-file="$TFVARS" \
+    -var='kvm_lan_configuration_phase=configured' \
+    -var='aws_site_configuration_phase=configured' \
+    -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE"
+  scope_plan zero-change
+  rm -f -- "$PLAN_FILE"
 }
 
 destroy_all() {
   local cycle=$1 require_kvm=${2:-false}
   phase_paths "$cycle" full_destroy reviewed
-  tf_plan -destroy -input=false -no-color -var-file="$TFVARS" \
+  DESTROY_FALLBACK=false
+  tf output -json xc_site_names >"$PRIVATE_ROOT/latest-destroy-us-sites.json" 2>/dev/null || printf '{}\n' >"$PRIVATE_ROOT/latest-destroy-us-sites.json"
+  tf output -json ca_xc_site_names >"$PRIVATE_ROOT/latest-destroy-ca-sites.json" 2>/dev/null || printf '{}\n' >"$PRIVATE_ROOT/latest-destroy-ca-sites.json"
+  tf output -json resource_group_name >"$PRIVATE_ROOT/latest-destroy-us-rg.json" 2>/dev/null || printf 'null\n' >"$PRIVATE_ROOT/latest-destroy-us-rg.json"
+  tf output -json ca_resource_group_name >"$PRIVATE_ROOT/latest-destroy-ca-rg.json" 2>/dev/null || printf 'null\n' >"$PRIVATE_ROOT/latest-destroy-ca-rg.json"
+  tf state pull >"$EVIDENCE_DIR/prior-state.json"
+  tf_plan -destroy -json -input=false -no-color -var-file="$TFVARS" \
     -var='aws_site_configuration_phase=bootstrap' -var='enable_aws_tgw_connect=false' \
-    -var='enable_kvm=false' -out="$PLAN_FILE"
-  DESTROY_JSON=$(tf show -json "$PLAN_FILE")
-  jq -e '[.resource_changes[]? | select(.change.actions != ["no-op"] and .change.actions != ["read"] and .change.actions != ["delete"])] | length == 0' \
-    <<<"$DESTROY_JSON" >/dev/null || die "destroy plan contains a non-delete action"
-  jq -e '[.resource_changes[]? | select(.change.actions != ["no-op"] and .change.actions != ["read"]) | select(.type | startswith("azurerm_") or startswith("azuread_") or startswith("azapi_"))] | length == 0' \
-    <<<"$DESTROY_JSON" >/dev/null || die "destroy plan contains an Azure action"
+    -var='enable_kvm=false' -var='enable_kvm_lan=false' \
+    -var='kvm_lan_configuration_phase=disabled' -var='kvm_lan=null' \
+    -out="$PLAN_FILE" >"$EVIDENCE_DIR/destroy-events.jsonl"
+  if tf show -json "$PLAN_FILE" >"$EVIDENCE_DIR/destroy-plan.json" 2>"$EVIDENCE_DIR/show-json-error.log"; then
+    DESTROY_JSON=$(cat "$EVIDENCE_DIR/destroy-plan.json")
+  elif [ "$require_kvm" = false ] &&
+    grep -Fq 'unsupported attribute "namespace"' "$EVIDENCE_DIR/show-json-error.log"; then
+    DESTROY_FALLBACK=true
+    DESTROY_JSON=""
+  else
+    die "saved destroy plan could not be decoded for review"
+  fi
   if [ "$require_kvm" = true ]; then
     jq -e '[.resource_changes[]? | select(.type == "xcsh_securemesh_site_v2" and .name == "onprem_kvm" and .change.actions == ["delete"])] | length == 1' \
       <<<"$DESTROY_JSON" >/dev/null || die "destroy plan does not contain the owned KVM site"
   fi
   unset DESTROY_JSON
-  "$REPO_ROOT/scripts/aws-smsv2-uat-preflight.sh" \
-    --evidence-dir "$EVIDENCE_DIR" --terraform-dir "$TERRAFORM_DIR" --plan-file "$PLAN_FILE" \
-    --tfvars "$TFVARS" --plan-mode destroy --lifecycle-phase full_destroy \
-    --expected-aws-account "$AWS_ACCOUNT" --expected-aws-region "$AWS_REGION" \
-    --expected-xc-tenant "$XC_TENANT" --creator-id "$CREATOR_ID" \
-    --deployment-generation "$GENERATION" --component "$COMPONENT" \
-    --source-repository "$SOURCE_REPOSITORY" --source-ref "$SOURCE_REF" \
-    --source-commit-sha "$SOURCE_COMMIT_SHA" --deployment-owner-id "$DEPLOYMENT_OWNER_ID" \
-    --deployment-actor-id "$DEPLOYMENT_ACTOR_ID" \
-    --expected-site "${final_sites[0]}" --expected-site "${final_sites[1]}" --expected-site "${final_sites[2]}"
-  plan_sha256="sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')"
-  jq -n --arg phase full_destroy --arg plan_sha256 "$plan_sha256" \
-    --arg environment_key "$DEPLOYMENT_ENVIRONMENT_KEY" --arg source_commit "$SOURCE_COMMIT_SHA" \
-    --arg backend_key "$SHOWCASE_BACKEND_KEY" \
-    '{phase:$phase,plan_sha256:$plan_sha256,environment_key:$environment_key,source_commit:$source_commit,backend_key:$backend_key}' \
-    >"$EVIDENCE_DIR/plan-receipt.json"
-  tf apply -input=false -no-color "$PLAN_FILE"
-  rm -f -- "$PLAN_FILE"
+  apply_scoped_plan full-destroy
+  rm -f -- "$EVIDENCE_DIR/prior-state.json" "$EVIDENCE_DIR/destroy-events.jsonl" \
+    "$EVIDENCE_DIR/destroy-plan.json" "$EVIDENCE_DIR/show-json-error.log"
+  DESTROY_FALLBACK=false
   [ -z "$(tf state list)" ] || die "Terraform state is not empty after destroy"
 }
 
 verify_absence() {
   local response_file="$PRIVATE_ROOT/xc-absence.json" status site
-  for site in "${final_sites[@]}" "${bootstrap_sites[@]}" "${SITE_PREFIX}-kvm"; do
+  local -a azure_sites=()
+  mapfile -t azure_sites < <(jq -r '.[]' "$PRIVATE_ROOT/latest-destroy-us-sites.json" "$PRIVATE_ROOT/latest-destroy-ca-sites.json")
+  for site in "${final_sites[@]}" "${bootstrap_sites[@]}" "${SITE_PREFIX}-kvm" "${azure_sites[@]}"; do
     status=$(printf 'header = "Authorization: APIToken %s"\n' "$XCSH_API_TOKEN" |
       curl -sS --connect-timeout 10 --max-time 30 --config - --output "$response_file" --write-out '%{http_code}' \
         "$XCSH_API_URL/api/config/namespaces/system/securemesh_site_v2s/$site") || die "XC absence query failed"
@@ -502,6 +733,16 @@ verify_absence() {
     'Name=instance-state-name,Values=pending,running,stopping,stopped' \
     --query 'length(Reservations[].Instances[])' --output text)
   [ "$instance_count" = 0 ] || die "owned AWS instances remain after destroy"
+  local rg
+  for file in "$PRIVATE_ROOT/latest-destroy-us-rg.json" "$PRIVATE_ROOT/latest-destroy-ca-rg.json"; do
+    rg=$(jq -r '. // empty' "$file")
+    [ -z "$rg" ] || [ "$(az group exists --subscription "$AZURE_SUBSCRIPTION" --name "$rg")" = false ] ||
+      die "owned Azure resource group remains after destroy: $rg"
+  done
+  jq -n --arg checked_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --argjson azure_site_count "${#azure_sites[@]}" \
+    '{checked_at:$checked_at,azure_site_count:$azure_site_count,aws_instance_count:0,azure_resource_groups_absent:true,xc_sites_absent:true}' \
+    >"$PRIVATE_ROOT/absence-receipt-$(date -u +%Y%m%dT%H%M%SZ).json"
 }
 
 observe_refresh_only_drift() {
@@ -543,6 +784,7 @@ observe_refresh_only_drift() {
   esac
   unset drift_json
   plan_sha256="sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')"
+  scope_plan refresh-only
   jq -n --arg phase refresh_only --arg drift_kind "$drift_kind" \
     --arg expected_address "$expected_address" --arg plan_sha256 "$plan_sha256" \
     --arg environment_key "$DEPLOYMENT_ENVIRONMENT_KEY" --arg source_commit "$SOURCE_COMMIT_SHA" \
@@ -597,12 +839,12 @@ exercise_managed_drift() {
 
 case "$MODE" in
 verify)
-  CYCLE_DIR="$PRIVATE_ROOT/verify-private"
+  CYCLE_DIR="$PRIVATE_ROOT/second-private"
   REGISTRATION_PROJECTION=${REGISTRATION_PROJECTION:-$CYCLE_DIR/aws-registration-projection.json}
   ENI_PROJECTION=${ENI_PROJECTION:-$CYCLE_DIR/aws-eni-projection.json}
   MAPPING_FILE=${MAPPING_FILE:-$CYCLE_DIR/aws-device-mapping.json}
   [ -f "$MAPPING_FILE" ] || die "verify requires retained private mapping artifacts"
-  verify_configured verify healthy true
+  verify_final verify
   ;;
 destroy)
   destroy_all requested false
@@ -611,7 +853,6 @@ destroy)
 build)
   [ -z "$(tf state list)" ] || die "build requires empty state"
   build_cycle build true
-  rm -f -- "$MAPPING_FILE" "$REGISTRATION_PROJECTION" "$ENI_PROJECTION"
   ;;
 full)
   if [ -n "$(tf state list)" ]; then
@@ -619,13 +860,10 @@ full)
     verify_absence
   fi
   build_cycle first true
-  exercise_managed_drift first
   rm -f -- "$MAPPING_FILE" "$REGISTRATION_PROJECTION" "$ENI_PROJECTION"
   destroy_all first true
   verify_absence
   build_cycle second true
-  exercise_managed_drift second
-  rm -f -- "$MAPPING_FILE" "$REGISTRATION_PROJECTION" "$ENI_PROJECTION"
   ;;
 esac
 

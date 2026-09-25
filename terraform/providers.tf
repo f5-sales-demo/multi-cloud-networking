@@ -30,6 +30,10 @@ provider "azurerm" {
   skip_provider_registration = !local.azure_provider_enabled
 }
 
+provider "azapi" {
+  subscription_id = local.azure_provider_enabled ? var.subscription_id : null
+}
+
 # AWS — deploys the VPC, subnets, CE EC2 instances and internet gateway.
 # Auth comes from the environment (aws CLI login / AWS_* env vars).
 provider "aws" {

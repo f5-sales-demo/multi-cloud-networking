@@ -96,6 +96,17 @@ run "hardware_phase_declares_the_second_nic_only" {
     )
     error_message = "Hardware phase must preserve SLO-first ordering and defer XC LAN exposure."
   }
+
+  assert {
+    condition = (
+      length(libvirt_domain.workload[0].network_interface) == 2 &&
+      libvirt_domain.workload[0].network_interface[1].bridge == "br-lan-demo" &&
+      libvirt_domain.workload[0].network_interface[1].mac == "52:54:00:10:01:64" &&
+      strcontains(libvirt_cloudinit_disk.workload[0].network_config, "192.0.2.20/24") &&
+      strcontains(libvirt_cloudinit_disk.workload[0].user_data, "mcn-kvm-lan-origin")
+    )
+    error_message = "The real HTTP origin must also be provisioned on the LAN before first boot."
+  }
 }
 
 run "configured_phase_adopts_and_changes_only_the_runtime_sli" {

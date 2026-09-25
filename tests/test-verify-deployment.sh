@@ -24,7 +24,7 @@ set -euo pipefail
 if [ "${1:-}" = "-chdir=terraform" ]; then shift; fi
 case "${1:-} ${2:-} ${3:-}" in
 "version -json ")
-  printf '{"terraform_version":"1.16.1","provider_selections":{"registry.terraform.io/f5-sales-demo/xcsh":"11.0.2"}}\n'
+  printf '{"terraform_version":"1.16.1","provider_selections":{"registry.terraform.io/f5-sales-demo/xcsh":"11.3.0"}}\n'
   ;;
 "output -json xc_site_names")
   printf '{"eastus01":"site-01","eastus02":"site-02","eastus03":"site-03"}\n'
@@ -38,6 +38,16 @@ case "${1:-} ${2:-} ${3:-}" in
 "output -json ca_ce_vm_names")
   printf '{"canadacentral01":"ca-ce-01","canadacentral02":"ca-ce-02","canadacentral03":"ca-ce-03"}\n'
   ;;
+"output -json ce_mgmt_private_ips") printf '{"eastus01":"10.0.1.4","eastus02":"10.0.1.5","eastus03":"10.0.1.6"}\n' ;;
+"output -json canada_ce_mgmt_private_ips") printf '{"canadacentral01":"10.200.1.4","canadacentral02":"10.200.1.5","canadacentral03":"10.200.1.6"}\n' ;;
+"output -json ce_sli_private_ips") printf '{"eastus01":"10.0.3.4","eastus02":"10.0.3.5","eastus03":"10.0.3.6"}\n' ;;
+"output -json canada_ce_sli_private_ips") printf '{"canadacentral01":"10.200.3.4","canadacentral02":"10.200.3.5","canadacentral03":"10.200.3.6"}\n' ;;
+"output -json route_server_peer_ips") printf '["10.0.4.4","10.0.4.5"]\n' ;;
+"output -json canada_route_server_peer_ips") printf '["10.200.4.4","10.200.4.5"]\n' ;;
+"output -json azure_frr_vm_names") printf '["us-frr-20","us-frr-21"]\n' ;;
+"output -json canada_frr_vm_names") printf '["ca-frr-20","ca-frr-21"]\n' ;;
+"output -json azure_frr_peer_ips") printf '["10.0.1.20","10.0.1.21"]\n' ;;
+"output -json canada_frr_peer_ips") printf '["10.200.1.20","10.200.1.21"]\n' ;;
 "output -json ce_vm_ids")
   printf '{"eastus01":"/subscriptions/000/resourceGroups/rg-example/providers/Microsoft.Compute/virtualMachines/ce-01","eastus02":"/subscriptions/000/resourceGroups/rg-example/providers/Microsoft.Compute/virtualMachines/ce-02","eastus03":"/subscriptions/000/resourceGroups/rg-example/providers/Microsoft.Compute/virtualMachines/ce-03"}\n'
   ;;
@@ -53,9 +63,16 @@ case "${1:-} ${2:-} ${3:-}" in
 "output -raw ca_client_vm_name") printf 'ca-client-example\n' ;;
 "output -raw azure_ilb_private_ip") printf '10.0.1.10\n' ;;
 "output -raw canada_ilb_private_ip") printf '10.200.1.10\n' ;;
+"output -raw azure_ilb_console_ip") printf '10.0.1.11\n' ;;
+"output -raw canada_ilb_console_ip") printf '10.200.1.11\n' ;;
+"output -raw azure_ilb_application_domain") printf 'mcn-inside.example.com\n' ;;
+"output -raw canada_ilb_application_domain") printf 'mcn-ca-inside.example.com\n' ;;
 "output -raw lb_domain") printf 'mcn.example.com\n' ;;
 "output -raw ca_lb_domain") printf 'mcn-ca.example.com\n' ;;
 "output -raw vip") printf '10.250.0.10\n' ;;
+"output -raw ca_vip") printf '10.250.1.10\n' ;;
+"output -raw client_nic_name") printf 'client-us-nic\n' ;;
+"output -raw canada_client_nic_name") printf 'client-ca-nic\n' ;;
 "output -raw origin_ip") printf '198.51.100.10\n' ;;
 "output -raw bastion_name") printf 'bastion-example\n' ;;
 *) printf 'unexpected terraform call: %s\n' "$*" >&2; exit 2 ;;
@@ -87,6 +104,14 @@ cat >"${WORK}/bin/az" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 case "$*" in
+*"account show"*) printf 'Enabled\n' ;;
+*"network nic show-effective-route-table"*)
+  if [[ "$*" == *"client-ca-nic"* ]]; then
+    printf '{"value":[{"addressPrefix":["10.250.1.10/32"],"nextHopIpAddress":["10.200.1.20","10.200.1.21"]}]}\n'
+  else
+    printf '{"value":[{"addressPrefix":["10.250.0.10/32"],"nextHopIpAddress":["10.0.1.20","10.0.1.21"]}]}\n'
+  fi
+  ;;
 *"vm get-instance-view"*)
   vm_name=""
   while [ "$#" -gt 0 ]; do
@@ -112,6 +137,18 @@ case "$*" in
   fi
   ;;
 *"vm run-command invoke"*)
+  if [[ "$*" == *"MCN_CONSOLE_BACKENDS"* ]]; then
+    printf 'MCN_CONSOLE_BACKENDS healthy=3\n'
+    exit 0
+  fi
+  if [[ "$*" == *"MCN_FRR"* ]]; then
+    if [ "${AZ_BGP_MODE:-ok}" = "missing-ce" ]; then
+      printf 'MCN_FRR ce_established=2 rs_established=2 vip_learned=1\n'
+    else
+      printf 'MCN_FRR ce_established=3 rs_established=2 vip_learned=1\n'
+    fi
+    exit 0
+  fi
   if [[ "$*" == *"MCN_ILB"* ]]; then
     if [ "${AZ_ILB_MODE:-ok}" = "missing" ]; then
       printf 'MCN_ILB reachable=0\n'
@@ -126,10 +163,12 @@ case "$*" in
     printf '%s\n' 'ERROR: (Conflict) Run command extension execution is in progress. Please wait for completion before invoking a run command.' >&2
     exit 1
   fi
-  if [ "${CURL_CANADA_LB_MODE:-ok}" = "fail" ]; then
-    printf 'MCN_UAT vip_ok=50 vip_fail=0 ca_lb_ok=0 ca_lb_fail=50 origin_ok=25 origin_fail=0\n'
+  if [[ "$*" == *"region=canada"* ]] && [ "${CURL_CANADA_LB_MODE:-ok}" = "fail" ]; then
+    printf 'MCN_REGION region=canada vip_ok=0 vip_fail=50 ilb_ok=50 ilb_fail=0 origin_ok=50 origin_fail=0\n'
+  elif [[ "$*" == *"region=canada"* ]]; then
+    printf 'MCN_REGION region=canada vip_ok=50 vip_fail=0 ilb_ok=50 ilb_fail=0 origin_ok=50 origin_fail=0\n'
   else
-    printf 'MCN_UAT vip_ok=50 vip_fail=0 ca_lb_ok=50 ca_lb_fail=0 origin_ok=25 origin_fail=0\n'
+    printf 'MCN_REGION region=us vip_ok=50 vip_fail=0 ilb_ok=50 ilb_fail=0 origin_ok=50 origin_fail=0\n'
   fi
   ;;
 *"network bastion tunnel"*)
@@ -147,6 +186,7 @@ run_uat() {
     MCN_UAT_TEST_MODE=1 \
     bash "$SCRIPT" \
     --terraform-dir terraform \
+    --subscription 00000000-0000-0000-0000-000000000000 \
     --evidence-dir "${WORK}/evidence-$1" \
     --samples-per-batch 50 \
     --max-batches 3 \
@@ -168,10 +208,10 @@ if OUT=$(run_uat healthy 2>&1); then
   else
     bad "aggregate summary is missing or incorrect"
   fi
-  if jq -e '.xc_site_names.value | length == 3' "${WORK}/evidence-healthy/terraform-output.json" >/dev/null; then
-    ok "wrote the private Terraform output snapshot"
+  if [ ! -e "${WORK}/evidence-healthy/terraform-output.json" ]; then
+    ok "kept sensitive Terraform outputs out of sanitized evidence"
   else
-    bad "Terraform output snapshot is missing"
+    bad "wrote sensitive Terraform output snapshot"
   fi
 else
   bad "healthy UAT failed: ${OUT}"
@@ -208,6 +248,7 @@ fi
 echo "6. fewer than 100 possible samples is rejected before any API call"
 if PATH="${WORK}/bin:${PATH}" MCN_UAT_TEST_MODE=1 bash "$SCRIPT" \
   --terraform-dir terraform \
+  --subscription 00000000-0000-0000-0000-000000000000 \
   --evidence-dir "${WORK}/evidence-too-small" \
   --samples-per-batch 30 \
   --max-batches 3 \
@@ -239,6 +280,7 @@ if OUT=$(PATH="${WORK}/bin:${PATH}" \
   MCN_UAT_TEST_MODE=1 \
   bash "$SCRIPT" \
   --terraform-dir terraform \
+  --subscription 00000000-0000-0000-0000-000000000000 \
   --evidence-dir "${WORK}/evidence-console" \
   --samples-per-batch 50 \
   --max-batches 3 \
@@ -254,13 +296,18 @@ else
   bad "Site Console UAT failed: ${OUT}"
 fi
 
-echo "9. the default verifier uses only the supported ILB topology"
-if rg -qi 'routeserver peering|show-effective-route-table|effective_next_hops|peerings_with_vip' "$SCRIPT"; then
-  bad "default verifier still contains an Azure Route Server verification path"
+echo "9. the verifier requires both BGP and ILB application paths"
+if grep -Fq 'show-effective-route-table' "$SCRIPT" && grep -Fq 'MCN_FRR' "$SCRIPT"; then
+  ok "default verifier checks FRR sessions and both VIP next hops"
 else
-  ok "default verifier contains no Azure Route Server verification path"
+  bad "default verifier omits the Azure BGP path"
 fi
-if rg -q 'azure_ilb_private_ip' "$SCRIPT" && rg -q 'canada_ilb_private_ip' "$SCRIPT"; then
+if AZ_BGP_MODE=missing-ce run_uat missing-bgp >/dev/null 2>&1; then
+  bad "UAT passed with a missing direct CE-FRR session"
+else
+  ok "rejected a missing direct CE-FRR session"
+fi
+if grep -Fq 'azure_ilb_private_ip' "$SCRIPT" && grep -Fq 'canada_ilb_private_ip' "$SCRIPT"; then
   ok "default verifier requires both US and Canada ILB endpoints"
 else
   bad "default verifier does not require both supported ILB endpoints"

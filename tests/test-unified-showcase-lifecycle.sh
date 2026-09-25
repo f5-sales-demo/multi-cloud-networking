@@ -69,8 +69,13 @@ require 'KVM LAN preflight is read-only' "$lifecycle"
 require 'kvm-lan-plan-scope.py' "$lifecycle"
 test -x "$repo_root/scripts/kvm-lan-live-acceptance.py" || fail 'KVM LAN live acceptance driver is missing'
 require 'shared bridge/uplink resources survive' "$lifecycle"
-require 'exercise_managed_drift first' "$lifecycle"
-require 'exercise_managed_drift second' "$lifecycle"
+require 'exercise_managed_drift "$cycle"' "$lifecycle"
+require 'apply_scoped_plan kvm-configured' "$lifecycle"
+require 'apply_scoped_plan azure-build' "$lifecycle"
+require 'scope_plan zero-change' "$lifecycle"
+require 'verify-azure-failover.sh' "$lifecycle"
+test -x "$repo_root/scripts/verify-azure-failover.sh" || fail 'Azure failover verifier is not executable'
+require 'verify-kvm-lan-client.py' "$lifecycle"
 reject 'terraform destroy' "$lifecycle"
 reject 'terraform import' "$lifecycle"
 reject 'terraform state rm' "$lifecycle"
@@ -78,4 +83,4 @@ reject 'preflight_kvm_image' "$lifecycle"
 reject "-target='data.xcsh_site_image.kvm'" "$lifecycle"
 reject 'maurice_config_cardinality_exactly_one' "$lifecycle"
 
-printf 'PASS: unified AWS and KVM lifecycle contract is enforced\n'
+printf 'PASS: unified AWS, KVM, and Azure lifecycle contract is enforced\n'

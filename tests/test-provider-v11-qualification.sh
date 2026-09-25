@@ -4,9 +4,11 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 
 for file in terraform/versions.tf terraform/recovery/aws-smsv2-orphans/versions.tf \
-  terraform/modules/xc-site/versions.tf terraform/modules/kvm/providers.tf coverage/smsv2/versions.tf; do
+  terraform/modules/xc-site/versions.tf terraform/modules/kvm/providers.tf \
+  terraform/modules/azure-ilb-app/versions.tf terraform/preflight/ce-egress/main.tf \
+  coverage/smsv2/versions.tf; do
   block=$(sed -n '/^[[:space:]]*xcsh = {/,/^[[:space:]]*}/p' "$root/$file")
-  grep -Eq 'version[[:space:]]*=[[:space:]]*"= 11\.0\.2"' <<<"$block" || {
+  grep -Eq 'version[[:space:]]*=[[:space:]]*"= 11\.3\.0"' <<<"$block" || {
     echo "provider v11 pin missing: $file" >&2
     exit 1
   }

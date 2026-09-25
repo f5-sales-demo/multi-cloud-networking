@@ -1,220 +1,37 @@
 ---
-title: High Availability Options — BGP/ECMP vs. Azure ILB
-description: Detailed architectural inflection point and drill-down comparison between dynamic BGP/ECMP routing and Azure Internal Load Balancer (ILB) high availability patterns for F5 Distributed Cloud Customer Edge nodes.
+title: Compare the Azure application paths
+description: How the regional BGP VIP and internal load balancer serve the same Customer Edge fleet.
 sidebar:
-  order: 25
-  label: HA Comparison
+  order: 30
 ---
 
-import { Aside, Steps, CardGrid } from "@astrojs/starlight/components";
-import LinkCard from "@f5-sales-demo/docs-theme/components/LinkCard.astro";
+Each Azure region runs three CEs and exposes two independent HTTP application paths.
+The external VIP is learned through BGP; the internal ILB frontend is on the CE
+inside subnet. Both paths use the region's own origin pool and require the
+matching `Host` domain.
 
-When deploying F5 Distributed Cloud (XC) Customer Edge (CE) nodes in cloud environments, choosing the high availability (HA) ingress pattern is a key architectural decision.
-
-This page compares the two patterns implemented by this repository. For reusable guidance
-on Virtual Sites versus clustering, route withdrawal, ECMP path limits, and persistence,
-start with [Customer Edge high availability](../../customer-edge/high-availability/).
-
-The AWS [SMSv2 procedure](../../customer-edge/smsv2/aws-tgw-connect/) adds an internal
-NLB frontend over three routed site listeners. Its six Connect peers carry twelve BGP
-sessions. [AWS acceptance](https://github.com/f5-sales-demo/multi-cloud-networking/pull/1103) verified a single
-CE outage leaving eight sessions and recovery to twelve. The Azure comparison below retains
-its 2026-08-08 scope; final v8 acceptance did not re-prove Azure failover.
-
-This deployment demonstrates both primary HA patterns in a single multi-cloud environment:
-
-1. **Dynamic BGP / ECMP Routing (Azure Route Server / AWS Transit Gateway Connect)**: Used for the Rest of World (`eastus`) and AWS (`ap-northeast-1`) paths. On-Premise KVM has one CE and one FRR BGP peer; it imports `198.51.100.0/24` without ECMP.
-2. **Azure Internal Load Balancer (ILB) with HA Ports**: Used as the Canadian regional demonstration variation (`enable_canada_ilb = true`).
-
----
-
-## 1. The Architectural Inflection Point
-
-Observed 2026-08-08.
-
-The table below summarizes the core differences between dynamic BGP/ECMP routing and Azure Internal Load Balancer ingress:
-
-| Architectural Metric | Pattern A: BGP / ECMP via Azure Route Server | Pattern B: Azure Internal Load Balancer (ILB) |
+| Property | BGP VIP | Internal ILB application VIP |
 | --- | --- | --- |
-| **Ingress Mechanism** | CEs advertise `/32` host routes via eBGP (ASN `64512`) to Azure Route Server (ASN `65515`). ARS updates VNet system route tables with equal-cost next hops. | Azure Standard ILB listens on a static VNet private IP (`10.250.1.10`) and balances traffic across CE management NICs (`eth0`/SLO). |
-| **Health Detection & Node Removal** | This deployment uses BGP session state and hold timers; BFD is disabled. When a route is withdrawn or the session times out, ARS removes that next hop after convergence. | Azure ILB Health Probe (`Tcp/65500` Site Console or `Tcp/80`). When a node fails consecutive probes, ILB removes it from the backend address pool. |
-| **Port & Protocol Handling** | All ports destined for the `/32` VIP route natively to the CEs without port translation or rule limits. | Azure ILB HA Ports rule (`protocol = "All"`, `frontend_port = 0`, `backend_port = 0`) forwards all TCP/UDP traffic to backend CEs. |
-| **Subnet & Footprint Requirements** | Requires a dedicated `/27` subnet named `RouteServerSubnet` (`10.0.4.0/27`) with no Network Security Group or route table. | **No dedicated subnet required.** Frontend IP sits directly in existing management (`snet-hub-management`) or internal subnets. |
-| **BGP Configuration on CE** | Requires `xcsh_bgp` resources bound to the explicit `eth0` SLO interface on each CE site object. | **No BGP configuration required.** CE nodes require no BGP peering resources or BGP neighbor definitions. |
-| **Standing Cost (Azure)** | Azure Route Server standing charge (~$0.60/hour, ~$430/month). | Azure Standard ILB standing charge (~$0.025/hour, ~$18/month + data processing). |
+| Next hops | Two FRR relays at management addresses `.20` and `.21` | Three CE internal NICs in the backend pool |
+| Route exchange | Each CE peers with both FRRs; each FRR peers with both Route Server endpoints | Azure Standard ILB probes TCP/80 and forwards TCP/80 |
+| Advertised address | Regional external application VIP `/32` | Inside-subnet frontend `.10`, configured as the CE specified inside VIP |
+| Return path | FRR IP forwarding toward the client | Floating IP with direct server return |
+| Domain | Existing regional external application domain | Separate private regional application domain |
+| Failure behavior | One CE failure withdraws its route from both FRRs; one FRR failure removes one client next hop | Unhealthy CE inside endpoints leave the backend pool |
 
----
+The same ILB also has a separate frontend at `.11` for Site Console TCP/65500.
+Its rule is **nonfloating**. The console endpoint is a health and management
+path, not the application VIP.
 
-## 2. Pattern A Drill-Down: Dynamic eBGP / ECMP Routing
+The Canadian load balancer and BGP VIP use Canadian CEs only. The Canadian
+Regional Edge virtual site continues to select Toronto and Montreal. Run the
+traffic probe from the Canadian client and inspect its effective routes to
+prove the Canadian path; a US client request cannot establish that isolation.
 
-### Architecture & Traffic Flow
+The AWS path has three sites, six Transit Gateway Connect peers, and twelve
+BGP sessions. The KVM path has one CE with a NAT SLO and physical-LAN SLI;
+its custom inside VIP serves an independent physical client. Neither uses
+Azure Route Server or the Azure ILB design.
 
-In the eBGP/ECMP architecture, Customer Edge nodes act as BGP speakers peering with Azure Route Server or a containerized Top-of-Rack (ToR) BGP router.
-
-```text
-               Client Request
-                     |
-         +-----------v-----------+
-         | VNet System Route     | (Equal-Cost Next Hops)
-         | 10.250.0.10/32 -> ECMP|
-         +-----+-----+-----+-----+
-               |     |     |
-         +-----+     |     +-----+
-         |           |           |
-      CE-01       CE-02       CE-03
-     (eastus)    (eastus)    (eastus)
-```
-
-1. **Host Route Advertisement**: Each CE node advertises the HTTP Load Balancer VIP (`10.250.0.10/32`) via eBGP (ASN `64512`) to the Azure Route Server peer IPs (`10.0.4.4`, `10.0.4.5`, ASN `65515`).
-2. **VNet Route Table Programming**: Azure Route Server receives the host route from all active CEs and programs the VNet effective route table with multiple equal-cost next hops (`nextHopType: VirtualNetworkGateway`).
-3. **Data-Plane Forwarding**: Client traffic to `10.250.0.10` is distributed across all healthy CE nodes by the Azure SDN fabric using 5-tuple hash ECMP.
-4. **Route Withdrawal**: If `CE-02` closes its BGP session, or the hold timer expires, Azure Route Server removes that path after routing convergence. This repository has not measured that failover interval, so the architecture is not evidence of a specific recovery time.
-
-### Key Verification Commands for Pattern A
-
-```bash
-# Query learned routes on Azure Route Server peering
-az network routeserver peering list-learned-routes \
-  --name "eastus01-bgp" \
-  --routeserver "$(terraform output -raw route_server_name)" \
-  -g "$(terraform output -raw resource_group_name)" \
-  -o table
-
-# Inspect effective route table on client NIC
-az network nic show-effective-route-table \
-  -g "$(terraform output -raw resource_group_name)" \
-  -n "$(terraform output -raw client_nic_name)" \
-  --query "value[?addressPrefix[0]=='$(terraform output -raw vip)/32']" \
-  -o json
-```
-
-Observed output from healthy ARS BGP/ECMP deployment:
-
-```json
-[
-  {
-    "addressPrefix": [
-      "10.250.0.10/32"
-    ],
-    "nextHopIpAddress": [
-      "10.0.1.4",
-      "10.0.1.5",
-      "10.0.1.6"
-    ],
-    "nextHopType": "VirtualNetworkGateway",
-    "state": "Active"
-  }
-]
-```
-
----
-
-## 3. Pattern B Drill-Down: Azure Internal Load Balancer (ILB)
-
-### Pattern B Architecture & Traffic Flow
-
-In the Azure ILB architecture variation (`enable_canada_ilb = true`), Azure's Standard Load Balancer acts as the L4 ingress mechanism for the Canadian Customer Edge cluster.
-
-```text
-               Client Request
-                     |
-         +-----------v-----------+
-         | Azure Internal LB     | (Frontend IP: 10.250.1.10)
-         | HA Ports Rule         |
-         +-----+-----+-----+-----+
-               |     |     |
-         +-----+     |     +-----+
-         |           |           |
-      CE-CA-01   CE-CA-02    CE-CA-03
-  (canadacentral)(canadacentral)(canadacentral)
-```
-
-1. **Frontend Private IP**: Standard Azure ILB (`azurerm_lb.ca_ilb`) provisions private IP `10.250.1.10` in `snet-hub-management`.
-2. **Backend Address Pool**: The management NICs (`eth0`/SLO) of all Canadian CEs (`CE-CA-01`, `CE-CA-02`, `CE-CA-03`) are registered in `azurerm_lb_backend_address_pool.ca_ce_backend`.
-3. **Health Probing**: The ILB probe (`azurerm_lb_probe.ca_site_console`) sends TCP SYN requests to port `65500` (Site Console / VPM service) every 5 seconds.
-4. **HA Ports Forwarding**: The HA Ports rule (`azurerm_lb_rule.ca_ha_ports`) forwards all incoming TCP/UDP traffic on frontend `10.250.1.10` across healthy backend CE NICs with `floating_ip_enabled = true`.
-5. **Node Failure & Failover**: If `CE-CA-02` stops answering TCP/65500 probes for 10 seconds (2 consecutive probe failures), the Azure ILB marks `CE-CA-02` unhealthy and redirects all new connections to `CE-CA-01` and `CE-CA-03`.
-
-### Key Verification Commands for Pattern B
-
-```bash
-# Query Azure Internal Load Balancer status
-az network lb show \
-  -g "$(terraform output -raw resource_group_name)" \
-  -n "$(terraform output -raw ca_ilb_id | cut -d/ -f9)" \
-  -o json
-
-# Query health probe status on backend pool
-az network lb probe show \
-  -g "$(terraform output -raw resource_group_name)" \
-  --lb-name "$(terraform output -raw ca_ilb_id | cut -d/ -f9)" \
-  -n "site-console-probe" \
-  -o json
-```
-
-Observed output from healthy Canadian Azure ILB deployment:
-
-```json
-{
-  "backendPools": [
-    "ca-ce-backend-pool"
-  ],
-  "frontendIp": "10.200.1.10",
-  "name": "mcn-ce-ha-ca-ilb",
-  "probes": [
-    {
-      "name": "site-console-probe",
-      "port": 65500,
-      "protocol": "Tcp"
-    }
-  ],
-  "sku": "Standard"
-}
-```
-
----
-
-## 4. Decision Matrix: When to Choose BGP/ECMP vs. ILB
-
-| Criteria / Constraint | Recommended Pattern | Architectural Justification |
-| --- | --- | --- |
-| **Strict BGP-Free Network Policy** | **Azure ILB** | Many enterprise cloud landing zones prohibit BGP peering with Azure Route Server or virtual network gateways. |
-| **Cost Optimization** | **Azure ILB** | Replaces ~$430/month Azure Route Server standing charge with ~$18/month Standard ILB. |
-| **Subnet Constrained Environment** | **Azure ILB** | Does not require carving out a dedicated `/27` `RouteServerSubnet`. |
-| **Multi-Cloud Consistency (AWS & Azure)** | **BGP / ECMP** | Uses BGP host route advertisement across AWS VPC and Azure ARS. The one-node KVM FRR path has one peer, not ECMP. |
-| **Native routed ingress** | **BGP / ECMP** | Packets route to a CE next hop without an intermediate Azure load-balancer rule. This row does not claim Direct Server Return behavior. |
-
----
-
-## 5. Verification & Teardown
-
-To verify both HA ingress patterns side-by-side:
-
-```bash
-cd terraform
-# Verify ROW BGP/ECMP VIP health
-curl -s -o /dev/null -w "%{http_code}\n" -H "Host: $(terraform output -raw lb_domain)" "http://$(terraform output -raw vip)/"
-
-# Verify Canadian ILB VIP health
-curl -s -o /dev/null -w "%{http_code}\n" -H "Host: $(terraform output -raw ca_lb_domain)" "http://$(terraform output -raw ca_vip)/"
-```
-
-To tear down the environment:
-
-```bash
-cd terraform
-terraform destroy -auto-approve
-```
-
-<CardGrid>
-  <LinkCard
-    title="Engineering Specification"
-    description="Full technical specification covering all four network paths."
-    href="../spec/"
-  />
-  <LinkCard
-    title="Prove it healthy"
-    description="Detailed four-step health check sequence for all regions."
-    href="../verify/"
-  />
-</CardGrid>
+See [Azure Route Server](../../customer-edge/smsv2/azure-route-server/) for the
+relay topology and [deployment verification](../verify/) for live acceptance.

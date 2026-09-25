@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Validate one full-root saved plan for the staged KVM LAN rollout."""
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name,too-many-branches,missing-function-docstring,line-too-long
 # ruff: noqa: D103, EM101, EM102, PLR2004, S603, TRY003, TRY004, TRY300, TRY301
 
 from __future__ import annotations
@@ -124,9 +124,14 @@ def validate_plan(document: object, stage: str) -> dict[str, Any]:
             raise ValueError(
                 "hardware plan contains an action outside the owned KVM domain"
             )
-        if set(changes[DOMAIN]) != {"create", "delete"}:
+        domain_change = changes[DOMAIN]
+        if domain_change not in (
+            ["create"],
+            ["delete", "create"],
+            ["create", "delete"],
+        ):
             raise ValueError(
-                "hardware plan must use KVM domain replacement; update-only NIC changes are unsafe"
+                "hardware plan must create or replace the KVM domain; update-only NIC changes are unsafe"
             )
         resources = {
             resource.get("address"): resource
@@ -137,9 +142,7 @@ def validate_plan(document: object, stage: str) -> dict[str, Any]:
         domain = _mapping(resources.get(DOMAIN))
         interfaces = _items(_mapping(domain.get("values")).get("network_interface"))
         if len(interfaces) != 2:
-            raise ValueError(
-                "hardware replacement must create exactly two ordered CE NICs"
-            )
+            raise ValueError("hardware plan must create exactly two ordered CE NICs")
         slo, sli = (_mapping(interface) for interface in interfaces)
         if not slo.get("network_id") or slo.get("bridge"):
             raise ValueError("first CE NIC must remain the libvirt-network SLO")
@@ -151,7 +154,7 @@ def validate_plan(document: object, stage: str) -> dict[str, Any]:
             raise ValueError(
                 "second CE NIC must be a distinct deterministic bridged SLI"
             )
-        domain_action = "replace"
+        domain_action = "create" if domain_change == ["create"] else "replace"
     else:
         required = {INTERFACE, *APPLICATION}
         if set(changes) != required:

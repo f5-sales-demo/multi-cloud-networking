@@ -1,0 +1,53 @@
+#cloud-config
+package_update: true
+packages:
+  - frr
+write_files:
+  - path: /etc/sysctl.d/90-mcn-frr.conf
+    permissions: '0644'
+    content: |
+      net.ipv4.ip_forward=1
+  - path: /etc/frr/frr.conf
+    owner: frr:frr
+    permissions: '0640'
+    content: |
+      frr defaults traditional
+      hostname mcn-frr
+      service integrated-vtysh-config
+      log syslog informational
+      ip prefix-list VIP seq 10 permit ${vip}/32
+      route-map CE-IN permit 10
+       match ip address prefix-list VIP
+      route-map RS-OUT permit 10
+       match ip address prefix-list VIP
+      route-map RS-IN deny 10
+      router bgp ${frr_asn}
+       bgp router-id ${router_ip}
+       no bgp default ipv4-unicast
+       neighbor CE peer-group
+       neighbor CE remote-as ${ce_asn}
+%{ for ip in ce_ips ~}
+       neighbor ${ip} peer-group CE
+%{ endfor ~}
+       neighbor RS peer-group
+       neighbor RS remote-as ${rs_asn}
+       neighbor RS ebgp-multihop 2
+%{ for ip in rs_peer_ips ~}
+       neighbor ${ip} peer-group RS
+%{ endfor ~}
+       address-family ipv4 unicast
+%{ for ip in ce_ips ~}
+        neighbor ${ip} activate
+        neighbor ${ip} route-map CE-IN in
+%{ endfor ~}
+%{ for ip in rs_peer_ips ~}
+        neighbor ${ip} activate
+        neighbor ${ip} route-map RS-IN in
+        neighbor ${ip} route-map RS-OUT out
+%{ endfor ~}
+       exit-address-family
+runcmd:
+  - [sysctl, --system]
+  - [sed, -i, 's/^bgpd=no/bgpd=yes/', /etc/frr/daemons]
+  - [systemctl, enable, --now, frr]
+  - [systemctl, restart, frr]

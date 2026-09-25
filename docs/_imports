@@ -59,6 +59,7 @@ terraform/bootstrap/state-backend/variables.tf -> terraform/bootstrap/state-back
 terraform/bootstrap/state-backend/versions.tf -> terraform/bootstrap/state-backend/versions.tf
 terraform/ca_ilb.tf -> terraform/ca_ilb.tf
 terraform/azure_ilb.tf -> terraform/azure_ilb.tf
+terraform/azure_ilb_xc.tf -> terraform/azure_ilb_xc.tf
 terraform/data.tf -> terraform/data.tf
 terraform/kvm.tf -> terraform/kvm.tf
 terraform/kvm_frr.tf -> terraform/kvm_frr.tf
@@ -69,8 +70,13 @@ terraform/modules/azure-hub/main.tf -> terraform/modules/azure-hub/main.tf
 terraform/modules/azure-hub/outputs.tf -> terraform/modules/azure-hub/outputs.tf
 terraform/modules/azure-hub/variables.tf -> terraform/modules/azure-hub/variables.tf
 terraform/modules/azure-hub/versions.tf -> terraform/modules/azure-hub/versions.tf
-terraform/modules/azure-route-server-bgp/main.tf -> terraform/modules/azure-route-server-bgp/main.tf
-terraform/modules/azure-route-server-bgp/versions.tf -> terraform/modules/azure-route-server-bgp/versions.tf
+terraform/modules/azure-frr/main.tf -> terraform/modules/azure-frr/main.tf
+terraform/modules/azure-frr/variables.tf -> terraform/modules/azure-frr/variables.tf
+terraform/modules/azure-frr/versions.tf -> terraform/modules/azure-frr/versions.tf
+terraform/modules/azure-frr/cloud-init.yaml.tftpl -> terraform/modules/azure-frr/cloud-init.yaml.tftpl
+terraform/modules/azure-ilb-app/main.tf -> terraform/modules/azure-ilb-app/main.tf
+terraform/modules/azure-ilb-app/variables.tf -> terraform/modules/azure-ilb-app/variables.tf
+terraform/modules/azure-ilb-app/versions.tf -> terraform/modules/azure-ilb-app/versions.tf
 terraform/modules/ce-node/main.tf -> terraform/modules/ce-node/main.tf
 terraform/modules/ce-node/outputs.tf -> terraform/modules/ce-node/outputs.tf
 terraform/modules/ce-node/variables.tf -> terraform/modules/ce-node/variables.tf
@@ -107,6 +113,7 @@ terraform/onprem_workload.tf -> terraform/onprem_workload.tf
 terraform/outputs.tf -> terraform/outputs.tf
 terraform/providers.tf -> terraform/providers.tf
 terraform/providers_libvirt.tf -> terraform/providers_libvirt.tf
+terraform/preflight/ce-egress/main.tf -> terraform/preflight/ce-egress/main.tf
 terraform/securemesh_interface_contract.tf -> terraform/securemesh_interface_contract.tf
 terraform/variables.tf -> terraform/variables.tf
 terraform/variables_aws.tf -> terraform/variables_aws.tf

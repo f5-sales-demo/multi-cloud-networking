@@ -14,7 +14,7 @@ Allow tens of minutes for bootstrap and hours for a full serial-upgrade rehearsa
 
 - **Terraform** at the version floor in `terraform/versions.tf` — `>= 1.16.1`, for
   provider-defined functions and the `check` block that guards the VIP.
-- **The `xcsh` provider at exactly v11.0.2 for normal deployments.** This deployment uses
+- **The `xcsh` provider at exactly v11.3.0 for normal deployments.** This deployment uses
   only the clean-break SMSv2 contract. A release-candidate acceptance run may substitute one
   reviewed local binary through the explicit procedure below. The root `.terraform.lock.hcl`
   is committed; its checksums and the exact source constraint are authoritative.
@@ -101,10 +101,10 @@ above before you mint another token.
 ## AWS SMSv2 preflight is mandatory
 
 The AWS Transit Gateway and KVM paths are pinned to the immutable
-[`xcsh` v11.0.2 release](https://github.com/f5-sales-demo/terraform-provider-xcsh/releases/tag/v11.0.2),
+[`xcsh` v11.3.0 release](https://github.com/f5-sales-demo/terraform-provider-xcsh/releases/tag/v11.3.0),
 which aligns mutation ALPN negotiation with the HTTP/1 transport used for non-idempotent requests.
 That release publishes contract `f5xc-smsv2-api/v1` version `7.0.0` from
-`api-specs-enriched` v8.0.0. Its five AWS SMSv2 capabilities, including
+`api-specs-enriched` v8.0.2. Its AWS SMSv2 capabilities, including
 the evidence-backed `aws_node_configuration` `discovery_rebuild` strategy,
 must all report `available`; do not bypass a failed gate.
 
@@ -116,7 +116,7 @@ upgrade, stage, or replace a site.
 
 Before applying an AWS plan, run the non-mutating preflight below. It checks the reviewed
 plan against the expected cloud account, region, XC tenant, site set, and provider artifact;
-it rejects Azure resource changes. The only supported lifecycle is three saved plans in this
+it rejects Azure resource changes. The AWS component lifecycle uses three saved plans in this
 order: `bootstrap` for all three `-bootstrap` sites and CEs,
 `bootstrap_retirement` in destroy mode for only the disposable CE/site/material objects, then
 `configured` for the three distinct final sites using the private checksummed registration/ENI
@@ -143,16 +143,37 @@ See the [dated acceptance baseline](../../customer-edge/smsv2/) for the result a
 
 ## Apply
 
-Run the bootstrap commands below from the repository root. After the AWS backend is
-configured, run the saved-plan sequence from `terraform/` with `terraform.tfvars` and
-`backend.hcl`. Replace uppercase placeholders with private paths and the exact identities
-from your reviewed plan. On a new deployment, site outputs do not exist yet; take the
-expected names from the plan, not from stale state.
+The complete showcase runs from one noninteractive command on merged `main`.
+Pass the private, reviewed tfvars, production backend configuration, and a new
+private evidence directory. The command verifies exact source and owner identity,
+the configured Azure subscription, provider artifact digest, Customer Edge DNS,
+NTP, and HTTPS egress, then performs the AWS/KVM and Azure saved-plan phases.
+It verifies traffic and failover, repairs managed drift, destroys the owned
+stack, checks absence, and leaves the second verified build deployed with a
+refresh-enabled zero-change plan.
+
+```bash
+scripts/showcase-lifecycle.sh --mode full \
+  --tfvars '<PRIVATE_FULL_SHOWCASE_TFVARS>' \
+  --backend-config '<PRIVATE_PRODUCTION_BACKEND_HCL>' \
+  --private-root '<NEW_PRIVATE_EVIDENCE_DIRECTORY>' \
+  --source-ref refs/heads/main \
+  --source-commit-sha "$(git rev-parse HEAD)" \
+  --deployment-owner-id showcase-team \
+  --deployment-actor-id terraform-cli
+```
+
+The private tfvars enables AWS TGW, Azure US, Azure Canada, BGP, both ILB
+application paths, and the KVM physical LAN. Bastion remains opt-in. A failed
+live gate stops the command for a source fix and another reviewed iteration.
+Use the sections below when reviewing an individual AWS phase or the separate
+backend bootstrap; they are not a replacement for the complete lifecycle.
 
 ### Bootstrap the dedicated AWS state backend
 
-The former Azure state was retired with the prior deployment. Start with a fresh,
-dedicated S3 bucket; do not reuse a shared bucket or resurrect an old state object.
+The backend bootstrap is a separate stack. Reuse its verified dedicated S3
+backend for the lifecycle; run the following bootstrap only when that backend
+does not exist. Do not delete or recreate a shared bucket as part of showcase teardown.
 The bootstrap stack creates KMS encryption, version recovery, public-access blocks,
 TLS-only bucket access, Terraform's native S3 lockfile, regional server-access logs,
 EventBridge object notifications, and a separately encrypted cross-region recovery
@@ -197,7 +218,7 @@ existing remote metadata and reconfigures it idempotently. Production keeps the 
 showcase key; a preview receives its deterministic environment-specific key before init.
 The showcase has no old state to migrate.
 
-### AWS saved-plan sequence
+### AWS saved-plan sequence (component-level reference)
 
 Create a registry-only CLI configuration for this task before initialization or planning:
 
@@ -211,8 +232,8 @@ umask 077
 printf 'provider_installation {\n  direct {}\n}\n' > "$REGISTRY_TFRC"
 export TF_CLI_CONFIG_FILE="$REGISTRY_TFRC"
 ../scripts/terraform-with-aws-sso.sh -- init -upgrade -backend-config=backend.hcl
-# The AWS preflight rejects Azure actions. This supported graph boundary omits
-# Azure US, Azure Canada, Marketplace, and KVM resources without Terraform targeting.
+# The AWS component preflight rejects Azure actions. The full lifecycle above
+# adds Azure and KVM in later saved-plan stages without Terraform targeting.
 ../scripts/terraform-with-aws-sso.sh -- plan -var='enable_azure=false' -var='enable_kvm=false' \
   -var="deployment_generation=$DEPLOYMENT_GENERATION" -out="$PLAN_FILE"
 ../scripts/terraform-with-aws-sso.sh -- show "$PLAN_FILE"
@@ -262,7 +283,7 @@ manifest bound to the expected plan digest, AWS account and region, Sales Demo
 tenant, creator, component, generation, provider IDs, and creation evidence. Its
 configuration-driven import blocks must first produce an import-only saved plan.
 Verify that plan with `scripts/verify-aws-smsv2-orphan-recovery-plan.sh` before
-applying it. Destroy the adopted resources only with provider v11.0.2 or newer,
+applying it. Destroy the adopted resources only with provider v11.3.0 or newer,
 then prove the recovery state is empty and every manifest identity is absent.
 CLI import, direct API deletion, state editing, taint, console cleanup, and broad
 tag-based deletion are not recovery mechanisms.
@@ -328,8 +349,8 @@ ambiguous, changed, or mismatched candidate fails closed.
 
 ### Azure registration phases
 
-The AWS preflight rejects Azure changes; do not use it to authorize an Azure apply.
-Review a separately scoped Azure plan and apply it. Once the intended nodes register,
+The AWS component preflight rejects Azure changes. The complete lifecycle uses
+its own Azure saved-plan scope and artifact receipt. Once the intended nodes register,
 make and review another plan so approval can be included:
 
 ```bash

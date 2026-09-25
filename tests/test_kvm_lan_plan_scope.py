@@ -1,3 +1,4 @@
+# pylint: disable=missing-module-docstring,missing-class-docstring,missing-function-docstring
 # ruff: noqa: INP001, PT009, PT027
 import importlib.util
 import json
@@ -53,6 +54,31 @@ def plan(stage, changes, resources):
 
 
 class PlanScopeTests(unittest.TestCase):
+    def test_hardware_stage_accepts_initial_two_nic_create(self):
+        document = plan(
+            "hardware",
+            [
+                {
+                    "address": 'libvirt_domain.ce_node["01"]',
+                    "change": {"actions": ["create"]},
+                }
+            ],
+            [
+                {
+                    "address": 'libvirt_domain.ce_node["01"]',
+                    "values": {
+                        "network_interface": [
+                            {"mac": "52:54:00:10:00:11", "network_id": "bgp"},
+                            {"mac": "52:54:00:20:00:11", "bridge": "br-lan-demo"},
+                        ]
+                    },
+                }
+            ],
+        )
+        self.assertEqual(
+            MODULE.validate_plan(document, "hardware")["domain_action"], "create"
+        )
+
     @patch.object(MODULE.subprocess, "run")
     def test_host_network_verifies_bridge_uplink_mac_and_mtu(self, run):
         run.side_effect = [
@@ -156,7 +182,7 @@ class PlanScopeTests(unittest.TestCase):
             ],
             [],
         )
-        with self.assertRaisesRegex(ValueError, "replacement"):
+        with self.assertRaisesRegex(ValueError, "create or replace"):
             MODULE.validate_plan(document, "hardware")
 
     def test_rejects_unrelated_cloud_action(self):

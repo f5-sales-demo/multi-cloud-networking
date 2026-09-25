@@ -1,5 +1,5 @@
 # Pure computation module: expands ce_count into the per-CE node map that drives
-# the ce-node, xc-site and azure-route-server-bgp for_each loops. Has NO
+# the ce-node and xc-site for_each loops. Has NO
 # providers and NO data sources, so it is fully hermetic and plan-testable at
 # any N without Azure/XC credentials (see tests/n_scaling.tftest.hcl).
 

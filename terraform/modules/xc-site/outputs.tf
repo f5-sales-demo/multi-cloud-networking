@@ -43,6 +43,6 @@ output "registration_approval_name" {
 }
 
 output "peer_count" {
-  description = "Number of external BGP peers configured (one per Route Server IP; 0 when enable_bgp is false)."
-  value       = var.enable_bgp ? var.rs_peer_count : 0
+  description = "Number of external BGP peers configured (one per regional FRR relay; 0 when enable_bgp is false)."
+  value       = var.enable_bgp ? var.peer_count : 0
 }

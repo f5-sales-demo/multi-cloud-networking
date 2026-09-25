@@ -74,7 +74,7 @@ reject 'runs-on: managed-socketless' "$repo_root/.github/workflows/terraform.yml
 require '!terraform/.terraform.lock.hcl' "$repo_root/.gitignore"
 [ -f "$aws_lockfile" ] || fail "missing tracked AWS root lockfile"
 require 'registry.terraform.io/f5-sales-demo/xcsh' "$aws_lockfile"
-require 'version     = "11.0.2"' "$aws_lockfile"
+require 'version     = "11.3.0"' "$aws_lockfile"
 require 'registry.terraform.io/hashicorp/aws' "$aws_lockfile"
 require 'version     = "5.100.0"' "$aws_lockfile"
 require 'registry.terraform.io/hashicorp/external' "$aws_lockfile"
