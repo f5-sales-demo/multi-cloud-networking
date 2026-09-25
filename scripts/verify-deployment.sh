@@ -296,7 +296,8 @@ verify_region_routing() {
   jq -e 'length == 3 and all(.[]; type == "string" and test("^[0-9.]+$"))' <<<"$ce_ips_json" >/dev/null || die "${region} CE peer inventory is invalid"
   jq -e 'length == 2 and all(.[]; type == "string" and test("^[0-9.]+$"))' <<<"$rs_ips_json" >/dev/null || die "${region} Route Server peer inventory is invalid"
   local remote_script
-  remote_script=$(cat <<PY
+  remote_script=$(
+    cat <<PY
 python3 - <<'MCN_PY'
 import json, subprocess
 ce_ips = set(json.loads('${ce_ips_json}'))
@@ -317,7 +318,7 @@ print('MCN_FRR ce_established=%d rs_established=%d vip_learned=%d' %
       (sum(established(ip) for ip in ce_ips), sum(established(ip) for ip in rs_ips), int(learned)))
 MCN_PY
 PY
-)
+  )
   while IFS= read -r frr_name; do
     message=$(az_vm_run_command --resource-group "$resource_group" --name "$frr_name" \
       --command-id RunShellScript --query 'value[0].message' --output tsv --scripts "$remote_script")
@@ -374,7 +375,8 @@ done; echo MCN_REGION region=${region} vip_ok=\$vip_ok vip_fail=\$vip_fail ilb_o
   result=$(grep -Eo "MCN_REGION region=${region} vip_ok=[0-9]+ vip_fail=[0-9]+ ilb_ok=[0-9]+ ilb_fail=[0-9]+ origin_ok=[0-9]+ origin_fail=[0-9]+" <<<"$message" | tail -n 1)
   [ -n "$result" ] || die "${region} client traffic verifier returned no aggregate result"
   read -r region_vip_ok region_vip_fail region_ilb_ok region_ilb_fail region_origin_ok region_origin_fail < <(
-    sed -E 's/.*vip_ok=([0-9]+) vip_fail=([0-9]+) ilb_ok=([0-9]+) ilb_fail=([0-9]+) origin_ok=([0-9]+) origin_fail=([0-9]+).*/\1 \2 \3 \4 \5 \6/' <<<"$result")
+    sed -E 's/.*vip_ok=([0-9]+) vip_fail=([0-9]+) ilb_ok=([0-9]+) ilb_fail=([0-9]+) origin_ok=([0-9]+) origin_fail=([0-9]+).*/\1 \2 \3 \4 \5 \6/' <<<"$result"
+  )
   [ $((region_vip_ok + region_vip_fail)) -eq "$SAMPLES_PER_BATCH" ] || die "${region} VIP sample count differs"
   [ $((region_ilb_ok + region_ilb_fail)) -eq "$SAMPLES_PER_BATCH" ] || die "${region} ILB sample count differs"
   [ $((region_origin_ok + region_origin_fail)) -eq "$SAMPLES_PER_BATCH" ] || die "${region} origin sample count differs"

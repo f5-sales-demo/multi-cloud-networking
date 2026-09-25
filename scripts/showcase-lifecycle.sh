@@ -405,15 +405,27 @@ phase_paths() {
 
 scope_plan() {
   local scope=$1 receipt=$EVIDENCE_DIR/showcase-plan-receipt.json
-  python3 "$REPO_ROOT/scripts/showcase-plan-scope.py" \
-    --terraform-dir "$TERRAFORM_DIR" --plan-file "$PLAN_FILE" \
-    --provider-zip "$PROVIDER_ZIP" --backend-config "$BACKEND_CONFIG" \
-    --scope "$scope" --source-commit "$SOURCE_COMMIT_SHA" \
-    --backend-key "$SHOWCASE_BACKEND_KEY" --environment-key "$DEPLOYMENT_ENVIRONMENT_KEY" \
-    --owner-id "$DEPLOYMENT_OWNER_ID" \
-    --legacy-deployer "$LEGACY_DEPLOYER" --legacy-environment "$LEGACY_ENVIRONMENT" \
-    --legacy-generation "$GENERATION" --legacy-tenant "$XC_TENANT" \
-    >"$receipt" || die "saved plan failed $scope scope"
+  if [ "$scope" = full-destroy ] && [ "${DESTROY_FALLBACK:-false}" = true ]; then
+    python3 "$REPO_ROOT/scripts/showcase-legacy-destroy-scope.py" \
+      --terraform-dir "$TERRAFORM_DIR" --state "$EVIDENCE_DIR/prior-state.json" \
+      --events "$EVIDENCE_DIR/destroy-events.jsonl" --plan "$PLAN_FILE" \
+      --provider-zip "$PROVIDER_ZIP" --backend-config "$BACKEND_CONFIG" \
+      --source-commit "$SOURCE_COMMIT_SHA" --backend-key "$SHOWCASE_BACKEND_KEY" \
+      --environment-key "$DEPLOYMENT_ENVIRONMENT_KEY" --owner-id "$DEPLOYMENT_OWNER_ID" \
+      --legacy-deployer "$LEGACY_DEPLOYER" --legacy-environment "$LEGACY_ENVIRONMENT" \
+      --legacy-generation "$GENERATION" --legacy-tenant "$XC_TENANT" \
+      >"$receipt" || die "legacy destroy plan failed exact ownership/action scope"
+  else
+    python3 "$REPO_ROOT/scripts/showcase-plan-scope.py" \
+      --terraform-dir "$TERRAFORM_DIR" --plan-file "$PLAN_FILE" \
+      --provider-zip "$PROVIDER_ZIP" --backend-config "$BACKEND_CONFIG" \
+      --scope "$scope" --source-commit "$SOURCE_COMMIT_SHA" \
+      --backend-key "$SHOWCASE_BACKEND_KEY" --environment-key "$DEPLOYMENT_ENVIRONMENT_KEY" \
+      --owner-id "$DEPLOYMENT_OWNER_ID" \
+      --legacy-deployer "$LEGACY_DEPLOYER" --legacy-environment "$LEGACY_ENVIRONMENT" \
+      --legacy-generation "$GENERATION" --legacy-tenant "$XC_TENANT" \
+      >"$receipt" || die "saved plan failed $scope scope"
+  fi
   chmod 600 "$receipt"
   jq -e --arg digest "sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')" \
     '.plan_sha256 == $digest' "$receipt" >/dev/null || die "saved plan digest changed"
@@ -615,7 +627,10 @@ wait_for_azure_online() {
         curl -fsS --connect-timeout 10 --max-time 30 -H @- \
           "$XCSH_API_URL/api/config/namespaces/system/sites/$site" 2>/dev/null |
         jq -r '.spec.site_state // .get_spec.site_state // empty') || state=""
-      if [ "$state" != ONLINE ]; then all_online=false; break; fi
+      if [ "$state" != ONLINE ]; then
+        all_online=false
+        break
+      fi
     done
     if [ "$all_online" = true ]; then
       jq -n --arg checked_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -669,22 +684,35 @@ verify_final() {
 destroy_all() {
   local cycle=$1 require_kvm=${2:-false}
   phase_paths "$cycle" full_destroy reviewed
+  DESTROY_FALLBACK=false
   tf output -json xc_site_names >"$PRIVATE_ROOT/latest-destroy-us-sites.json" 2>/dev/null || printf '{}\n' >"$PRIVATE_ROOT/latest-destroy-us-sites.json"
   tf output -json ca_xc_site_names >"$PRIVATE_ROOT/latest-destroy-ca-sites.json" 2>/dev/null || printf '{}\n' >"$PRIVATE_ROOT/latest-destroy-ca-sites.json"
   tf output -json resource_group_name >"$PRIVATE_ROOT/latest-destroy-us-rg.json" 2>/dev/null || printf 'null\n' >"$PRIVATE_ROOT/latest-destroy-us-rg.json"
   tf output -json ca_resource_group_name >"$PRIVATE_ROOT/latest-destroy-ca-rg.json" 2>/dev/null || printf 'null\n' >"$PRIVATE_ROOT/latest-destroy-ca-rg.json"
-  tf_plan -destroy -input=false -no-color -var-file="$TFVARS" \
+  tf state pull >"$EVIDENCE_DIR/prior-state.json"
+  tf_plan -destroy -json -input=false -no-color -var-file="$TFVARS" \
     -var='aws_site_configuration_phase=bootstrap' -var='enable_aws_tgw_connect=false' \
     -var='enable_kvm=false' -var='enable_kvm_lan=false' \
     -var='kvm_lan_configuration_phase=disabled' -var='kvm_lan=null' \
-    -out="$PLAN_FILE"
-  DESTROY_JSON=$(tf show -json "$PLAN_FILE")
+    -out="$PLAN_FILE" >"$EVIDENCE_DIR/destroy-events.jsonl"
+  if tf show -json "$PLAN_FILE" >"$EVIDENCE_DIR/destroy-plan.json" 2>"$EVIDENCE_DIR/show-json-error.log"; then
+    DESTROY_JSON=$(cat "$EVIDENCE_DIR/destroy-plan.json")
+  elif [ "$require_kvm" = false ] &&
+    grep -Fq 'unsupported attribute "namespace"' "$EVIDENCE_DIR/show-json-error.log"; then
+    DESTROY_FALLBACK=true
+    DESTROY_JSON=""
+  else
+    die "saved destroy plan could not be decoded for review"
+  fi
   if [ "$require_kvm" = true ]; then
     jq -e '[.resource_changes[]? | select(.type == "xcsh_securemesh_site_v2" and .name == "onprem_kvm" and .change.actions == ["delete"])] | length == 1' \
       <<<"$DESTROY_JSON" >/dev/null || die "destroy plan does not contain the owned KVM site"
   fi
   unset DESTROY_JSON
   apply_scoped_plan full-destroy
+  rm -f -- "$EVIDENCE_DIR/prior-state.json" "$EVIDENCE_DIR/destroy-events.jsonl" \
+    "$EVIDENCE_DIR/destroy-plan.json" "$EVIDENCE_DIR/show-json-error.log"
+  DESTROY_FALLBACK=false
   [ -z "$(tf state list)" ] || die "Terraform state is not empty after destroy"
 }
 

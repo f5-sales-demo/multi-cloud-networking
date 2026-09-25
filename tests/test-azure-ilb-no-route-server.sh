@@ -10,9 +10,9 @@ done
 
 grep -Fq 'module "azure_frr_us" {' terraform/main.tf
 grep -Fq 'module "azure_frr_ca" {' terraform/main.tf
-! grep -Fq 'module "azure_route_server_bgp" {' terraform/main.tf
-! grep -Fq 'module "azure_route_server_bgp_ca" {' terraform/main.tf
-! grep -Fq 'azure_route_server_ebgp_multihop' terraform/main.tf
+if grep -Fq 'module "azure_route_server_bgp" {' terraform/main.tf; then exit 1; fi
+if grep -Fq 'module "azure_route_server_bgp_ca" {' terraform/main.tf; then exit 1; fi
+if grep -Fq 'azure_route_server_ebgp_multihop' terraform/main.tf; then exit 1; fi
 
 for ilb in terraform/azure_ilb.tf terraform/ca_ilb.tf; do
   grep -Fq 'name                          = "application-frontend"' "$ilb"

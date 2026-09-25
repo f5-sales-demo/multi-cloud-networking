@@ -8,14 +8,32 @@ SUBSCRIPTION=""
 SOURCE_COMMIT=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --terraform-dir) TERRAFORM_DIR=${2:?}; shift 2 ;;
-    --evidence-dir) EVIDENCE_DIR=${2:?}; shift 2 ;;
-    --subscription) SUBSCRIPTION=${2:?}; shift 2 ;;
-    --source-commit) SOURCE_COMMIT=${2:?}; shift 2 ;;
-    *) echo "verify-azure-failover: unknown argument $1" >&2; exit 2 ;;
+  --terraform-dir)
+    TERRAFORM_DIR=${2:?}
+    shift 2
+    ;;
+  --evidence-dir)
+    EVIDENCE_DIR=${2:?}
+    shift 2
+    ;;
+  --subscription)
+    SUBSCRIPTION=${2:?}
+    shift 2
+    ;;
+  --source-commit)
+    SOURCE_COMMIT=${2:?}
+    shift 2
+    ;;
+  *)
+    echo "verify-azure-failover: unknown argument $1" >&2
+    exit 2
+    ;;
   esac
 done
-die() { echo "verify-azure-failover: $*" >&2; exit 2; }
+die() {
+  echo "verify-azure-failover: $*" >&2
+  exit 2
+}
 [ -d "$TERRAFORM_DIR" ] && [ -n "$EVIDENCE_DIR" ] && [ -n "$SUBSCRIPTION" ] || die "Terraform, evidence, and subscription inputs are required"
 [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || die "reviewed source commit is required"
 mkdir -p "$EVIDENCE_DIR"
@@ -38,7 +56,8 @@ trap recover EXIT
 frr_sessions() {
   local rg=$1 vm=$2 ce_ips_json=$3 rs_ips_json=$4 vip=$5
   local script result
-  script=$(cat <<PY
+  script=$(
+    cat <<PY
 python3 - <<'MCN_PY'
 import json, subprocess
 ce = set(json.loads('${ce_ips_json}'))
@@ -55,7 +74,7 @@ learned = isinstance(paths, list) and any(ip in str(path.get('peerId', path.get(
 print('MCN_FAILOVER ce=%d rs=%d vip=%d' % (sum(up(ip) for ip in ce), sum(up(ip) for ip in rs), int(learned)))
 MCN_PY
 PY
-)
+  )
   result=$(az vm run-command invoke --resource-group "$rg" --name "$vm" --command-id RunShellScript \
     --query 'value[0].message' --output tsv --scripts "$script") || return 1
   grep -Eo 'MCN_FAILOVER ce=[0-9]+ rs=[0-9]+ vip=[01]' <<<"$result" | tail -n 1
@@ -84,8 +103,8 @@ wait_state() {
   local result
   while ((SECONDS < deadline)); do
     result=$(frr_sessions "$rg" "$frr" "$ce_ips" "$rs_ips" "$vip" 2>/dev/null || true)
-    if [ "$result" = "MCN_FAILOVER ce=${expected_ce} rs=2 vip=1" ] && \
-       client_next_hops "$rg" "$nic" "$vip" "$expected_hops"; then return 0; fi
+    if [ "$result" = "MCN_FAILOVER ce=${expected_ce} rs=2 vip=1" ] &&
+      client_next_hops "$rg" "$nic" "$vip" "$expected_hops"; then return 0; fi
     sleep 30
   done
   return 1
@@ -102,7 +121,8 @@ run_region() {
   survivor_ip=$(jq -r '.[1]' <<<"$frr_ips")
   [ -n "$ce_vm" ] && [ -n "$frr_vm" ] && [ -n "$survivor_vm" ] || die "$region VM inventory is incomplete"
 
-  recover_rg=$rg; recover_vm=$ce_vm
+  recover_rg=$rg
+  recover_vm=$ce_vm
   az vm stop --resource-group "$rg" --name "$ce_vm" --only-show-errors >/dev/null
   wait_state "$rg" "$nic" "$vip" "$survivor_vm" "$ce_ips" "$rs_ips" 2 "$frr_ips" || die "$region CE failure did not withdraw one direct session"
   traffic "$rg" "$client" "$domain" "$vip" "$inside_domain" "$ilb" "$console_ip" || die "$region traffic failed during CE stop"
@@ -113,7 +133,8 @@ run_region() {
     '{region:$region,source_commit:$commit,stage:"ce",sessions_during_failure:2,traffic_samples:20,recovered:true}' \
     >"$EVIDENCE_DIR/${region}-ce.json"
 
-  recover_rg=$rg; recover_vm=$frr_vm
+  recover_rg=$rg
+  recover_vm=$frr_vm
   az vm stop --resource-group "$rg" --name "$frr_vm" --only-show-errors >/dev/null
   wait_state "$rg" "$nic" "$vip" "$survivor_vm" "$ce_ips" "$rs_ips" 3 "[\"$survivor_ip\"]" || die "$region FRR failure did not withdraw its VIP next hop"
   traffic "$rg" "$client" "$domain" "$vip" "$inside_domain" "$ilb" "$console_ip" || die "$region traffic failed during FRR stop"

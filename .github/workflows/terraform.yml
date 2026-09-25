@@ -43,12 +43,14 @@ on:
       - 'scripts/deployment-identity.py'
       - 'scripts/showcase-lifecycle.sh'
       - 'scripts/showcase-plan-scope.py'
+      - 'scripts/showcase-legacy-destroy-scope.py'
       - 'scripts/verify-deployment.sh'
       - 'scripts/verify-azure-failover.sh'
       - 'scripts/verify-kvm-lan-client.py'
       - 'scripts/customer-edge-egress-preflight.py'
       - 'tests/test-complete-showcase-graph.sh'
       - 'tests/test_showcase_plan_scope.py'
+      - 'tests/test_showcase_legacy_destroy_scope.py'
       - 'tests/test-verify-deployment.sh'
       - 'scripts/terraform-with-aws-sso.sh'
       - 'scripts/aws-smsv2-uat-preflight.sh'
@@ -89,12 +91,14 @@ on:
       - 'scripts/deployment-identity.py'
       - 'scripts/showcase-lifecycle.sh'
       - 'scripts/showcase-plan-scope.py'
+      - 'scripts/showcase-legacy-destroy-scope.py'
       - 'scripts/verify-deployment.sh'
       - 'scripts/verify-azure-failover.sh'
       - 'scripts/verify-kvm-lan-client.py'
       - 'scripts/customer-edge-egress-preflight.py'
       - 'tests/test-complete-showcase-graph.sh'
       - 'tests/test_showcase_plan_scope.py'
+      - 'tests/test_showcase_legacy_destroy_scope.py'
       - 'tests/test-verify-deployment.sh'
       - 'scripts/terraform-with-aws-sso.sh'
       - 'scripts/aws-smsv2-uat-preflight.sh'
@@ -189,6 +193,7 @@ jobs:
         run: |
           bash tests/test-complete-showcase-graph.sh
           python3 -m unittest tests/test_showcase_plan_scope.py
+          python3 -m unittest tests/test_showcase_legacy_destroy_scope.py
           bash tests/test-verify-deployment.sh
           bash tests/test-unified-showcase-lifecycle.sh
 
