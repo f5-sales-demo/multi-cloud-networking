@@ -3,8 +3,8 @@ set -euo pipefail
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 
-check() { rg -q -- "$1" "$2" || { echo "missing $1 in $2" >&2; exit 1; }; }
-reject() { if rg -q -- "$1" "$2"; then echo "obsolete $1 in $2" >&2; exit 1; fi; }
+check() { grep -Eq -- "$1" "$2" || { echo "missing $1 in $2" >&2; exit 1; }; }
+reject() { if grep -Eq -- "$1" "$2"; then echo "obsolete $1 in $2" >&2; exit 1; fi; }
 
 check 'version = "= 11\.3\.0"' terraform/versions.tf
 check 'xcsh_network_customer_edge_egress' terraform/data.tf
