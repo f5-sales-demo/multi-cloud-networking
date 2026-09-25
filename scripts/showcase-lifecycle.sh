@@ -14,6 +14,8 @@ AWS_ACCOUNT=280469140135
 XC_TENANT=f5-sales-demo
 COMPONENT=mcn-ce-ha
 GENERATION=""
+# The reviewed predecessor state uses a different generation from new builds.
+LEGACY_GENERATION=smsv2-current
 MODE=full
 PRIVATE_ROOT=""
 CREATOR_ID=$(git -C "$REPO_ROOT" config user.email 2>/dev/null || true)
@@ -427,7 +429,7 @@ scope_plan() {
       --source-commit "$SOURCE_COMMIT_SHA" --backend-key "$SHOWCASE_BACKEND_KEY" \
       --environment-key "$DEPLOYMENT_ENVIRONMENT_KEY" --owner-id "$DEPLOYMENT_OWNER_ID" \
       --legacy-deployer "$LEGACY_DEPLOYER" --legacy-environment "$LEGACY_ENVIRONMENT" \
-      --legacy-generation "$GENERATION" --legacy-tenant "$XC_TENANT" \
+      --legacy-generation "$LEGACY_GENERATION" --legacy-tenant "$XC_TENANT" \
       >"$receipt" || die "legacy destroy plan failed exact ownership/action scope"
   else
     python3 "$REPO_ROOT/scripts/showcase-plan-scope.py" \
@@ -437,7 +439,7 @@ scope_plan() {
       --backend-key "$SHOWCASE_BACKEND_KEY" --environment-key "$DEPLOYMENT_ENVIRONMENT_KEY" \
       --owner-id "$DEPLOYMENT_OWNER_ID" \
       --legacy-deployer "$LEGACY_DEPLOYER" --legacy-environment "$LEGACY_ENVIRONMENT" \
-      --legacy-generation "$GENERATION" --legacy-tenant "$XC_TENANT" \
+      --legacy-generation "$LEGACY_GENERATION" --legacy-tenant "$XC_TENANT" \
       >"$receipt" || die "saved plan failed $scope scope"
   fi
   chmod 600 "$receipt"
