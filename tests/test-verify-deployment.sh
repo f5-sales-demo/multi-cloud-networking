@@ -297,7 +297,7 @@ else
 fi
 
 echo "9. the verifier requires both BGP and ILB application paths"
-if rg -q 'show-effective-route-table' "$SCRIPT" && rg -q 'MCN_FRR' "$SCRIPT"; then
+if grep -Fq 'show-effective-route-table' "$SCRIPT" && grep -Fq 'MCN_FRR' "$SCRIPT"; then
   ok "default verifier checks FRR sessions and both VIP next hops"
 else
   bad "default verifier omits the Azure BGP path"
@@ -307,7 +307,7 @@ if AZ_BGP_MODE=missing-ce run_uat missing-bgp >/dev/null 2>&1; then
 else
   ok "rejected a missing direct CE-FRR session"
 fi
-if rg -q 'azure_ilb_private_ip' "$SCRIPT" && rg -q 'canada_ilb_private_ip' "$SCRIPT"; then
+if grep -Fq 'azure_ilb_private_ip' "$SCRIPT" && grep -Fq 'canada_ilb_private_ip' "$SCRIPT"; then
   ok "default verifier requires both US and Canada ILB endpoints"
 else
   bad "default verifier does not require both supported ILB endpoints"
