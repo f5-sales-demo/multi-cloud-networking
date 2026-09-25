@@ -57,7 +57,12 @@ require "-var='enable_aws_tgw_connect=false'" "$lifecycle"
 require "enable_aws_tgw_connect[[:space:]]*=[[:space:]]*true" "$lifecycle"
 reject 'tf console "${IDENTITY_TF_ARGS[@]}"' "$lifecycle"
 require 'var.smsv2_site_generation' "$lifecycle"
-reject 'GENERATION=smsv2' "$lifecycle"
+! grep -Eq '^[[:space:]]*GENERATION=smsv2([[:space:]]|$)' "$lifecycle" ||
+  fail 'new deployment generation must come from the reviewed Terraform input'
+require 'LEGACY_GENERATION=smsv2-current' "$lifecycle"
+reject '--legacy-generation "$GENERATION"' "$lifecycle"
+[ "$(grep -Fc -- '--legacy-generation "$LEGACY_GENERATION"' "$lifecycle")" -eq 2 ] ||
+  fail 'both destroy validators must receive the reviewed predecessor generation'
 require 'wait_for_approvals bootstrap 3 1' "$lifecycle"
 require '.registration_count == 1 and .online_count == 1' "$lifecycle"
 require 'systemctl enable --now' "$lifecycle"
