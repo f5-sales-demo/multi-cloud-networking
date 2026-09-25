@@ -178,7 +178,7 @@ if [ "$MODE" = kvm-lan-preflight ]; then
   exit 0
 fi
 
-for command_name in aws az curl getent gh jq python3 stat sudo systemctl terraform sha256sum virsh; do
+for command_name in aws az curl getent gh jq python3 stat sudo systemctl tar terraform sha256sum virsh; do
   command -v "$command_name" >/dev/null 2>&1 || die "required command is unavailable: $command_name"
 done
 [ -n "$CREATOR_ID" ] || die "Git user.email is required for ownership checks"
@@ -281,14 +281,37 @@ caller_account=$(AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_SDK_LOAD_CONFIG=1 \
 unset caller_account
 
 tf init -reconfigure -input=false -lockfile=readonly -backend-config="$BACKEND_CONFIG"
-AZURE_SUBSCRIPTION=$(printf '%s\n' 'var.subscription_id' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS" | jq -er 'select(type == "string" and test("^[0-9a-fA-F-]{36}$"))') ||
+# The old production state contains xcsh data attributes the current provider
+# cannot decode in terraform console. Evaluate only tracked source and private
+# inputs in an empty local-backend copy. The TGW toggle is temporarily disabled
+# for this read: bootstrap has no device mapping yet. Its actual private value
+# is checked below and every saved build/final plan validates the full scope.
+INPUT_DIR=$(mktemp -d "$PRIVATE_ROOT/input-console.XXXXXX")
+git -C "$REPO_ROOT" archive "$SOURCE_COMMIT_SHA:terraform" | tar -x -C "$INPUT_DIR"
+[ "$(grep -Ec '^[[:space:]]*backend "s3" \{\}[[:space:]]*$' "$INPUT_DIR/backend.tf")" -eq 1 ] ||
+  die "isolated input root has an unexpected backend declaration"
+sed -i '/^[[:space:]]*backend "s3" {}[[:space:]]*$/d' "$INPUT_DIR/backend.tf"
+terraform -chdir="$INPUT_DIR" init -backend=false -input=false -lockfile=readonly \
+  >"$PRIVATE_ROOT/input-console-init.log" 2>&1 || die "isolated input root initialization failed"
+input_expr='jsonencode({subscription=var.subscription_id,flags={aws=var.enable_aws,azure=var.enable_azure,canada=var.enable_canada,bgp=var.enable_bgp,us_ilb=var.enable_azure_ilb,ca_ilb=var.enable_canada_ilb,kvm=var.enable_kvm,kvm_lan=var.enable_kvm_lan},generation=var.smsv2_site_generation,site_prefix=local.site_prefix,aws_prefix=local.aws_resource_prefix,deployer=local.deployer,environment=var.environment})'
+input_line=$(printf '%s\n' "$input_expr" |
+  "${TF_RUNNER[@]}" -chdir="$INPUT_DIR" console "${IDENTITY_TF_ARGS[@]}" \
+    -var-file="$TFVARS" -var='enable_aws_tgw_connect=false' | tail -n 1) ||
+  die "isolated input console failed"
+INPUT_VALUES_JSON=$(jq -er 'fromjson | select(type == "object" and (.flags | type == "object"))' <<<"$input_line") ||
+  die "isolated input console did not return a JSON object"
+rm -r -- "$INPUT_DIR"
+unset INPUT_DIR input_expr input_line
+AZURE_SUBSCRIPTION=$(jq -er '.subscription | select(type == "string" and test("^[0-9a-fA-F-]{36}$"))' <<<"$INPUT_VALUES_JSON") ||
   die "configured Azure subscription is unavailable"
 az account show --subscription "$AZURE_SUBSCRIPTION" --query state --output tsv | grep -qx Enabled ||
   die "configured Azure subscription is not enabled"
-showcase_flags=$(printf '%s\n' 'jsonencode({aws=var.enable_aws,tgw=var.enable_aws_tgw_connect,azure=var.enable_azure,canada=var.enable_canada,bgp=var.enable_bgp,us_ilb=var.enable_azure_ilb,ca_ilb=var.enable_canada_ilb,kvm=var.enable_kvm,kvm_lan=var.enable_kvm_lan})' |
-  tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS" | jq -r .) || die "cannot resolve showcase toggles"
-jq -e 'all(.[]; . == true)' <<<"$showcase_flags" >/dev/null || die "all showcase paths must be enabled in tfvars"
-unset showcase_flags
+jq -e '.flags | length == 8 and all(.[]; . == true)' <<<"$INPUT_VALUES_JSON" >/dev/null ||
+  die "all non-TGW showcase paths must be enabled in tfvars"
+if [ "$(grep -Ec '^[[:space:]]*enable_aws_tgw_connect[[:space:]]*=' "$TFVARS")" -ne 1 ] ||
+  ! grep -Eq '^[[:space:]]*enable_aws_tgw_connect[[:space:]]*=[[:space:]]*true[[:space:]]*(#.*)?$' "$TFVARS"; then
+  die "private tfvars must explicitly enable AWS TGW Connect"
+fi
 latest_xcsh=$(gh release view --repo f5-sales-demo/terraform-provider-xcsh --json tagName --jq .tagName) || die "cannot check latest xcsh release"
 [ "$latest_xcsh" = v11.3.0 ] || die "xcsh release advanced beyond the pinned v11.3.0"
 PROVIDER_ZIP="$PRIVATE_ROOT/terraform-provider-xcsh_11.3.0_linux_amd64.zip"
@@ -337,26 +360,17 @@ if [ -n "$existing_provenance" ] && [ "$existing_provenance" != null ]; then
     die "cross-environment state ownership mismatch"
 fi
 unset existing_provenance
-generation_json=$(printf '%s\n' 'var.smsv2_site_generation' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS") ||
-  die "cannot resolve smsv2_site_generation from tfvars"
-GENERATION=$(jq -er 'select(type == "string" and test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"))' <<<"$generation_json") ||
+GENERATION=$(jq -er '.generation | select(type == "string" and test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"))' <<<"$INPUT_VALUES_JSON") ||
   die "smsv2_site_generation is not a DNS-style label"
-unset generation_json
-site_prefix_json=$(printf '%s\n' 'local.site_prefix' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS") ||
-  die "cannot resolve environment-scoped site prefix"
-SITE_PREFIX=$(jq -er 'select(type == "string" and test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"))' <<<"$site_prefix_json") ||
+SITE_PREFIX=$(jq -er '.site_prefix | select(type == "string" and test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"))' <<<"$INPUT_VALUES_JSON") ||
   die "environment-scoped site prefix is not a DNS-style label"
-aws_resource_prefix_json=$(printf '%s\n' 'local.aws_resource_prefix' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS") ||
-  die "cannot resolve environment-scoped AWS prefix"
-AWS_RESOURCE_PREFIX=$(jq -er 'select(type == "string" and test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"))' <<<"$aws_resource_prefix_json") ||
+AWS_RESOURCE_PREFIX=$(jq -er '.aws_prefix | select(type == "string" and test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"))' <<<"$INPUT_VALUES_JSON") ||
   die "environment-scoped AWS prefix is not a DNS-style label"
-unset site_prefix_json aws_resource_prefix_json
-LEGACY_DEPLOYER=$(printf '%s\n' 'local.deployer' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS" |
-  jq -er 'select(type == "string" and test("^[a-z0-9]+$"))') ||
+LEGACY_DEPLOYER=$(jq -er '.deployer | select(type == "string" and test("^[a-z0-9]+$"))' <<<"$INPUT_VALUES_JSON") ||
   die "legacy deployer identity is unavailable"
-LEGACY_ENVIRONMENT=$(printf '%s\n' 'var.environment' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS" |
-  jq -er 'select(type == "string" and test("^[a-z0-9-]+$"))') ||
+LEGACY_ENVIRONMENT=$(jq -er '.environment | select(type == "string" and test("^[a-z0-9-]+$"))' <<<"$INPUT_VALUES_JSON") ||
   die "legacy environment identity is unavailable"
+unset INPUT_VALUES_JSON
 
 libvirt_unit=""
 for candidate in libvirtd.service virtqemud.service; do
