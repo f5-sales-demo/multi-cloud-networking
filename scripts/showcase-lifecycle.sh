@@ -351,6 +351,12 @@ aws_resource_prefix_json=$(printf '%s\n' 'local.aws_resource_prefix' | tf consol
 AWS_RESOURCE_PREFIX=$(jq -er 'select(type == "string" and test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"))' <<<"$aws_resource_prefix_json") ||
   die "environment-scoped AWS prefix is not a DNS-style label"
 unset site_prefix_json aws_resource_prefix_json
+LEGACY_DEPLOYER=$(printf '%s\n' 'local.deployer' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS" |
+  jq -er 'select(type == "string" and test("^[a-z0-9]+$"))') ||
+  die "legacy deployer identity is unavailable"
+LEGACY_ENVIRONMENT=$(printf '%s\n' 'var.environment' | tf console "${IDENTITY_TF_ARGS[@]}" -var-file="$TFVARS" |
+  jq -er 'select(type == "string" and test("^[a-z0-9-]+$"))') ||
+  die "legacy environment identity is unavailable"
 
 libvirt_unit=""
 for candidate in libvirtd.service virtqemud.service; do
@@ -404,7 +410,10 @@ scope_plan() {
     --provider-zip "$PROVIDER_ZIP" --backend-config "$BACKEND_CONFIG" \
     --scope "$scope" --source-commit "$SOURCE_COMMIT_SHA" \
     --backend-key "$SHOWCASE_BACKEND_KEY" --environment-key "$DEPLOYMENT_ENVIRONMENT_KEY" \
-    --owner-id "$DEPLOYMENT_OWNER_ID" >"$receipt" || die "saved plan failed $scope scope"
+    --owner-id "$DEPLOYMENT_OWNER_ID" \
+    --legacy-deployer "$LEGACY_DEPLOYER" --legacy-environment "$LEGACY_ENVIRONMENT" \
+    --legacy-generation "$GENERATION" --legacy-tenant "$XC_TENANT" \
+    >"$receipt" || die "saved plan failed $scope scope"
   chmod 600 "$receipt"
   jq -e --arg digest "sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')" \
     '.plan_sha256 == $digest' "$receipt" >/dev/null || die "saved plan digest changed"

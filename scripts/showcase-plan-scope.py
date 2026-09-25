@@ -69,7 +69,8 @@ def _value(document: dict[str, Any], name: str) -> Any:
 
 
 def validate(document: dict[str, Any], scope: str, source_commit: str,
-             environment_key: str | None = None, owner_id: str | None = None) -> int:
+             environment_key: str | None = None, owner_id: str | None = None,
+             backend_key: str | None = None, legacy: dict[str, str] | None = None) -> int:
     """Validate source, provider, toggles, and every active action."""
     if document.get("terraform_version") != "1.16.3":
         raise ValueError("unexpected Terraform version")
@@ -199,7 +200,25 @@ def validate(document: dict[str, Any], scope: str, source_commit: str,
                 marker = tags if "mcn_owner_id" in tags else labels if "mcn-owner-id" in labels else None
                 if marker is None:
                     if item.get("type") in ("azurerm_resource_group", "aws_vpc", "aws_instance", "xcsh_securemesh_site_v2"):
-                        raise ValueError(f"destroy lacks required ownership markers: {item['address']}")
+                        legacy_owned = backend_key == "mcn-ce-ha-smsv2/showcase.tfstate" and legacy is not None
+                        if item.get("type") in ("aws_vpc", "aws_instance"):
+                            legacy_owned = legacy_owned and all((
+                                tags.get("component") == "mcn-ce-ha",
+                                tags.get("environment") == legacy["environment"],
+                                tags.get("deployer") == legacy["deployer"],
+                                tags.get("managed_by") == "terraform",
+                            ))
+                        elif item.get("type") == "xcsh_securemesh_site_v2":
+                            legacy_owned = legacy_owned and all((
+                                before.get("namespace") == "system",
+                                labels.get("mcn-deployment-generation") == legacy["generation"],
+                                labels.get("mcn-xc-tenant") == legacy["tenant"],
+                                str(labels.get("mcn-topology", "")).endswith("-aws"),
+                            ))
+                        else:
+                            legacy_owned = False
+                        if not legacy_owned:
+                            raise ValueError(f"destroy lacks required ownership markers: {item['address']}")
                     continue
                 if marker.get("mcn_owner_id", marker.get("mcn-owner-id")) != owner_id or \
                    marker.get("mcn_environment", marker.get("mcn-environment")) != environment_key:
@@ -235,6 +254,10 @@ def main() -> int:
     parser.add_argument("--backend-key", required=True)
     parser.add_argument("--environment-key", required=True)
     parser.add_argument("--owner-id", required=True)
+    parser.add_argument("--legacy-deployer")
+    parser.add_argument("--legacy-environment")
+    parser.add_argument("--legacy-generation")
+    parser.add_argument("--legacy-tenant")
     args = parser.parse_args()
     if sha256_file(args.provider_zip) != PROVIDER_SHA256:
         raise ValueError("provider release asset digest mismatch")
@@ -248,7 +271,13 @@ def main() -> int:
         timeout=120,
     )
     document = json.loads(result.stdout)
-    count = validate(document, args.scope, args.source_commit, args.environment_key, args.owner_id)
+    legacy_values = (args.legacy_deployer, args.legacy_environment,
+                     args.legacy_generation, args.legacy_tenant)
+    legacy = None
+    if all(legacy_values):
+        legacy = dict(zip(("deployer", "environment", "generation", "tenant"), legacy_values))
+    count = validate(document, args.scope, args.source_commit, args.environment_key,
+                     args.owner_id, args.backend_key, legacy)
     receipt = {
         "schema": "mcn.showcase-plan-receipt/v1",
         "scope": args.scope,

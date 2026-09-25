@@ -92,6 +92,22 @@ class ShowcasePlanScopeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ownership marker mismatch"):
             module.validate(document, "full-destroy", "a" * 40, "production", "showcase-team")
 
+    def test_destroy_accepts_exact_legacy_production_owner(self):
+        document = plan([('aws_vpc.aws[0]', ["delete"])])
+        document["resource_changes"][0]["type"] = "aws_vpc"
+        document["resource_changes"][0]["change"]["before"] = {
+            "tags": {"component": "mcn-ce-ha", "environment": "lab",
+                     "deployer": "operator", "managed_by": "terraform"}
+        }
+        legacy = {"deployer": "operator", "environment": "lab",
+                  "generation": "smsv2-current", "tenant": "f5-sales-demo"}
+        self.assertEqual(module.validate(document, "full-destroy", "a" * 40,
+                         "production", "showcase-team",
+                         "mcn-ce-ha-smsv2/showcase.tfstate", legacy), 1)
+        with self.assertRaisesRegex(ValueError, "ownership markers"):
+            module.validate(document, "full-destroy", "a" * 40,
+                            "production", "showcase-team", "foreign/backend.tfstate", legacy)
+
     def test_source_mismatch_rejected(self):
         with self.assertRaisesRegex(ValueError, "source commit"):
             module.validate(plan([]), "zero-change", "b" * 40)
