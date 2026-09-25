@@ -42,6 +42,14 @@ on:
       - 'scripts/configure-aws-state-backend.sh'
       - 'scripts/deployment-identity.py'
       - 'scripts/showcase-lifecycle.sh'
+      - 'scripts/showcase-plan-scope.py'
+      - 'scripts/verify-deployment.sh'
+      - 'scripts/verify-azure-failover.sh'
+      - 'scripts/verify-kvm-lan-client.py'
+      - 'scripts/customer-edge-egress-preflight.py'
+      - 'tests/test-complete-showcase-graph.sh'
+      - 'tests/test_showcase_plan_scope.py'
+      - 'tests/test-verify-deployment.sh'
       - 'scripts/terraform-with-aws-sso.sh'
       - 'scripts/aws-smsv2-uat-preflight.sh'
       - 'scripts/aws-smsv2-lifecycle-plan.sh'
@@ -80,6 +88,14 @@ on:
       - 'scripts/configure-aws-state-backend.sh'
       - 'scripts/deployment-identity.py'
       - 'scripts/showcase-lifecycle.sh'
+      - 'scripts/showcase-plan-scope.py'
+      - 'scripts/verify-deployment.sh'
+      - 'scripts/verify-azure-failover.sh'
+      - 'scripts/verify-kvm-lan-client.py'
+      - 'scripts/customer-edge-egress-preflight.py'
+      - 'tests/test-complete-showcase-graph.sh'
+      - 'tests/test_showcase_plan_scope.py'
+      - 'tests/test-verify-deployment.sh'
       - 'scripts/terraform-with-aws-sso.sh'
       - 'scripts/aws-smsv2-uat-preflight.sh'
       - 'scripts/aws-smsv2-lifecycle-plan.sh'
@@ -168,6 +184,14 @@ jobs:
         working-directory: .
         run: bash tests/test-azure-ilb-no-route-server.sh
 
+      - name: Complete showcase graph and saved-plan scope
+        working-directory: .
+        run: |
+          bash tests/test-complete-showcase-graph.sh
+          python3 -m unittest tests/test_showcase_plan_scope.py
+          bash tests/test-verify-deployment.sh
+          bash tests/test-unified-showcase-lifecycle.sh
+
       - name: KVM FRR lifecycle contract
         working-directory: .
         run: bash tests/test-kvm-frr-lifecycle.sh
@@ -235,7 +259,7 @@ jobs:
   # xcsh provider, so the provider's own schema validators fire at plan with no XC API call.
   # This job resolves f5-sales-demo/xcsh from the public registry, so it only turns green once
   # the exact clean-break provider version required by
-  # `coverage/smsv2/versions.tf` (`= 11.0.2`) is published in the registry. Locally the same tests run
+  # `coverage/smsv2/versions.tf` (`= 11.3.0`) is published in the registry. Locally the same tests run
   # against the dev_overrides build via verify.sh.
   coverage-smsv2:
     name: coverage-smsv2

@@ -93,7 +93,7 @@ output "origin_ip" {
 }
 
 output "route_server_peer_ips" {
-  description = "Route Server BGP peer IPs (the CE external BGP peer addresses)."
+  description = "US Route Server endpoints to which each regional FRR relay peers."
   value       = try(module.azure_hub[0].rs_peer_ips, [])
 }
 
@@ -242,7 +242,7 @@ output "ca_origin_pool_name" {
 }
 
 output "ca_vip" {
-  description = "HA VIP for Canadian CEs advertised via eBGP/ECMP or Azure ILB."
+  description = "Canadian external HA VIP advertised through CE-to-FRR-to-Route-Server BGP. The inside ILB frontend is separate."
   value       = var.ca_vip
 }
 
@@ -439,4 +439,93 @@ output "aws_smsv2_nlb_dns_name" {
 output "aws_smsv2_target_group_arn" {
   description = "Target group containing the three BGP-routed SMSv2 site listeners."
   value       = try(aws_lb_target_group.smsv2[0].arn, null)
+}
+
+output "ce_egress_requirements" {
+  description = "Explicit outbound DNS, NTP, and HTTPS checks derived from the release-pinned CE allowlists."
+  value = {
+    api_release_tag = data.xcsh_network_customer_edge_egress.secure_mesh_v2.api_release_tag
+    dns = {
+      direction    = "egress"
+      protocols    = ["udp", "tcp"]
+      port         = 53
+      destinations = data.xcsh_network_customer_edge_defaults.system_services.dns_servers
+    }
+    ntp = {
+      direction    = "egress"
+      protocols    = ["udp"]
+      port         = 123
+      destinations = data.xcsh_network_customer_edge_defaults.system_services.ntp_servers
+    }
+    https = {
+      direction    = "egress"
+      protocols    = ["tcp"]
+      port         = 443
+      destinations = data.xcsh_network_customer_edge_egress.secure_mesh_v2.domains
+    }
+  }
+}
+
+output "azure_ilb_application_domain" {
+  value = try(module.azure_ilb_application[0].domain, null)
+}
+
+output "azure_ilb_console_ip" {
+  value = try(azurerm_lb.azure_ilb[0].frontend_ip_configuration[1].private_ip_address, null)
+}
+
+output "canada_ilb_application_domain" {
+  value = try(module.azure_ilb_application_ca[0].domain, null)
+}
+
+output "canada_ilb_console_ip" {
+  value = try(azurerm_lb.ca_ilb[0].frontend_ip_configuration[1].private_ip_address, null)
+}
+
+output "azure_frr_peer_ips" {
+  value = try(module.azure_frr_us[0].peer_ips, [])
+}
+
+output "canada_frr_peer_ips" {
+  value = try(module.azure_frr_ca[0].peer_ips, [])
+}
+
+output "azure_frr_vm_names" {
+  value = try(module.azure_frr_us[0].vm_names, [])
+}
+
+output "canada_frr_vm_names" {
+  value = try(module.azure_frr_ca[0].vm_names, [])
+}
+
+output "canada_route_server_name" {
+  value = local.ca_route_server_name
+}
+
+output "canada_client_nic_name" {
+  value = try(module.client_vm_ca[0].nic_name, null)
+}
+
+output "azure_ilb_name" {
+  value = try(azurerm_lb.azure_ilb[0].name, null)
+}
+
+output "canada_ilb_name" {
+  value = try(azurerm_lb.ca_ilb[0].name, null)
+}
+
+output "canada_ce_mgmt_private_ips" {
+  value = { for key, node in module.ce_node_ca : key => node.mgmt_private_ip }
+}
+
+output "canada_ce_sli_private_ips" {
+  value = { for key, node in module.ce_node_ca : key => node.sli_private_ip }
+}
+
+output "canada_route_server_peer_ips" {
+  value = try(module.azure_hub_ca[0].rs_peer_ips, [])
+}
+
+output "azure_subscription_id" {
+  value = var.subscription_id
 }

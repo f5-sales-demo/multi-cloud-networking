@@ -15,7 +15,7 @@ fail() {
 }
 
 tracked_terraform() {
-  git -C "$1" ls-files 'terraform/*.tf' 'terraform/**/*.tf' 'terraform/cloud-init/ce-node-aws.multipart.tpl' | LC_ALL=C sort -u
+  git -C "$1" ls-files 'terraform/*.tf' 'terraform/**/*.tf' 'terraform/**/*.tftpl' 'terraform/cloud-init/ce-node-aws.multipart.tpl' | LC_ALL=C sort -u
 }
 
 manifest_terraform() {

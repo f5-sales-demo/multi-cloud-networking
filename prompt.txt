@@ -5,7 +5,7 @@ Write the complete, modular, production-grade Terraform codebase under `terrafor
 ### Core Architectural Specifications
 
 1. **Versions & Providers** (`versions.tf`, `providers.tf`):
-   - Terraform CLI `>= 1.16.1`. Providers: `f5-sales-demo/xcsh` (`= 11.0.2`, setting `api_url = local.xc_api_url` derived from `var.expected_xc_tenant` -> `https://${var.expected_xc_tenant}.console.ves.volterra.io`), `azurerm` (`~> 4.0`, features {}, subscription_id), `azuread` (`~> 3.0`), `external` (`~> 2.3`), `random` (`~> 3.0`). Partial backend: `backend "azurerm" {}` with `backend.hcl.example`.
+   - Terraform CLI `>= 1.16.1`. Providers: `f5-sales-demo/xcsh` (`= 11.3.0`, setting `api_url = local.xc_api_url` derived from `var.expected_xc_tenant` -> `https://${var.expected_xc_tenant}.console.ves.volterra.io`), `azurerm` (`~> 4.0`, features {}, subscription_id), `azuread` (`~> 3.0`), `external` (`~> 2.3`), `random` (`~> 3.0`). Partial backend: `backend "azurerm" {}` with `backend.hcl.example`.
 
 2. **Tenant Guard & Safety Checks** (`data.tf`, `main.tf`, `scripts/xc-env-tenant.sh`):
    - Executable script `scripts/xc-env-tenant.sh` (`chmod +x`) outputs `{"tenant":"<label>","api_url_set":"<bool>"}` from `XCSH_API_URL`.
@@ -20,7 +20,7 @@ Write the complete, modular, production-grade Terraform codebase under `terrafor
    - `azure-hub`: RG `rg-<component>-<deployer>` (`<deployer>` from Azure AD 4-tier fallback in `locals.tf`), VNet `hub-vnet`, subnets (`snet-hub-management`, `snet-hub-external`, `snet-hub-internal`, `RouteServerSubnet` `/27`, `AzureBastionSubnet` `/26`), Azure Route Server (`<component>-rs`, ASN `65515`, Standard PIP), Bastion (`<component>-bastion`, `tunneling_enabled = true`, `ip_connect_enabled = true`).
    - `ce-node`: UserAssigned Identity, 3 NICs (mgmt/SLO, external, internal; IP forwarding on, accelerated networking off, `private_ip_address_allocation` Static for mgmt / Dynamic for external/internal), `azurerm_linux_virtual_machine` (`volterraedgeservices/volterra-node/volterra-node`, 64GB `StandardSSD_LRS` OS disk, `custom_data = base64encode(cloud_init)`).
    - `xc-site`: `xcsh_securemesh_site_v2` (explicit eth0 interface in `azure.not_managed.node_list.interface_list` with `ethernet_interface` and `network_option.site_local_network` bound to mgmt NIC MAC, `terraform_data.ce_vm` parking VM instance ID for `lifecycle { replace_triggered_by = [terraform_data.ce_vm] }`), `data.xcsh_site_registration`, `xcsh_registration_approval` (when found), `xcsh_bgp` (CE ASN `64512`, RS ASN `65515`, peer port 179).
-   - `azure-route-server-bgp`: `azurerm_route_server_bgp_connection` connecting Route Server to CE mgmt IP.
+   - `azure-frr`: two FRR relays per region, each peering with three CEs and both Route Server endpoints, exporting only the regional VIP /32.
    - `client-vm`: Ubuntu test client in `snet-hub-internal` (`private_ip_address_allocation = "Dynamic"`).
 
 5. **App Tier & Canada Extension**:

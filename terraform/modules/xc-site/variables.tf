@@ -28,13 +28,13 @@ variable "ce_vm_instance_id" {
   }
 }
 
-variable "rs_peer_ips" {
-  description = "List of Azure Route Server BGP peer IPs (virtual_router_ips), e.g. [10.0.4.4, 10.0.4.5]. Values may be unknown until apply; the count of peers comes from rs_peer_count so the peers block expands at plan time."
+variable "peer_ips" {
+  description = "List of regional FRR BGP peer IPs (virtual_router_ips), e.g. [10.0.4.4, 10.0.4.5]. Values may be unknown until apply; the count of peers comes from peer_count so the peers block expands at plan time."
   type        = list(string)
 }
 
-variable "rs_peer_count" {
-  description = "Number of external BGP peers (Azure Route Server always exposes exactly 2 virtual router IPs). Drives the peers block with a plan-known count so for_each never sees an unknown value."
+variable "peer_count" {
+  description = "Number of external BGP peers (regional FRR always exposes exactly 2 virtual router IPs). Drives the peers block with a plan-known count so for_each never sees an unknown value."
   type        = number
   default     = 2
 }
@@ -45,7 +45,7 @@ variable "ce_asn" {
   default     = 64512
 }
 
-variable "rs_asn" {
+variable "peer_asn" {
   description = "Route Server (peer) BGP ASN."
   type        = number
   default     = 65515

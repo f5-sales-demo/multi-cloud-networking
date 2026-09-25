@@ -103,7 +103,7 @@ jq -n '{
 }' >"$manifest"
 
 jq --arg provider_source "$provider_source" -n '{format_version:"1.2",terraform_version:"1.16.3",
-  configuration:{provider_config:{xcsh:{full_name:$provider_source,version_constraint:"11.0.2"}}},
+  configuration:{provider_config:{xcsh:{full_name:$provider_source,version_constraint:"11.3.0"}}},
   resource_changes:[
   {address:"aws_key_pair.recovery[\"aws_key_pair.ce[0]\"]",type:"aws_key_pair",
    change:{actions:["no-op"],importing:{id:"mcn-ce-ha-gen-01-key"}}},
@@ -158,7 +158,7 @@ fi
 destroy_plan="$scratch/destroy-plan.json"
 destroy_receipt="$scratch/destroy-receipt.json"
 jq --arg provider_source "$provider_source" -n '{format_version:"1.2",terraform_version:"1.16.3",
-  configuration:{provider_config:{xcsh:{full_name:$provider_source,version_constraint:"11.0.2"}}},
+  configuration:{provider_config:{xcsh:{full_name:$provider_source,version_constraint:"11.3.0"}}},
   resource_changes:[
     {address:"aws_key_pair.recovery[\"aws_key_pair.ce[0]\"]",type:"aws_key_pair",
      change:{actions:["delete"],before:{id:"mcn-ce-ha-gen-01-key",key_name:"mcn-ce-ha-gen-01-key"},after:null}},

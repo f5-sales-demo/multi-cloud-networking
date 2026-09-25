@@ -70,9 +70,9 @@ variable "rs_asn" {
 }
 
 variable "enable_bgp" {
-  description = "Enable the unsupported Azure Route Server BGP topology. Defaults false: the supported showcase uses Azure ILB instead. Setting true fails during planning, before Terraform, Azure, or F5 mutation, with the authoritative multihop-contract reason."
+  description = "Enable both regional CE-to-FRR and FRR-to-Route-Server BGP paths alongside the ILB application path."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "approve_registration" {

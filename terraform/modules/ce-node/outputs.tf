@@ -46,3 +46,8 @@ output "identity_id" {
   description = "User-assigned managed identity resource ID."
   value       = azurerm_user_assigned_identity.this.id
 }
+
+output "internal_nic_id" {
+  description = "Resource ID of the CE inside NIC used by the ILB application and console pools."
+  value       = azurerm_network_interface.internal.id
+}

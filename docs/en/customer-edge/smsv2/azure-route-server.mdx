@@ -1,104 +1,76 @@
 ---
 title: Azure Route Server
-description: Deploy the MCN Azure marketplace topology and interpret its dated registration and routing evidence.
+description: Deploy and verify regional CE-to-FRR-to-Route-Server routing alongside the inside application ILB.
 sidebar:
   order: 4
 ---
 
-## Prerequisites
+## Regional routing design
 
-Use authorized Microsoft Azure and F5 Distributed Cloud (XC) access, marketplace image
-terms, and the [MCN Terraform prerequisites](../../../demo/deploy/). Allow tens of minutes
-for registration and potentially hours for a version-installation investigation.
-The current source pins `f5-sales-demo/xcsh` v11.0.2 and immutable
-`api-specs-enriched` v8.0.0. It intentionally does **not** claim current Azure Route
-Server convergence: the contract has no schema-valid writable eBGP-multihop control.
-Retain the dates below when presenting Azure observations.
+The unified root pins `f5-sales-demo/xcsh` v11.3.0, built from
+`api-specs-enriched` v8.0.2. Each Azure region has three Customer Edges (CEs),
+two Terraform-managed FRR routers, and one Azure Route Server. A CE peers directly
+with both FRRs on the management subnet. Each FRR peers with both Route Server
+endpoints using eBGP multihop. Route Server peers with the FRRs at management
+addresses `.20` and `.21`; it does not peer directly with the CEs.
 
-## Deploy the marketplace shape
+The FRR import and export policy permits only the regional application VIP `/32`
+learned from a CE. Each FRR enables packet forwarding. The expected client route
+for that VIP has two FRR next hops. The US and Canadian VIPs, peers, and route
+servers stay in their respective regional VNets.
 
-The `ce-node` module selects the fixed certified tuple
-`f5-networks:f5xc_customer_edge:f5xc-ce-crt-20260201:20260201.0178.1`, with the
-matching Marketplace plan. Terraform first reads and then idempotently writes `accepted = true`
-for exactly `f5-networks/offers/f5xc_customer_edge/plans/f5xc-ce-crt-20260201` through
-AzAPI 2.12.0; Azure foundation resources transitively depend on that agreement. Operators
-must not accept terms in the portal or CLI, import an agreement, edit state, taint resources,
-or substitute an arbitrary offer. The module attaches three network interface cards (NICs),
-enables IP forwarding, disables accelerated networking, and enables boot diagnostics.
+The Azure marketplace image is the certified
+`f5-networks:f5xc_customer_edge:f5xc-ce-crt-20260201:20260201.0178.1` tuple.
+Terraform handles its agreement through AzAPI before creating the hub. It then
+creates each CE with management/SLO, external, and internal/SLI NICs. The
+management NIC is the CE BGP source; the internal NIC belongs to the ILB backend.
+Do not infer an appliance interface name from Azure NIC order: use the provider's
+realized interface and registration data.
 
-| Attachment order | MCN cloud role | Address and XC interpretation |
-| --- | --- | --- |
-| First | `mgmt` | Static private address and public IP; explicit `eth0` Site Local Outside (SLO), also the BGP source. This is not a separate management network. |
-| Second | `external` | Dynamic private address; inspect the realized Site Local Inside (SLI) assignment. |
-| Third | `internal` | Dynamic private address; inspect the realized SLI assignment. |
+## Two application paths and Site Console
 
-Do not infer host addresses solely from cloud NIC order. On the observed appliance builds,
-SLO appears on `vhost0`, and the internal address can appear on different guest interfaces.
-Read [the interface model](../../interface-model/) and refresh `ce_sli_private_ips` after
-replacement. The [source reference](../../../demo/terraform/) contains the authoritative
-`ce-node`, `xc-site`, and `azure-hub` modules.
+Each regional ILB has an inside-subnet application frontend at `.10` and a
+Site Console frontend at `.11`. The application rule uses floating IP and the
+XC load balancer advertises that exact inside VIP on the CE's specified inside
+network. This gives the backend a direct server return path. The console rule
+uses TCP/65500 without floating IP. The ILB backend pool attaches the CE internal
+NICs. A separate private application domain matches the inside VIP; the existing
+external application domain and VIP remain the BGP path.
 
-## Route Server and BGP: current stop condition
+The Canadian external path retains the Toronto and Montreal Regional Edge
+virtual-site selector and Canadian CE selector. Traffic tests run from each
+region's own client and resolve that region's domain to its VIP.
 
-Azure Route Server requires a dedicated `RouteServerSubnet`. Do not associate a network
-security group (NSG) or user-defined route (UDR) table with that subnet. Peer every network
-virtual appliance with both Route Server service addresses and advertise the same routes
-to each. Configure multihop external Border Gateway Protocol (BGP); the service endpoints
-are not a directly attached neighbor pair. See [Microsoft's Route Server guidance](https://learn.microsoft.com/en-us/azure/route-server/route-server-faq).
+## Deployment and acceptance
 
-MCN retains the topology code and observations, but does not permit its Route Server BGP
-path to apply. `enable_bgp` defaults to `false`. Setting it to `true` requires the immutable
-`azure_route_server_ebgp_multihop` capability and fails during planning, before Terraform,
-Azure, or F5 mutation, with enforcement `reject_before_mutation` and reason
-`no_schema_valid_ebgp_multihop_request_control`.
+Use the [deployment lifecycle](../../../demo/deploy/) from a reviewed commit on
+merged `main`. The configured subscription must be passed explicitly to every
+Azure CLI command because it may differ from the CLI default. The lifecycle
+uses saved plans bound to the source commit, backend key, provider artifact,
+action scope, and digest. It applies the AWS and KVM stages first, then the Azure
+stage, verifies each region, destroys the owned stack, and repeats the build.
 
-Do not add multihop, time-to-live, `target_service`, or `family_inet_v6` inputs to work around
-this boundary. A future release must supply the precise request schema, field path, value
-semantics, validation, and live acceptance before this path can be enabled.
+For **each** Azure region, retain sanitized receipts proving:
 
-## Register in phases
+1. Three registered `ONLINE` CEs, six direct CE–FRR sessions, and four
+   FRR–Route Server sessions.
+2. The regional VIP `/32` at both FRRs and two FRR next hops at the client.
+3. HTTP origin responses through the external BGP VIP and inside ILB VIP, plus
+   healthy Site Console TCP/65500 reachability.
+4. Continuity and expected route withdrawal after stopping one CE and, separately,
+   one FRR; full session and next-hop recovery after starting each VM.
 
-1. Leave `enable_bgp = false` while the multihop capability is unavailable.
-2. Treat a plan with `enable_bgp = true` as the authoritative pre-mutation rejection check,
-   not as a bootstrap or apply request.
-3. Preserve existing sanitized Azure observations; do not rerun the blocked deployment.
+A successful apply does not establish those results. Stop on a failed live gate,
+fix the source, and repeat a reviewed iteration. The final state requires a
+refresh-enabled zero-change plan with all showcase paths enabled.
 
-Current Azure bootstrap uses the tenant-scoped `xcsh_token.ce` and Azure-specific
-`cloud-init/ce-node.yaml`. It does not implement AWS's site-bound JWT flow. Keep this
-limitation visible when adapting the [general lifecycle](../terraform-lifecycle/).
-Do not add a dependency to the plan-time registration lookup that makes approval count unknown.
+The historical observations dated 2026-08-03 and 2026-08-08 describe an earlier
+Azure shape. They do not prove this relay and inside-VIP design. The former
+schema-invalid direct CE multihop gate is no longer part of the deployment.
 
-## Preserve replacement and version behavior
+## Cleanup
 
-Changes to Azure VM `custom_data` replace the VM. MCN's site lifecycle follows the VM
-instance identity, retiring stale site registrations before replacement registration can
-converge. A replacement also changes SSH host keys and can reassign dynamic SLI addresses.
-Refresh connection information instead of reusing a prior address.
-
-Observed 2026-07-29: the tested software/operating-system pair failed on the marketplace
-image's 31 GiB disk and installed at tested sizes from 33 GB upward. The module defaults
-to 64 GB and rejects values below 40 GB. Those results are not a universal disk minimum.
-Observed 2026-08-03: a clean rebuild with empty version selectors installed the then-advertised
-versions and reached `ONLINE` on all three nodes with a clean plan.
-
-Marketplace `latest` selects the image at creation; empty XC version selectors select the
-then-advertised installation target. Editing create-time selectors is not an upgrade action.
-Provider v8 now exposes upgrade actions, but the final three-site upgrade acceptance was AWS.
-Keep Azure's dated [version and disk evidence](../../lifecycle/) separate.
-
-## Verify
-
-Do not perform Route Server BGP, learned-route, VIP-traffic, failover, replacement, or upgrade
-acceptance while the multihop gate is unavailable. Keep the VIP outside the configured
-virtual-network ranges as required by the MCN guards for future supported validation.
-
-Observed 2026-08-08: the guide records Azure route and HTTP verification. That proves the
-dated path, not node-failure timing, even distribution across next hops, or v8 from-zero
-acceptance. Finish current operations with live routing/traffic checks and a refresh-enabled
-no-change plan; label new results with their date and artifact identity.
-
-## Clean up
-
-Review the stack's destroy plan and follow [Deploy cleanup](../../../demo/deploy/#clean-up).
-The shared app namespace is read rather than managed. Preserve unrelated Azure resources
-and remove private bootstrap artifacts according to the backend's retention policy.
+Review the full destroy plan's ownership and action scope before applying its
+exact digest. The app namespace and the shared KVM bridge/uplink remain outside
+Terraform ownership. Use the saved teardown absence receipt to confirm Azure
+resource groups and XC sites are gone.

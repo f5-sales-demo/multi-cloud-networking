@@ -28,9 +28,9 @@ run "no_approval_before_the_ce_registers" {
     interface_name    = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
     mgmt_nic_mac      = "7c:1e:52:18:c1:77"
     ce_vm_instance_id = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
-    rs_peer_ips       = ["10.0.4.4", "10.0.4.5"]
+    peer_ips          = ["10.0.1.20", "10.0.1.21"]
     ce_asn            = 64512
-    rs_asn            = 65515
+    peer_asn          = 65020
     # Not under test here; the real 71-char interface name is covered by bgp.tftest.hcl.
     enable_bgp           = false
     approve_registration = true
@@ -76,9 +76,9 @@ run "new_registration_uses_the_resolved_registration_name" {
     interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
     mgmt_nic_mac         = "7c:1e:52:18:c1:77"
     ce_vm_instance_id    = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
-    rs_peer_ips          = ["10.0.4.4", "10.0.4.5"]
+    peer_ips             = ["10.0.1.20", "10.0.1.21"]
     ce_asn               = 64512
-    rs_asn               = 65515
+    peer_asn             = 65515
     enable_bgp           = false
     approve_registration = true
   }
@@ -138,9 +138,9 @@ run "approve_registration_false_plans_no_approval" {
     interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
     mgmt_nic_mac         = "7c:1e:52:18:c1:77"
     ce_vm_instance_id    = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
-    rs_peer_ips          = ["10.0.4.4", "10.0.4.5"]
+    peer_ips             = ["10.0.1.20", "10.0.1.21"]
     ce_asn               = 64512
-    rs_asn               = 65515
+    peer_asn             = 65515
     enable_bgp           = false
     approve_registration = false
   }
@@ -181,9 +181,9 @@ run "retired_registration_plans_no_approval" {
     interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
     mgmt_nic_mac         = "7c:1e:52:18:c1:77"
     ce_vm_instance_id    = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
-    rs_peer_ips          = ["10.0.4.4", "10.0.4.5"]
+    peer_ips             = ["10.0.1.20", "10.0.1.21"]
     ce_asn               = 64512
-    rs_asn               = 65515
+    peer_asn             = 65515
     enable_bgp           = false
     approve_registration = true
   }

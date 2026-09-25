@@ -1,138 +1,56 @@
 ---
 title: Present the demo
-description: Walk through the demo presentation structure, highlighting routing fabric ECMP next hops, traffic localization, and operational boundaries.
+description: Show the deployed routing, inside load balancing, regional isolation, and failure recovery.
 sidebar:
   order: 40
   label: Present
 ---
 
-import { Aside, Steps, CardGrid } from "@astrojs/starlight/components";
-import LinkCard from "@f5-sales-demo/docs-theme/components/LinkCard.astro";
+Use the receipts from the current deployment. Historical Azure observations
+through 2026-08-08 describe a different topology and do not prove the new FRR
+relay or inside-VIP paths.
 
-Present the platform-specific evidence, including its date and limits:
+## Start with the route
 
-- Azure observations through 2026-08-08 show BGP routes and working traffic. They do not measure node-failure recovery time.
-- [AWS v8 acceptance](https://github.com/f5-sales-demo/multi-cloud-networking/pull/1103) covers three independent sites, six Transit Gateway Connect peers, twelve BGP sessions, and an internal NLB in front of three routed listeners.
-- The final v8 run did not mutate or re-prove Azure or KVM end-to-end. See the [SMSv2 baseline](../../customer-edge/smsv2/).
-
-Run [the four health checks](../verify/) first. Everything below assumes they passed.
-
-## The one command that makes it visible
-
-Effective routes are the strongest single artifact: they are what Azure actually programmed,
-not what the CEs claim.
+In each Azure region, three CEs peer with both local FRR relays. Both FRRs peer
+with both Azure Route Server endpoints. The relays export only the CE-learned
+application VIP `/32`. The client's effective route table should show **two
+FRR next hops**. Select the configured subscription explicitly:
 
 ```bash
 cd terraform
 az network nic show-effective-route-table \
-  -g "$(terraform output -raw resource_group_name)" \
-  -n "$(terraform output -raw client_nic_name)" \
-  --query "value[?addressPrefix[0]=='$(terraform output -raw vip)/32'].{prefix:addressPrefix[0],nh:nextHopIpAddress,state:state}" \
-  -o json
+  --subscription "$(terraform output -raw azure_subscription_id)" \
+  --resource-group "$(terraform output -raw resource_group_name)" \
+  --name "$(terraform output -raw client_nic_name)" \
+  --output json
 ```
 
-Observed 2026-08-08 on live deployment:
+The external application domain resolves to the BGP VIP for the routed test.
+The private application domain uses the ILB frontend at inside-subnet `.10`.
+Send each domain as the HTTP `Host` value; a bare-IP request need not match
+an XC load balancer. The ILB's `.11` frontend independently checks Site Console
+TCP/65500 with a nonfloating rule.
 
-```json
-[
-  {
-    "addressPrefix": [
-      "10.250.0.10/32"
-    ],
-    "nextHopIpAddress": [
-      "10.0.1.4",
-      "10.0.1.5",
-      "10.0.1.6"
-    ],
-    "nextHopType": "VirtualNetworkGateway",
-    "state": "Active"
-  }
-]
-```
+## Demonstration order
 
-One prefix, three next hops, `Active`. That is the whole point of the demo in a single
-output, and it is worth pausing on: nothing in the picture is a load balancer.
+1. Show three `ONLINE` CEs in US and three in Canada.
+2. Show six CE–FRR and four FRR–Route Server sessions per region, the VIP at
+   both FRRs, and two effective client next hops.
+3. Send HTTP requests from each region's client through its BGP VIP and ILB
+   application VIP. Show the same owned origin response and healthy console
+   frontend. Keep Canadian traffic on the Canadian client and VIP.
+4. Stop one CE, demonstrate route withdrawal and continuous traffic, then
+   start it and show recovery. Repeat with one FRR to demonstrate one surviving
+   next hop. Use the lifecycle's sanitized failure and recovery receipts.
+5. Show AWS's three sites, six Connect peers, twelve sessions, workload/VIP
+   responses, and recovery receipts.
+6. Show the KVM CE's provider-owned SLO and physical-LAN SLI, FRR route, and
+   independent client response through its custom inside VIP. Verify the host
+   bridge and default route remain intact.
+7. Finish with the refresh-enabled zero-change plan from the second build.
 
-Then show it serving, from inside the VNet and with the `Host` header:
-
-```bash
-az vm run-command invoke \
-  -g "$(terraform output -raw resource_group_name)" \
-  -n "$(terraform output -raw client_vm_name)" \
-  --command-id RunShellScript --query "value[0].message" -o tsv \
-  --scripts "curl -s -o /dev/null -w '%{http_code}\n' \
-               -H 'Host: $(terraform output -raw lb_domain)' \
-               http://$(terraform output -raw vip)/"
-```
-
-<Aside type="caution" title="Do not demo it by typing the address into a browser">
-The load balancer matches on `Host`, so a bare-IP request returns **404** — on a completely
-healthy deployment. Either send the header, or resolve the domain to the VIP first. A 404 in
-front of an audience is hard to walk back from even though nothing is wrong.
-</Aside>
-
-## Suggested order
-
-<Steps>
-
-1. **Frame the 4-path hybrid architecture.** AWS and KVM demonstrate routed BGP; both Azure regions use supported ILB health and CE Site Console traffic while Route Server multihop remains explicitly deferred:
-   - **ROW (`eastus`)**: Azure Standard ILB (`enable_azure_ilb`)
-   - **Canada (`canadacentral`)**: Azure Standard ILB (`enable_canada_ilb`) and Canadian Regional Edge Virtual Site (`f5-sales-demo.ca`)
-   - **AWS (`ap-northeast-1`)**: AWS VPC + EC2 CEs (`m5.2xlarge`) (`aws.mcn-ce-ha.f5-sales-demo.com`)
-   - **On-Premise KVM**: One CE (`10.100.0.11`) and FRR ToR BGP router (`10.100.0.2`, ASN `65515`) on a local libvirt bridge; NAT gateway `10.100.0.1`, workload `10.100.0.100`.
-2. **Show the advertisement side.** Loop the peerings ([check 2](../verify/)) — each CE
-   advertising the same prefix with its own next hop, all with the same AS path, so none is
-   preferred.
-3. **Show what Azure, AWS, and FRR did with it.**
-   - In Azure: Effective route table showing one prefix with $N$ next hops (`type: VirtualNetworkGateway`).
-   - In On-Premise FRR: `vtysh -c "show ip bgp summary"` showing one Established CE peer, and `vtysh -c "show ip bgp 198.51.100.0/24"` showing the imported route. This one-node KVM deployment makes no ECMP claim.
-4. **Show regional data sovereignty & traffic localization.** Demonstrate how `xcsh_virtual_site.canada_re` uses `ves.io/city in (toronto, montreal)` to restrict ingress, egress, and TLS decryption for `f5-sales-demo.ca` strictly within Canadian Regional Edges.
-5. **Show Canadian ILB Architecture Variation (when `enable_canada_ilb = true`).** Show how Azure Standard ILB (`azurerm_lb.ca_ilb`) uses HA Ports (`protocol = "All"`) and Health Probes (`Tcp/65500`) to distribute traffic across Canadian CE management NICs without BGP.
-6. **Show it serving.** The `curl` commands, sending Host headers for `mcn-ce-ha.f5-sales-demo.com`, `mcn-ce-ha.f5-sales-demo.ca`, and `aws.mcn-ce-ha.f5-sales-demo.com`.
-7. **Show the configuration.** [The Terraform](../terraform/) is published here, read from
-   the files that deploy it — useful when someone asks whether this is reproducible.
-
-</Steps>
-
-## Failover evidence and remaining limits
-
-AWS acceptance stopped one CE: established BGP sessions fell from twelve to eight and
-returned to twelve after restart. The receipt includes 849 traffic samples, no retry-window
-VIP failures, and 26 separately reported raw transport transients. Three serial upgrades
-completed. This is not zero first-attempt loss or a universal recovery-time guarantee.
-
-Azure's dated route and traffic evidence does not establish its node-failure interval.
-Use [routing and failover](../../customer-edge/high-availability/routing-and-failover/)
-for the mechanism and the [AWS procedure](../../customer-edge/smsv2/aws-tgw-connect/)
-for the accepted rehearsal. Schedule live disruptions within the authorized demo window.
-
-The remaining Azure observations are scoped to the historical deployment:
-
-- **Traffic distribution across the next hops has not been measured.** The from-zero UAT sent
-  160 requests to the VIP, and earlier testing sent 1,470 more. The
-  [verify page](../verify/) establishes that the path
-  works and how it behaves over time. None of that shows how requests were spread across the
-  next hops, and this topology gives no per-node HTTP listener to attribute them with. If
-  asked "is it even?", the honest answer is that it has not been measured here.
-- **The cause of the fresh-build convergence transient is not established.** It is
-  characterized — when it happens, for how long, and that the origin is clean throughout —
-  and not explained.
-
-<Aside type="note" title="If you are presenting on a freshly built stack, wait">
-The VIP loses a small fraction of requests for roughly the first 45 minutes after the CEs
-reach `ONLINE`. It clears completely. Build the demo well before you need it, and re-run
-check 4 immediately beforehand.
-</Aside>
-
-<CardGrid>
-  <LinkCard
-    title="Prove it healthy"
-    description="The four checks, and the normal-looking results that read as an outage and are not."
-    href="../verify/"
-  />
-  <LinkCard
-    title="The Terraform"
-    description="The configuration itself, for the question about whether this is reproducible."
-    href="../terraform/"
-  />
-</CardGrid>
+The Canadian Regional Edge virtual site selects Toronto and Montreal, and
+its Customer Edge selector names only the Canadian sites. The selector alone
+is configuration evidence; pair it with Canadian client route and traffic
+receipts before describing the path as healthy.

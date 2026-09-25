@@ -16,9 +16,9 @@ run "site_and_interface_binding" {
     interface_name    = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
     mgmt_nic_mac      = "7c:1e:52:18:c1:77"
     ce_vm_instance_id = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
-    rs_peer_ips       = ["10.0.4.4", "10.0.4.5"]
+    peer_ips          = ["10.0.1.20", "10.0.1.21"]
     ce_asn            = 64512
-    rs_asn            = 65515
+    peer_asn          = 65020
     # enable_bgp left at its true default. It used to be forced false because the real
     # 71-char interface name asserted below exceeded the provider's object-ref name cap;
     # v3.74.0 relaxed that cap, so the real name now validates as an INPUT, not merely as

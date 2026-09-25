@@ -1,432 +1,80 @@
 ---
-title: Prove it healthy
-description: Execute four sequential validation checks to verify BGP peerings, route tables, application health, and common false-positive scenarios.
+title: Verify the deployed showcase
+description: Check the routed, internal load balancer, AWS, and physical LAN paths using current saved-plan and traffic receipts.
 sidebar:
   order: 30
   label: Verify
 ---
 
-import { Aside, Steps, CardGrid } from "@astrojs/starlight/components";
-import LinkCard from "@f5-sales-demo/docs-theme/components/LinkCard.astro";
+The complete lifecycle writes sanitized receipts outside the repository. Its
+last receipt must be a **refresh-enabled zero-change plan** from the second
+build. A successful apply or a static Terraform test does not establish a
+healthy showcase.
 
-Run these before you present. Each check narrows where a fault would be, so a failure tells
-you something rather than only that something is wrong.
+## Azure US and Canada
 
-Every command reads what it needs from the deployment. Set these once and the rest follow:
-
-```bash
-cd terraform
-RG=$(terraform output -raw resource_group_name)
-RS=$(terraform output -raw route_server_name)
-CLIENT=$(terraform output -raw client_vm_name)
-DOMAIN=$(terraform output -raw lb_domain)
-VIP=$(terraform output -raw vip)
-NIC=$(terraform output -raw client_nic_name)
-
-# Canada Regional Path variables (when enable_canada = true)
-CA_LB_DOMAIN=$(terraform output -raw ca_lb_domain)
-CA_VIP=$(terraform output -raw ca_vip)
-CA_RE_VSITE=$(terraform output -raw ca_re_virtual_site_name)
-CA_CE_VSITE=$(terraform output -raw ca_ce_virtual_site_name)
-
-# AWS Customer Edge Extension variables (when enable_aws = true)
-AWS_VPC_ID=$(terraform output -raw aws_vpc_id)
-AWS_LB_DOMAIN=$(terraform output -raw aws_lb_domain)
-AWS_VIP=$(terraform output -raw aws_vip)
-AWS_LB_NAME=$(terraform output -raw aws_loadbalancer_name)
-```
-
-## Platform evidence scope
-
-The checks below retain Azure observations through 2026-08-08. Final provider-v8 acceptance
-did not mutate or re-prove Azure end-to-end. Use the [AWS SMSv2 verification procedure](../../customer-edge/smsv2/aws-tgw-connect/#verify)
-for the accepted three-site, six-interface, six-Connect-peer, twelve-session topology.
-One AWS CE outage must leave eight sessions; recovery must restore twelve.
-
-[PR #1103](https://github.com/f5-sales-demo/multi-cloud-networking/pull/1103) records 849 traffic samples,
-no retry-window VIP failures, 26 raw transport transients, zero origin-control failures,
-three serial upgrades, and a refresh-enabled no-change plan. Keep those outcomes separate
-from the historical Azure checks below and from any unmeasured traffic distribution.
-
-## Four checks, in this order
-
-<Steps>
-
-1. **Every site is `ONLINE`.** Nothing downstream can be true if this is not.
-
-   ```bash
-   for s in $(terraform output -json xc_site_names | jq -r '.[]'); do
-     printf '%s -> ' "$s"
-     curl -sS -H "Authorization: APIToken $XCSH_API_TOKEN" \
-       "$XCSH_API_URL/api/config/namespaces/system/sites/$s" | jq -r '.spec.site_state'
-   done
-   ```
-
-   Observed 2026-08-08 after live deployment verification:
-
-   ```text
-   mcn-ce-ha-eastus01 -> ONLINE
-   mcn-ce-ha-eastus02 -> ONLINE
-   mcn-ce-ha-eastus03 -> ONLINE
-   ```
-
-2. **Every peering is learning that CE's VIP advertisement.** Query each peering
-   separately — see the first trap below, because this is where the demo most often looks
-   broken and is not.
-
-   ```bash
-   for k in $(terraform output -json xc_site_names | jq -r 'keys[]'); do
-     echo "--- ${k}-bgp"
-     az network routeserver peering list-learned-routes \
-       --name "${k}-bgp" --routeserver "$RS" -g "$RG" \
-       --query "RouteServiceRole_IN_0[?network=='${VIP}/32'].{net:network,nextHop:nextHop,asPath:asPath,origin:origin}" \
-       -o table
-   done
-   ```
-
-   Observed 2026-08-08 on live Azure Route Server peerings:
-
-   ```text
-   --- eastus01-bgp
-   Net             NextHop    AsPath    Origin
-   --------------  ---------  --------  --------
-   10.250.0.10/32  10.0.1.4   64512     EBgp
-   --- eastus02-bgp
-   Net             NextHop    AsPath    Origin
-   --------------  ---------  --------  --------
-   10.250.0.10/32  10.0.1.5   64512     EBgp
-   --- eastus03-bgp
-   Net             NextHop    AsPath    Origin
-   --------------  ---------  --------  --------
-   10.250.0.10/32  10.0.1.6   64512     EBgp
-   ```
-
-   Three peerings, three different next hops, one prefix. That is the advertisement side of
-   ECMP proven.
-
-3. **The client's effective routes carry every next hop.** This is the ECMP itself, as the
-   VNet has programmed it — not what the CEs claim, but what Azure did with it.
-
-   ```bash
-   az network nic show-effective-route-table -g "$RG" -n "$NIC" \
-     --query "value[?addressPrefix[0]=='${VIP}/32'].{prefix:addressPrefix[0],nh:nextHopIpAddress,type:nextHopType,state:state}" \
-     -o json
-   ```
-
-   Observed 2026-08-08 on client VM `mcn-ce-ha-client`:
-
-   ```json
-   [
-     {
-       "addressPrefix": [
-         "10.250.0.10/32"
-       ],
-       "nextHopIpAddress": [
-         "10.0.1.4",
-         "10.0.1.5",
-         "10.0.1.6"
-       ],
-       "nextHopType": "VirtualNetworkGateway",
-       "state": "Active"
-     }
-   ]
-   ```
-
-   `state: Active` with one entry per CE in `nh` is the check. **The order is not
-   significant and is not stable** — Azure returns them differently between calls, so count
-   them rather than comparing to a previous run. One next hop where you expect three means a
-   CE has stopped advertising, and step 2 identifies which.
-
-4. **The VIPs serve traffic.** From the client VM, and **with the `Host` header** — see the
-   second trap. Sample both the Rest of World (`f5-sales-demo.com`) and Canada (`f5-sales-demo.ca`) domains.
-
-   ```bash
-   az vm run-command invoke -g "$RG" -n "$CLIENT" \
-     --command-id RunShellScript --query "value[0].message" -o tsv \
-     --scripts "ok=0; fail=0
-                for i in \$(seq 1 30); do
-                  c=\$(curl -s -o /dev/null -m 5 -w '%{http_code}' \
-                        -H 'Host: ${DOMAIN}' http://${VIP}/)
-                  [ \"\$c\" = 200 ] && ok=\$((ok+1)) || fail=\$((fail+1))
-                done
-                echo \"ROW_DOMAIN_OK=\$ok ROW_DOMAIN_FAIL=\$fail\"
-                if [ -n \"${CA_LB_DOMAIN:-}\" ] && [ -n \"${CA_VIP:-}\" ]; then
-                  ca_ok=0; ca_fail=0
-                  for i in \$(seq 1 30); do
-                    c=\$(curl -s -o /dev/null -m 5 -w '%{http_code}' \
-                          -H 'Host: ${CA_LB_DOMAIN}' http://${CA_VIP}/)
-                    [ \"\$c\" = 200 ] && ca_ok=\$((ca_ok+1)) || ca_fail=\$((ca_fail+1))
-                  done
-                  echo \"CANADA_DOMAIN_OK=\$ca_ok CANADA_DOMAIN_FAIL=\$ca_fail\"
-                fi"
-   ```
-
-   Observed 2026-08-08 live HTTP response headers and body proxied by Customer Edge (`server: volt-adc`):
-
-   ```text
-   HTTP/1.1 200 OK
-   date: Sat, 08 Aug 2026 13:26:32 GMT
-   content-type: text/html
-   content-length: 1089
-   last-modified: Wed, 22 Jul 2026 02:38:45 GMT
-   vary: Accept-Encoding
-   etag: "6a602d35-441"
-   accept-ranges: bytes
-   x-envoy-upstream-service-time: 322
-   server: volt-adc
-
-   <!DOCTYPE html>
-   <html>
-   <head><title>Origin Server</title></head>
-   <body>
-   ```
-
-</Steps>
-
-## Trap: one peering shows one route, and that is correct
-
-`list-learned-routes` is scoped to the peering you name. It reports what **that** peer
-advertised, not the Route Server's whole table.
-
-So querying one peering alone returns a single VIP `/32` via a single next hop, and it is
-tempting to read that as "only one CE is advertising — the others are down". Nothing is
-down. The other advertisements are visible on their own peerings, which is what step 2 loops
-over.
-
-Confirming ECMP from a single peering query is not possible. Either loop every peering, or
-read the client's effective route table, which shows the merged result in one call.
-
-## Trap: a bare-IP request returns 404
-
-The load balancer matches on `Host`. The VIP is not a virtual server that serves anything to
-whoever connects to the address.
-
-Both of these came from the same run against the healthy deployment:
-
-```text
-curl -H "Host: $DOMAIN" http://$VIP/   ->  200   (60 of 60)
-curl                     http://$VIP/   ->  404
-```
-
-**A bare-IP 404 is proof the path works** — the request reached the CE, the CE's proxy
-answered, and it declined because no configured domain matched. Reading it as an outage
-sends you looking at BGP, where you will find nothing wrong.
-
-The same applies during a demo: if you type the address into a browser rather than resolving
-the domain to it, you get the 404.
-
-## A fresh deployment can have a convergence transient
-
-The 2026-08-03 from-zero UAT sent 160 VIP requests in four time-separated batches. Three
-requests failed in the first two batches; the final 80 were clean. The origin control was
-80 of 80 throughout. That proves convergence for this rebuild without attributing the early
-loss to the origin.
-
-Earlier measurements on 2026-07-28 showed the longer shape: the VIP lost a small fraction of
-requests for roughly the first 45 minutes after the CEs reached `ONLINE`, then served cleanly.
-Measured over 1,470
-requests from the client VM, all with the `Host` header:
-
-| Window | Requests | Failures | Rate |
-| --- | --- | --- | --- |
-| First ~45 minutes after ECMP came up | 570 | 12 | **2.11 %** |
-| The following 23 minutes | 900 | **0** | **0.00 %** |
-
-Every failure was `curl: (28)` — a timeout with zero bytes received — not an HTTP error
-status. The last one landed about 43 minutes after ECMP came up. Of the 900 clean requests,
-400 ran with a 30-second timeout and every one finished in under 2 seconds, so nothing was
-hidden by a short timeout.
-
-It reproduced again on a later rebuild on 2026-07-28, and that run is the clearer picture
-because it was sampled as the window elapsed rather than after it. 360 requests, all with
-the `Host` header, each batch paired with a control straight to the origin:
-
-| Time after `ONLINE` | Requests | Failures | Rate | Origin control |
-| --- | --- | --- | --- | --- |
-| immediately | 60 | 8 | **13.3 %** | 30/30 clean |
-| ~25–40 min (3 batches) | 180 | 3 | **1.67 %** | 60/60 clean |
-| ~50 min | 120 | **0** | **0.00 %** | 40/40 clean |
-
-Monotonically decreasing to zero, and the origin was clean in every batch — including the
-one where one VIP request in eight failed.
-
-**The origin was not the cause.** A control batch straight to the origin
-(`terraform output -raw origin_ip`, bypassing the VIP) ran 120 of 120 clean *concurrently
-with* failing VIP batches. The fault is somewhere in the VIP, ECMP or CE path.
-
-Two things this is deliberately not called:
-
-- **It is not a steady-state defect.** It clears completely and stays clear — 120 of 120 at
-  the 50-minute mark, and 60 of 60 on a stack that had been up for hours.
-- **Do not conclude it is absent from a small early sample.** A 60-request batch taken
-  immediately after one rebuild returned 60 of 60, which read as "no transient"; the same
-  deployment lost 8 of 60 an hour later on the next rebuild. Sixty requests is not enough
-  to see a bursty loss. Sample 100 or more, in batches separated in time — the table above
-  needed 360 to show the shape.
-- **It is not attributable to a particular CE.** Nothing in this topology gives a per-node
-  HTTP listener, so there is no way to bind a dropped request to the node that dropped it.
-  The CE outside interfaces have no HTTP listener at all — only the VIP `/32` answers.
-
-<Aside type="caution" title="Do not sample 40 requests and conclude it is fine">
-Batches of 40 to 50 read as 100 % most of the time even inside the failing window. That is
-how this was first mischaracterised as an ongoing low-rate fault and then as no fault at
-all. Sample 100 or more, in batches separated in time.
-</Aside>
-
-## Two more measurement traps
-
-Both produced confident wrong answers in this environment, and neither is obvious.
-
-- **Probe from inside the VNet, not from your workstation.** A corporate proxy can complete
-  the TCP handshake itself on common ports, so a workstation probe reports a port **open**
-  that is actually closed. Ports 80 and 443 read as open on the CE public addresses from a
-  workstation and are closed when probed from inside the VNet. Use the client VM.
-- **Port 22 on a CE answers on the internal (SLI) address only.** Probed from the client VM,
-  each CE's internal address returns an OpenSSH banner, while its management and external
-  addresses time out — as does an unused address used as a control. eth0 is renamed
-  `a-i-eth0` and carries no host IP, because the datapath owns it. So probing the address
-  you know the node by tells you nothing about the node's SSH state.
-
-<Aside type="danger" title="Never hardcode a CE internal address — they are reassigned on every rebuild">
-Azure does not preserve which CE gets which address in the internal subnet, and the
-addresses are not in node order. Observed 2026-07-28: the three addresses were not
-sequential and differed from the previous rebuild. Read the current mapping from Terraform;
-published documentation deliberately does not carry the deployment's values.
-
-What decides whether they move is the **NIC**, not the VM. Replacing the CE VMs alone
-leaves the NICs in place and every address survives: verified the same day, when adopting
-the derived object names replaced all three CE VMs and the three internal addresses came
-back identical. A teardown that removes the NICs reassigns them from the subnet's free
-pool, in whatever order Azure fills it.
-
-The test client's NIC sits in that same subnet, so an address you remember as a CE's may
-now belong to the client.
-
-Read them instead of remembering them:
+Run the regional verifier with the configured subscription, which may differ
+from the Azure CLI default:
 
 ```bash
-terraform output -json ce_sli_private_ips
+scripts/verify-deployment.sh \
+  --terraform-dir terraform \
+  --evidence-dir '<NEW_PRIVATE_EVIDENCE_DIRECTORY>' \
+  --subscription "$(terraform -chdir=terraform output -raw azure_subscription_id)" \
+  --skip-console
 ```
 
-Without Terraform state to hand, ask Azure by NIC name, which *is* stable:
+The verifier checks three registered `ONLINE` CEs in each region, Azure VM and
+password-extension readiness, and all three CE Site Console TCP/65500 backends.
+For each of the two FRR relays per region, it requires three direct CE sessions,
+two Route Server sessions, and the CE-learned application VIP `/32`. The
+regional client must have both FRR next hops for that VIP.
 
-```bash
-az network nic show -g "$RG" -n "<vm-name>-internal-nic" \
-  --query ipConfigurations[0].privateIPAddress -o tsv
-```
+It sends time-separated HTTP batches from each region's own client through the
+external BGP VIP, the inside ILB application frontend, and the origin control.
+The application ILB frontend is `.10` on the inside subnet and uses the
+separate private domain. Site Console uses `.11` and a nonfloating TCP/65500
+rule. The external and inside paths are independent; send the matching `Host`
+domain for each one.
 
-Connecting to a remembered address lands you on the wrong node, on a VM that is not a CE,
-or nowhere — and the last of those looks identical to "SSH is not enabled".
-</Aside>
+The lifecycle also runs `scripts/verify-azure-failover.sh`. In each region it
+stops one CE, confirms a direct session withdraws from the FRRs while traffic
+continues, starts the CE and confirms recovery, then does the same with one
+FRR. The client must have one VIP next hop during the FRR outage and two after
+recovery. The script restarts a stopped VM if a gate fails and stops the
+lifecycle for a source fix.
 
-## Confirm the on-box command surface still matches the docs
+The Canadian Regional Edge virtual site selects Toronto and Montreal, and the
+Canadian CE virtual site selects only Canadian sites. Traffic from the
+Canadian client through the Canadian VIP and ILB is required alongside those
+selectors; a selector alone is not live path evidence.
 
-```bash
-bash scripts/capture-sitecli.sh --check \
-  --site "$(terraform output -json xc_site_names | jq -r '.eastus01')" \
-  --node "$(terraform output -json ce_vm_names | jq -r '.eastus01')"
-```
+## AWS
 
-`--check` writes nothing, so it is safe against the live demo.
+The AWS UAT receipt requires three independent sites, six Connect peers,
+twelve established sessions, workload and VIP HTTP responses, and zero VIP
+failures in its sampled window. It stops one CE, expects eight sessions,
+proves traffic continuity, restarts that CE, and waits for twelve sessions.
+The final zero-change plan confirms the recovered deployment has no Terraform
+actions. Raw transport transients are reported separately from successful
+application retries.
 
-## On-Premise KVM & FRR BGP Verification
+## KVM physical LAN
 
-Only run this after Terraform has completed a saved KVM plan and F5 reports the
-site `ONLINE`. A running libvirt domain alone is not a successful CE deployment.
-The pinned provider resolves the image from the uniquely owned Site UID, with an
-exact UID response, HTTPS URL, MD5 check, and ownership recheck. Stop on any
-ambiguous ownership or failed integrity check; never overwrite another site or
-apply a plan other than the one reviewed.
+The lifecycle runs `scripts/verify-kvm-lan-client.py` after configuring the
+provider-owned SLI and custom inside VIP. It checks the distinct SLO and SLI
+identities, one registered `ONLINE` CE, and FRR BGP convergence. From the
+independent NUC client on `xckvmlan`, it confirms the VIP route uses the
+physical LAN address, private name resolution maps to the VIP, the
+Terraform-managed origin responds with its marker, and ten HTTP requests
+through the custom VIP return that marker. It checks that the client's
+default routes and the Ubuntu shared bridge/uplink remain intact.
 
-For a controlled KVM teardown, set `enable_kvm = false` and create a saved destroy
-plan. This removes only Terraform-owned KVM resources without evaluating the
-image data source; do not use `-target`, import, taint, or state editing.
+The shared `br-kvm-lan` bridge and `enp3s0` uplink are prerequisites outside
+Terraform ownership. The private LAN allocation record and the evidence
+receipts stay outside Git. Site health, BGP state, origin traffic, and client
+VIP traffic must all pass before the KVM path is called complete.
 
-When the On-Premise KVM extension is deployed, verify hypervisor domain state, ToR router eBGP peering status, and local network reachability:
-
-1. **Verify KVM virtual machine domain state**:
-
-   ```bash
-   virsh list --all
-   ```
-
-   Confirm the one KVM Customer Edge node (`onprem-ce-01`, `10.100.0.11`) is running and registered to the owned site.
-
-2. **Verify the single FRR BGP peering and imported route**:
-
-   ```bash
-   docker exec mcn-kvm-frr-router vtysh -c "show ip bgp summary"
-   docker exec mcn-kvm-frr-router vtysh -c "show ip bgp 198.51.100.0/24"
-   ```
-
-   Confirm one Established peer between the CE (`10.100.0.11`, ASN `64512`) and FRR (`10.100.0.2`, ASN `65515`). Verify the imported route `198.51.100.0/24`; one peer cannot demonstrate multipath.
-
-3. **Verify network reachability**:
-
-   ```bash
-   ping -c 3 10.100.0.2
-   for ip in 10.100.0.1 10.100.0.11 10.100.0.100; do
-     ping -c 2 "$ip"
-   done
-   ```
-
-   Confirm local ICMP reachability to FRR (`10.100.0.2`), NAT gateway (`10.100.0.1`), CE (`10.100.0.11`), and workload (`10.100.0.100`). Local LAN reachability and workload traffic still require independent live acceptance (#1227); do not infer them from BGP status.
-
-## AWS Customer Edge Verification
-
-When the AWS Customer Edge extension is deployed (`enable_aws = true`), verify EC2 node instances, F5 XC site state, and HTTP load balancer routing:
-
-1. **Verify EC2 Customer Edge Instance States**:
-
-   ```bash
-   aws ec2 describe-instances --region ap-northeast-1 \
-     --instance-ids $(terraform output -json aws_ce_instance_ids | jq -r '.[]') \
-     --query "Reservations[*].Instances[*].{InstanceId:InstanceId,State:State.Name,PublicIp:PublicIpAddress,PrivateIp:PrivateIpAddress}" \
-     -o table
-   ```
-
-2. **Verify AWS SecureMesh v2 Site and Load Balancer State in F5 XC**:
-
-   ```bash
-   terraform output -json aws_site_names | jq -r 'to_entries | sort_by(.key) | .[].value' |
-   while IFS= read -r site; do
-     printf 'header = "Authorization: APIToken %s"\n' "$XCSH_API_TOKEN" |
-       curl -sS --config - \
-         "$XCSH_API_URL/api/config/namespaces/system/securemesh_site_v2s/$site" |
-       jq -r '.spec.site_state'
-   done
-
-   curl -sS -H "Authorization: APIToken $XCSH_API_TOKEN" \
-     "$XCSH_API_URL/api/config/namespaces/multi-cloud-networking/http_loadbalancers/$AWS_LB_NAME" | jq -r '.spec.state'
-   ```
-
-## Automated UAT verification script
-
-Automate the four health checks and traffic convergence sampling end-to-end with `scripts/verify-deployment.sh`:
-
-```bash
-bash scripts/verify-deployment.sh --evidence-dir /private/path/mcn-evidence
-```
-
-The script executes all checks against the live deployment, writes `summary.json`, `terraform-version.json`, and `terraform-output.json` to the specified private evidence directory, and exits zero when traffic has converged:
-
-| Flag | Purpose | Default |
-| --- | --- | --- |
-| `--evidence-dir <dir>` | Required path for JSON output artifacts (must be empty and outside git). | None |
-| `--skip-console` | Skips the Azure Bastion Site Console password authentication test. | Enabled |
-| `--samples-per-batch <N>` | Number of VIP HTTP requests per time-separated sampling batch. | `40` |
-| `--max-batches <N>` | Maximum sampling batches before timing out (requires at least 3). | `12` |
-| `--batch-interval <sec>` | Delay between time-separated traffic sampling batches. | `300` |
-
-<CardGrid>
-  <LinkCard
-    title="Reaching a Customer Edge"
-    description="Which access route applies, the credentials each needs, and why the choice is not a preference."
-    href="../../customer-edge/access/"
-  />
-  <LinkCard
-    title="BGP commands"
-    description="The on-box view from FRR — peering state, the full table, and what this node advertises."
-    href="../../customer-edge/commands/network/bgp/"
-  />
-</CardGrid>
+Observed 2026-08-08 Azure route and traffic samples and earlier AWS acceptance
+were for previous source and topology. Use the current deployment's receipts
+for presentation and failure claims.

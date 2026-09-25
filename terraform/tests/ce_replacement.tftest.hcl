@@ -37,9 +37,9 @@ run "site_is_keyed_to_the_ce_vm_instance_id" {
     interface_name    = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
     mgmt_nic_mac      = "7c:1e:52:18:c1:77"
     ce_vm_instance_id = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
-    rs_peer_ips       = ["10.0.4.4", "10.0.4.5"]
+    peer_ips          = ["10.0.1.20", "10.0.1.21"]
     ce_asn            = 64512
-    rs_asn            = 65515
+    peer_asn          = 65020
     # Not under test here; bgp.tftest.hcl covers the peer wiring.
     enable_bgp           = false
     approve_registration = false
@@ -79,9 +79,9 @@ run "a_different_instance_yields_a_different_key" {
     interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
     mgmt_nic_mac         = "7c:1e:52:18:c1:77"
     ce_vm_instance_id    = "81ab781d-36e0-42b0-aa3b-f1ba2c935e24"
-    rs_peer_ips          = ["10.0.4.4", "10.0.4.5"]
+    peer_ips             = ["10.0.1.20", "10.0.1.21"]
     ce_asn               = 64512
-    rs_asn               = 65515
+    peer_asn             = 65515
     enable_bgp           = false
     approve_registration = false
   }

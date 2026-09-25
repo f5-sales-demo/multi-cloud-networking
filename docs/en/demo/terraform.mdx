@@ -44,8 +44,9 @@ import modulesAzureHubMain from "../../_data/terraform/modules/azure-hub/main.tf
 import modulesAzureHubOutputs from "../../_data/terraform/modules/azure-hub/outputs.tf?raw";
 import modulesAzureHubVariables from "../../_data/terraform/modules/azure-hub/variables.tf?raw";
 import modulesAzureHubVersions from "../../_data/terraform/modules/azure-hub/versions.tf?raw";
-import modulesAzureRouteServerBgpMain from "../../_data/terraform/modules/azure-route-server-bgp/main.tf?raw";
-import modulesAzureRouteServerBgpVersions from "../../_data/terraform/modules/azure-route-server-bgp/versions.tf?raw";
+import modulesAzureFrrMain from "../../_data/terraform/modules/azure-frr/main.tf?raw";
+import modulesAzureFrrCloudInit from "../../_data/terraform/modules/azure-frr/cloud-init.yaml.tftpl?raw";
+import modulesAzureFrrVersions from "../../_data/terraform/modules/azure-frr/versions.tf?raw";
 import modulesCeNodeMain from "../../_data/terraform/modules/ce-node/main.tf?raw";
 import modulesCeNodeOutputs from "../../_data/terraform/modules/ce-node/outputs.tf?raw";
 import modulesCeNodeVariables from "../../_data/terraform/modules/ce-node/variables.tf?raw";
@@ -109,7 +110,7 @@ uses the F5-issued KVM appliance URL from `xcsh_site_image`, never a generic clo
 OS image.
 
 <Aside type="caution" title="KVM image resolution">
-The pinned `xcsh` v11.0.2 provider resolves the appliance from exactly one Site UID
+The pinned `xcsh` v11.3.0 provider resolves the appliance from exactly one Site UID
 owned by the named Secure Mesh Site v2 configuration. It checks the exact UID response
 from `/api/maurice/software_os_version`, the empty error status, HTTPS image URL,
 MD5, and ownership again before use. An ambiguous owner or incomplete mapping stops
@@ -250,7 +251,7 @@ Tenant, app namespace, load balancer, origin pool and the VIP.
 
 ### `terraform/versions.tf`
 
-Terraform floor and provider constraints. The xcsh provider is pinned exactly to the v11.0.2 release; the unified root lock file is committed and CI uses it read-only.
+Terraform floor and provider constraints. The xcsh provider is pinned exactly to the v11.3.0 release; the unified root lock file is committed and CI uses it read-only.
 
 <Code code={versions} lang="hcl" title="terraform/versions.tf" />
 
@@ -280,13 +281,16 @@ Resource group, hub VNet, the four subnets, the Azure Route Server and the optio
 
 <Code code={modulesAzureHubVersions} lang="hcl" title="terraform/modules/azure-hub/versions.tf" />
 
-### `terraform/modules/azure-route-server-bgp/`
+### `terraform/modules/azure-frr/`
 
-The Azure side of each eBGP session — one bgpConnection per CE, peering the Route Server to that CE eth0/SLO address.
+Two forwarding FRR routers per region. Each peers with all three CEs and both
+Route Server endpoints, and exports only the region's CE-learned VIP `/32`.
 
-<Code code={modulesAzureRouteServerBgpMain} lang="hcl" title="terraform/modules/azure-route-server-bgp/main.tf" />
+<Code code={modulesAzureFrrMain} lang="hcl" title="terraform/modules/azure-frr/main.tf" />
 
-<Code code={modulesAzureRouteServerBgpVersions} lang="hcl" title="terraform/modules/azure-route-server-bgp/versions.tf" />
+<Code code={modulesAzureFrrCloudInit} lang="yaml" title="terraform/modules/azure-frr/cloud-init.yaml.tftpl" />
+
+<Code code={modulesAzureFrrVersions} lang="hcl" title="terraform/modules/azure-frr/versions.tf" />
 
 ### `terraform/modules/ce-node/`
 

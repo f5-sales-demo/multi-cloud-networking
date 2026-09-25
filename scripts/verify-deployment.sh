@@ -18,6 +18,7 @@ MAX_BATCHES=12
 BATCH_INTERVAL=300
 CHECK_CONSOLE=1
 CONTEXT="${XCSH_CONTEXT:-f5-sales-demo}"
+AZURE_SUBSCRIPTION=""
 
 die() {
   printf 'error: %s\n' "$*" >&2
@@ -55,6 +56,10 @@ while [ "$#" -gt 0 ]; do
     CONTEXT="${2:?--context needs a value}"
     shift 2
     ;;
+  --subscription)
+    AZURE_SUBSCRIPTION="${2:?--subscription needs a value}"
+    shift 2
+    ;;
   --skip-console)
     CHECK_CONSOLE=0
     shift
@@ -65,6 +70,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 [ -n "$EVIDENCE_DIR" ] || die "--evidence-dir is required"
+[ -n "$AZURE_SUBSCRIPTION" ] || die "--subscription is required"
 case "$SAMPLES_PER_BATCH:$MAX_BATCHES:$BATCH_INTERVAL" in
 *[!0-9:]* | *::* | :* | *:) die "sample and interval values must be non-negative integers" ;;
 esac
@@ -78,6 +84,9 @@ fi
 for command_name in terraform jq curl az; do
   command -v "$command_name" >/dev/null 2>&1 || die "$command_name is required"
 done
+command az account show --subscription "$AZURE_SUBSCRIPTION" --query state --output tsv | grep -qx Enabled ||
+  die "configured Azure subscription is not enabled"
+az() { command az "$@" --subscription "$AZURE_SUBSCRIPTION"; }
 
 mkdir -p "$EVIDENCE_DIR"
 EVIDENCE_DIR=$(cd "$EVIDENCE_DIR" && pwd)
@@ -142,7 +151,6 @@ az_vm_run_command() {
 
 STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 "${TF[@]}" version -json >"${EVIDENCE_DIR}/terraform-version.json"
-"${TF[@]}" output -json >"${EVIDENCE_DIR}/terraform-output.json"
 
 SITES=$(tf_json xc_site_names)
 CA_SITES=$(tf_json ca_xc_site_names)
@@ -171,6 +179,12 @@ CA_RG=$(tf_raw ca_resource_group_name)
 CA_CLIENT=$(tf_raw ca_client_vm_name)
 US_ILB=$(tf_raw azure_ilb_private_ip)
 CA_ILB=$(tf_raw canada_ilb_private_ip)
+US_CONSOLE_ILB=$(tf_raw azure_ilb_console_ip)
+CA_CONSOLE_ILB=$(tf_raw canada_ilb_console_ip)
+US_INSIDE_DOMAIN=$(tf_raw azure_ilb_application_domain)
+CA_INSIDE_DOMAIN=$(tf_raw canada_ilb_application_domain)
+US_VIP=$(tf_raw vip)
+CA_VIP=$(tf_raw ca_vip)
 DOMAIN=$(tf_raw lb_domain)
 CA_DOMAIN=$(tf_raw ca_lb_domain)
 ORIGIN=$(tf_raw origin_ip)
@@ -253,62 +267,142 @@ verify_ilb_endpoint() {
   printf '%s_ilb_reachable=yes\n' "$region"
 }
 
-verify_ilb_endpoint us "$RG" "$CLIENT" "$US_ILB"
-verify_ilb_endpoint canada "$CA_RG" "$CA_CLIENT" "$CA_ILB"
+verify_ilb_endpoint us "$RG" "$CLIENT" "$US_CONSOLE_ILB"
+verify_ilb_endpoint canada "$CA_RG" "$CA_CLIENT" "$CA_CONSOLE_ILB"
+
+verify_console_backends() {
+  local region=$1 rg=$2 client=$3 ips_json=$4 script="set -eu; healthy=0; " ip message
+  jq -e 'length == 3 and all(.[]; type == "string" and test("^[0-9.]+$"))' <<<"$ips_json" >/dev/null ||
+    die "${region} console backend inventory is invalid"
+  while IFS= read -r ip; do
+    script+="timeout 10 bash -c '</dev/tcp/${ip}/65500'; healthy=\$((healthy+1)); "
+  done < <(jq -r '.[]' <<<"$ips_json")
+  script+='echo MCN_CONSOLE_BACKENDS healthy=$healthy'
+  message=$(az_vm_run_command --resource-group "$rg" --name "$client" \
+    --command-id RunShellScript --query 'value[0].message' --output tsv --scripts "$script")
+  grep -qF 'MCN_CONSOLE_BACKENDS healthy=3' <<<"$message" ||
+    die "${region} does not have three reachable Site Console backends"
+  printf '%s_console_backends=3/3\n' "$region"
+}
+
+verify_console_backends us "$RG" "$CLIENT" "$(tf_json ce_sli_private_ips | jq -c '[.[]]')"
+verify_console_backends canada "$CA_RG" "$CA_CLIENT" "$(tf_json canada_ce_sli_private_ips | jq -c '[.[]]')"
+
+verify_region_routing() {
+  local region=$1 resource_group=$2 client_nic=$3 vip=$4 ce_ips_json=$5 rs_ips_json=$6 frr_names_json=$7 frr_ips_json=$8
+  local frr_name message result ce_count rs_count vip_count route_json
+  [ "$(jq 'length' <<<"$frr_names_json")" -eq 2 ] || die "${region} requires two FRR VMs"
+  [ "$(jq 'length' <<<"$frr_ips_json")" -eq 2 ] || die "${region} requires two FRR peer addresses"
+  jq -e 'length == 3 and all(.[]; type == "string" and test("^[0-9.]+$"))' <<<"$ce_ips_json" >/dev/null || die "${region} CE peer inventory is invalid"
+  jq -e 'length == 2 and all(.[]; type == "string" and test("^[0-9.]+$"))' <<<"$rs_ips_json" >/dev/null || die "${region} Route Server peer inventory is invalid"
+  local remote_script
+  remote_script=$(cat <<PY
+python3 - <<'MCN_PY'
+import json, subprocess
+ce_ips = set(json.loads('${ce_ips_json}'))
+rs_ips = set(json.loads('${rs_ips_json}'))
+vip = '${vip}/32'
+def vtysh(*args):
+    return json.loads(subprocess.check_output(['vtysh', '-c', ' '.join(args)], timeout=20))
+summary = vtysh('show', 'bgp', 'ipv4', 'unicast', 'summary', 'json')
+peers = summary.get('ipv4Unicast', summary).get('peers', {})
+def established(ip):
+    peer = peers.get(ip, {})
+    return peer.get('state', peer.get('bgpState')) == 'Established'
+routes = vtysh('show', 'bgp', 'ipv4', 'unicast', vip, 'json')
+paths = routes.get('routes', {}).get(vip, routes.get('paths', routes.get(vip, [])))
+if isinstance(paths, dict): paths = [paths]
+learned = any(ip in str(path.get('peerId', path.get('nexthops', ''))) for path in paths for ip in ce_ips) if isinstance(paths, list) else False
+print('MCN_FRR ce_established=%d rs_established=%d vip_learned=%d' %
+      (sum(established(ip) for ip in ce_ips), sum(established(ip) for ip in rs_ips), int(learned)))
+MCN_PY
+PY
+)
+  while IFS= read -r frr_name; do
+    message=$(az_vm_run_command --resource-group "$resource_group" --name "$frr_name" \
+      --command-id RunShellScript --query 'value[0].message' --output tsv --scripts "$remote_script")
+    result=$(grep -Eo 'MCN_FRR ce_established=[0-9]+ rs_established=[0-9]+ vip_learned=[01]' <<<"$message" | tail -n 1)
+    [ -n "$result" ] || die "${region} FRR did not return BGP evidence"
+    read -r ce_count rs_count vip_count < <(sed -E 's/.*ce_established=([0-9]+) rs_established=([0-9]+) vip_learned=([01]).*/\1 \2 \3/' <<<"$result")
+    [ "$ce_count" -eq 3 ] && [ "$rs_count" -eq 2 ] && [ "$vip_count" -eq 1 ] ||
+      die "${region} FRR sessions or CE-learned VIP are unhealthy"
+  done < <(jq -r '.[]' <<<"$frr_names_json")
+  route_json=$(az network nic show-effective-route-table --resource-group "$resource_group" --name "$client_nic" --output json)
+  jq -e --arg vip "${vip}/32" --argjson peers "$frr_ips_json" '
+    [.value[]? | select(any(.addressPrefix[]?; . == $vip)) |
+      .nextHopIpAddress | if type == "array" then .[] else . end] |
+      map(select(type == "string" and length > 0)) | unique | sort == ($peers | sort)' \
+    <<<"$route_json" >/dev/null || die "${region} client lacks both FRR VIP next hops"
+  printf '%s_routing=ce_frr_6/6,frr_rs_4/4,vip_2/2,next_hops_2/2\n' "$region"
+}
+
+verify_region_routing us "$RG" "$(tf_raw client_nic_name)" "$US_VIP" \
+  "$(tf_json ce_mgmt_private_ips | jq -c '[.[]]')" "$(tf_json route_server_peer_ips)" \
+  "$(tf_json azure_frr_vm_names)" "$(tf_json azure_frr_peer_ips)"
+verify_region_routing canada "$CA_RG" "$(tf_raw canada_client_nic_name)" "$CA_VIP" \
+  "$(tf_json canada_ce_mgmt_private_ips | jq -c '[.[]]')" "$(tf_json canada_route_server_peer_ips)" \
+  "$(tf_json canada_frr_vm_names)" "$(tf_json canada_frr_peer_ips)"
 
 vip_ok=0
 vip_fail=0
 ca_lb_ok=0
 ca_lb_fail=0
+us_ilb_ok=0
+us_ilb_fail=0
+ca_ilb_ok=0
+ca_ilb_fail=0
 origin_ok=0
 origin_fail=0
 zero_streak=0
 batches=0
 converged=false
-origin_samples=$((SAMPLES_PER_BATCH / 2))
-[ "$origin_samples" -ge 20 ] || origin_samples=20
+
+probe_region() {
+  local region=$1 resource_group=$2 client=$3 domain=$4 vip=$5 inside_domain=$6 ilb_ip=$7
+  local remote_script message result
+  remote_script="set -u; vip_ok=0; vip_fail=0; ilb_ok=0; ilb_fail=0; origin_ok=0; origin_fail=0; \
+for i in \$(seq 1 ${SAMPLES_PER_BATCH}); do \
+origin_body=\$(curl -fsS -m 10 'http://${ORIGIN}/' 2>/dev/null || true); \
+if [ -n \"\$origin_body\" ]; then origin_ok=\$((origin_ok+1)); else origin_fail=\$((origin_fail+1)); fi; \
+body=\$(curl -fsS -m 10 --resolve '${domain}:80:${vip}' 'http://${domain}/' 2>/dev/null || true); \
+if [ -n \"\$origin_body\" ] && [ \"\$body\" = \"\$origin_body\" ]; then vip_ok=\$((vip_ok+1)); else vip_fail=\$((vip_fail+1)); fi; \
+body=\$(curl -fsS -m 10 --resolve '${inside_domain}:80:${ilb_ip}' 'http://${inside_domain}/' 2>/dev/null || true); \
+if [ -n \"\$origin_body\" ] && [ \"\$body\" = \"\$origin_body\" ]; then ilb_ok=\$((ilb_ok+1)); else ilb_fail=\$((ilb_fail+1)); fi; \
+done; echo MCN_REGION region=${region} vip_ok=\$vip_ok vip_fail=\$vip_fail ilb_ok=\$ilb_ok ilb_fail=\$ilb_fail origin_ok=\$origin_ok origin_fail=\$origin_fail"
+  message=$(az_vm_run_command --resource-group "$resource_group" --name "$client" \
+    --command-id RunShellScript --query 'value[0].message' --output tsv --scripts "$remote_script")
+  result=$(grep -Eo "MCN_REGION region=${region} vip_ok=[0-9]+ vip_fail=[0-9]+ ilb_ok=[0-9]+ ilb_fail=[0-9]+ origin_ok=[0-9]+ origin_fail=[0-9]+" <<<"$message" | tail -n 1)
+  [ -n "$result" ] || die "${region} client traffic verifier returned no aggregate result"
+  read -r region_vip_ok region_vip_fail region_ilb_ok region_ilb_fail region_origin_ok region_origin_fail < <(
+    sed -E 's/.*vip_ok=([0-9]+) vip_fail=([0-9]+) ilb_ok=([0-9]+) ilb_fail=([0-9]+) origin_ok=([0-9]+) origin_fail=([0-9]+).*/\1 \2 \3 \4 \5 \6/' <<<"$result")
+  [ $((region_vip_ok + region_vip_fail)) -eq "$SAMPLES_PER_BATCH" ] || die "${region} VIP sample count differs"
+  [ $((region_ilb_ok + region_ilb_fail)) -eq "$SAMPLES_PER_BATCH" ] || die "${region} ILB sample count differs"
+  [ $((region_origin_ok + region_origin_fail)) -eq "$SAMPLES_PER_BATCH" ] || die "${region} origin sample count differs"
+  printf 'batch=%s region=%s vip_ok=%s vip_fail=%s ilb_ok=%s ilb_fail=%s origin_ok=%s origin_fail=%s\n' \
+    "$batches" "$region" "$region_vip_ok" "$region_vip_fail" "$region_ilb_ok" "$region_ilb_fail" "$region_origin_ok" "$region_origin_fail"
+}
 
 while [ "$batches" -lt "$MAX_BATCHES" ]; do
   batches=$((batches + 1))
-  remote_script=$(printf '%s' \
-    "vip_ok=0; vip_fail=0; ca_lb_ok=0; ca_lb_fail=0; origin_ok=0; origin_fail=0; " \
-    "for i in \$(seq 1 ${SAMPLES_PER_BATCH}); do code=\$(curl -sS -o /dev/null -m 10 -w '%{http_code}' 'http://${DOMAIN}/' || true); if [ \"\$code\" = 200 ]; then vip_ok=\$((vip_ok+1)); else vip_fail=\$((vip_fail+1)); fi; done; " \
-    "for i in \$(seq 1 ${SAMPLES_PER_BATCH}); do code=\$(curl -sS -o /dev/null -m 10 -w '%{http_code}' 'http://${CA_DOMAIN}/' || true); if [ \"\$code\" = 200 ]; then ca_lb_ok=\$((ca_lb_ok+1)); else ca_lb_fail=\$((ca_lb_fail+1)); fi; done; " \
-    "for i in \$(seq 1 ${origin_samples}); do code=\$(curl -sS -o /dev/null -m 10 -w '%{http_code}' 'http://${ORIGIN}/' || true); if [ \"\$code\" = 200 ]; then origin_ok=\$((origin_ok+1)); else origin_fail=\$((origin_fail+1)); fi; done; " \
-    "echo MCN_UAT vip_ok=\$vip_ok vip_fail=\$vip_fail ca_lb_ok=\$ca_lb_ok ca_lb_fail=\$ca_lb_fail origin_ok=\$origin_ok origin_fail=\$origin_fail")
-  message=$(az_vm_run_command \
-    --resource-group "$RG" \
-    --name "$CLIENT" \
-    --command-id RunShellScript \
-    --query 'value[0].message' \
-    --output tsv \
-    --scripts "$remote_script")
-  result=$(grep -Eo 'MCN_UAT vip_ok=[0-9]+ vip_fail=[0-9]+ ca_lb_ok=[0-9]+ ca_lb_fail=[0-9]+ origin_ok=[0-9]+ origin_fail=[0-9]+' <<<"$message" | tail -n 1)
-  [ -n "$result" ] || die "client traffic verifier returned no aggregate result"
-  batch_vip_ok=$(sed -E 's/.*vip_ok=([0-9]+).*/\1/' <<<"$result")
-  batch_vip_fail=$(sed -E 's/.*vip_fail=([0-9]+).*/\1/' <<<"$result")
-  batch_ca_lb_ok=$(sed -E 's/.*ca_lb_ok=([0-9]+).*/\1/' <<<"$result")
-  batch_ca_lb_fail=$(sed -E 's/.*ca_lb_fail=([0-9]+).*/\1/' <<<"$result")
-  batch_origin_ok=$(sed -E 's/.*origin_ok=([0-9]+).*/\1/' <<<"$result")
-  batch_origin_fail=$(sed -E 's/.*origin_fail=([0-9]+).*/\1/' <<<"$result")
-  [ $((batch_vip_ok + batch_vip_fail)) -eq "$SAMPLES_PER_BATCH" ] || die "load-balancer batch returned the wrong sample count"
-  [ $((batch_ca_lb_ok + batch_ca_lb_fail)) -eq "$SAMPLES_PER_BATCH" ] || die "Canadian load-balancer batch returned the wrong sample count"
-  [ $((batch_origin_ok + batch_origin_fail)) -eq "$origin_samples" ] || die "origin batch returned the wrong sample count"
-  [ "$batch_origin_fail" -eq 0 ] || die "origin control failed; load-balancer results are not attributable"
-  vip_ok=$((vip_ok + batch_vip_ok))
-  vip_fail=$((vip_fail + batch_vip_fail))
-  ca_lb_ok=$((ca_lb_ok + batch_ca_lb_ok))
-  ca_lb_fail=$((ca_lb_fail + batch_ca_lb_fail))
-  origin_ok=$((origin_ok + batch_origin_ok))
-  origin_fail=$((origin_fail + batch_origin_fail))
-  if [ "$batch_vip_fail" -eq 0 ] && [ "$batch_ca_lb_fail" -eq 0 ]; then
-    zero_streak=$((zero_streak + 1))
-  else
-    zero_streak=0
-  fi
-  printf 'batch=%s vip_ok=%s vip_fail=%s ca_lb_ok=%s ca_lb_fail=%s origin_ok=%s origin_fail=%s\n' \
-    "$batches" "$batch_vip_ok" "$batch_vip_fail" "$batch_ca_lb_ok" "$batch_ca_lb_fail" "$batch_origin_ok" "$batch_origin_fail"
-  if [ $((vip_ok + vip_fail)) -ge 100 ] && [ "$batches" -ge 3 ] && [ "$zero_streak" -ge 2 ]; then
+  probe_region us "$RG" "$CLIENT" "$DOMAIN" "$US_VIP" "$US_INSIDE_DOMAIN" "$US_ILB"
+  vip_ok=$((vip_ok + region_vip_ok))
+  vip_fail=$((vip_fail + region_vip_fail))
+  us_ilb_ok=$((us_ilb_ok + region_ilb_ok))
+  us_ilb_fail=$((us_ilb_fail + region_ilb_fail))
+  origin_ok=$((origin_ok + region_origin_ok))
+  origin_fail=$((origin_fail + region_origin_fail))
+  batch_fail=$((region_vip_fail + region_ilb_fail + region_origin_fail))
+  probe_region canada "$CA_RG" "$CA_CLIENT" "$CA_DOMAIN" "$CA_VIP" "$CA_INSIDE_DOMAIN" "$CA_ILB"
+  ca_lb_ok=$((ca_lb_ok + region_vip_ok))
+  ca_lb_fail=$((ca_lb_fail + region_vip_fail))
+  ca_ilb_ok=$((ca_ilb_ok + region_ilb_ok))
+  ca_ilb_fail=$((ca_ilb_fail + region_ilb_fail))
+  origin_ok=$((origin_ok + region_origin_ok))
+  origin_fail=$((origin_fail + region_origin_fail))
+  batch_fail=$((batch_fail + region_vip_fail + region_ilb_fail + region_origin_fail))
+  if [ "$batch_fail" -eq 0 ]; then zero_streak=$((zero_streak + 1)); else zero_streak=0; fi
+  if [ $((vip_ok + vip_fail)) -ge 100 ] && [ $((ca_lb_ok + ca_lb_fail)) -ge 100 ] &&
+    [ "$batches" -ge 3 ] && [ "$zero_streak" -ge 2 ]; then
     converged=true
     break
   fi
@@ -374,11 +468,17 @@ jq -n \
   --argjson password_extensions_succeeded "$password_extensions_succeeded" \
   --arg us_ilb_reachable "yes" \
   --arg canada_ilb_reachable "yes" \
+  --argjson us_console_backends 3 \
+  --argjson canada_console_backends 3 \
   --argjson batches "$batches" \
   --argjson vip_samples "$((vip_ok + vip_fail))" \
   --argjson vip_failures "$vip_fail" \
   --argjson ca_lb_samples "$((ca_lb_ok + ca_lb_fail))" \
   --argjson ca_lb_failures "$ca_lb_fail" \
+  --argjson us_ilb_samples "$((us_ilb_ok + us_ilb_fail))" \
+  --argjson us_ilb_failures "$us_ilb_fail" \
+  --argjson ca_ilb_samples "$((ca_ilb_ok + ca_ilb_fail))" \
+  --argjson ca_ilb_failures "$ca_ilb_fail" \
   --argjson origin_samples "$((origin_ok + origin_fail))" \
   --argjson origin_failures "$origin_fail" \
   --argjson console_factory_rejected "$console_factory_rejected" \
@@ -392,11 +492,17 @@ jq -n \
     password_extensions_succeeded: $password_extensions_succeeded,
     us_ilb_reachable: $us_ilb_reachable,
     canada_ilb_reachable: $canada_ilb_reachable,
+    us_console_backends: $us_console_backends,
+    canada_console_backends: $canada_console_backends,
     batches: $batches,
     vip_samples: $vip_samples,
     vip_failures: $vip_failures,
     ca_lb_samples: $ca_lb_samples,
     ca_lb_failures: $ca_lb_failures,
+    us_ilb_samples: $us_ilb_samples,
+    us_ilb_failures: $us_ilb_failures,
+    ca_ilb_samples: $ca_ilb_samples,
+    ca_ilb_failures: $ca_ilb_failures,
     origin_samples: $origin_samples,
     origin_failures: $origin_failures,
     console_factory_rejected: $console_factory_rejected,
@@ -406,6 +512,8 @@ jq -n \
 
 printf 'vip_samples=%s vip_failures=%s\n' "$((vip_ok + vip_fail))" "$vip_fail"
 printf 'ca_lb_samples=%s ca_lb_failures=%s\n' "$((ca_lb_ok + ca_lb_fail))" "$ca_lb_fail"
+printf 'us_ilb_samples=%s us_ilb_failures=%s\n' "$((us_ilb_ok + us_ilb_fail))" "$us_ilb_fail"
+printf 'ca_ilb_samples=%s ca_ilb_failures=%s\n' "$((ca_ilb_ok + ca_ilb_fail))" "$ca_ilb_fail"
 printf 'origin_samples=%s origin_failures=%s\n' "$((origin_ok + origin_fail))" "$origin_fail"
 if [ "$converged" = true ]; then
   echo 'converged=yes'

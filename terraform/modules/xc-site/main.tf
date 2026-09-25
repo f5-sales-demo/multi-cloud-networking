@@ -224,9 +224,8 @@ resource "xcsh_registration_approval" "this" {
   depends_on = [xcsh_securemesh_site_v2.this]
 }
 
-# One bgp object per CE site: eBGP from the CE (ASN var.ce_asn) to the Azure
-# Route Server (ASN var.rs_asn), one external peer per Route Server virtual
-# router IP, each bound to the explicit SLO interface.
+# One bgp object per CE site: eBGP from the CE (ASN var.ce_asn) to two regional FRR routers
+# (ASN var.peer_asn), one external peer per router IP, each bound to the explicit SLO interface.
 #
 # NOT BLOCKED — and nothing about this arm is gated any more. The object-ref name
 # length limit that used to block it is gone: the provider relaxed it to
@@ -270,15 +269,15 @@ resource "xcsh_bgp" "this" {
   # rs_peer_ips. The IP values may be unknown until the Route Server is applied,
   # but the number of peers is fixed, so the block expands cleanly at plan time.
   dynamic "peers" {
-    for_each = { for i in range(var.rs_peer_count) : "azure-rrs-${i + 1}" => i }
+    for_each = { for i in range(var.peer_count) : "azure-frr-${i + 1}" => i }
     content {
       metadata {
         name = peers.key
       }
 
       external {
-        asn     = var.rs_asn
-        address = try(var.rs_peer_ips[peers.value], "")
+        asn     = var.peer_asn
+        address = try(var.peer_ips[peers.value], "")
         port    = var.peer_port
 
         interface {

@@ -32,13 +32,13 @@ variable "enable_azure" {
 # ---------------------------------------------------------
 
 variable "enable_canada_ilb" {
-  description = "Deploy Azure Internal Load Balancer (ILB) in front of Canadian CEs as an alternative to Azure Route Server (eBGP/ECMP)."
+  description = "Deploy the Canadian inside application and Site Console ILB frontends alongside the BGP path."
   type        = bool
   default     = true
 }
 
 variable "enable_azure_ilb" {
-  description = "Deploy the Azure US Internal Load Balancer used by the supported non-Route-Server SMSv2 showcase path."
+  description = "Deploy the US inside application and Site Console ILB frontends alongside the BGP path."
   type        = bool
   default     = true
 }
@@ -256,4 +256,15 @@ variable "ssh_public_key_path" {
   description = "Path to the SSH public key file, read once at the root when ssh_public_key is empty."
   type        = string
   default     = "~/.ssh/id_ed25519.pub"
+}
+
+variable "azure_frr_asn" {
+  description = "ASN shared by the two independent FRR relays in each Azure region."
+  type        = number
+  default     = 65020
+
+  validation {
+    condition     = var.azure_frr_asn >= 64512 && var.azure_frr_asn <= 65534 && !contains([var.ce_asn, var.rs_asn], var.azure_frr_asn)
+    error_message = "azure_frr_asn must be a private ASN distinct from CE and Route Server ASNs."
+  }
 }
