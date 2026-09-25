@@ -16,6 +16,37 @@ from typing import Any
 
 PROVIDER_SHA256 = "5dab6b26cbc2656bd7df2a8259564f238b1947d5cfdf9e9370243300c954d85d"
 PRODUCTION_KEY = "mcn-ce-ha-smsv2/showcase.tfstate"
+LEGACY_KVM_BGP = "xcsh_bgp.onprem_ebgp[0]"
+
+
+def legacy_kvm_bgp_owned(
+    address: str, before: dict[str, Any], legacy: dict[str, str]
+) -> bool:
+    """Recognize only the reviewed predecessor KVM BGP object."""
+    if address != LEGACY_KVM_BGP:
+        return False
+    labels = before.get("labels") or {}
+    refs = ((before.get("where") or {}).get("site") or {}).get("ref")
+    site_name = "mcn-ce-ha-smsv2-current-kvm"
+    return all(
+        (
+            before.get("name") == "onprem-kvm-ebgp",
+            before.get("namespace") == "system",
+            labels.get("mcn-owner-id") == "kvm-poc",
+            labels.get("mcn-environment") == "production",
+            labels.get("mcn-deployment-generation")
+            == legacy.get("generation")
+            == "smsv2-current",
+            labels.get("mcn-xc-tenant") == legacy.get("tenant") == "f5-sales-demo",
+            labels.get("mcn-topology") == site_name,
+            isinstance(refs, list)
+            and len(refs) == 1
+            and isinstance(refs[0], dict)
+            and refs[0].get("name") == site_name
+            and refs[0].get("namespace") == "system"
+            and refs[0].get("kind", "site.Object") == "site.Object",
+        )
+    )
 
 
 def digest(path: pathlib.Path) -> str:
@@ -45,6 +76,11 @@ def verify_owner(
 ) -> None:
     """Verify old and new ownership markers on destructive core resources."""
     resource_type = resource["type"]
+    address = state_address(resource, instance)
+    if address == LEGACY_KVM_BGP and resource_type == "xcsh_bgp":
+        if not legacy_kvm_bgp_owned(address, instance.get("attributes") or {}, legacy):
+            raise ValueError(f"ownership marker mismatch: {address}")
+        return
     if resource_type not in {
         "aws_vpc",
         "aws_instance",
@@ -52,7 +88,6 @@ def verify_owner(
         "xcsh_securemesh_site_v2",
     }:
         return
-    address = state_address(resource, instance)
     before = instance.get("attributes") or {}
     tags = before.get("tags") or {}
     labels = before.get("labels") or {}

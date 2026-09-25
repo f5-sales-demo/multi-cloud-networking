@@ -85,6 +85,68 @@ FULL_FLAGS = (
     "enable_aws_tgw_connect",
 )
 
+PRODUCTION_KEY = "mcn-ce-ha-smsv2/showcase.tfstate"
+LEGACY_KVM_BGP = "xcsh_bgp.onprem_ebgp[0]"
+
+
+def legacy_kvm_bgp_owned(
+    address: str,
+    before: dict[str, Any],
+    backend_key: str | None,
+    legacy: dict[str, str] | None,
+) -> bool:
+    """Recognize only the reviewed predecessor KVM BGP object."""
+    if address != LEGACY_KVM_BGP or backend_key != PRODUCTION_KEY or legacy is None:
+        return False
+    labels = before.get("labels") or {}
+    refs = ((before.get("where") or {}).get("site") or {}).get("ref")
+    site_name = "mcn-ce-ha-smsv2-current-kvm"
+    return all(
+        (
+            before.get("name") == "onprem-kvm-ebgp",
+            before.get("namespace") == "system",
+            labels.get("mcn-owner-id") == "kvm-poc",
+            labels.get("mcn-environment") == "production",
+            labels.get("mcn-deployment-generation")
+            == legacy.get("generation")
+            == "smsv2-current",
+            labels.get("mcn-xc-tenant") == legacy.get("tenant") == "f5-sales-demo",
+            labels.get("mcn-topology") == site_name,
+            isinstance(refs, list)
+            and len(refs) == 1
+            and isinstance(refs[0], dict)
+            and refs[0].get("name") == site_name
+            and refs[0].get("namespace") == "system"
+            and refs[0].get("kind", "site.Object") == "site.Object",
+        )
+    )
+
+
+def prior_managed_addresses(document: dict[str, Any]) -> set[str]:
+    """Collect every managed address, including nested child modules."""
+    root = ((document.get("prior_state") or {}).get("values") or {}).get("root_module")
+    if not isinstance(root, dict):
+        raise ValueError("destroy plan lacks prior state")
+    addresses: set[str] = set()
+
+    def visit(module: dict[str, Any]) -> None:
+        for resource in module.get("resources") or []:
+            if resource.get("mode") != "managed":
+                continue
+            address = resource.get("address")
+            if not isinstance(address, str) or not address or address in addresses:
+                raise ValueError(
+                    "destroy prior state has malformed or duplicate address"
+                )
+            addresses.add(address)
+        for child in module.get("child_modules") or []:
+            if not isinstance(child, dict):
+                raise ValueError("destroy prior state has malformed child module")
+            visit(child)
+
+    visit(root)
+    return addresses
+
 
 def _value(document: dict[str, Any], name: str) -> Any:
     item = document.get("variables", {}).get(name, {})
@@ -257,6 +319,11 @@ def validate(
     elif scope == "full-destroy":
         if not changes:
             raise ValueError("destroy plan has no actions")
+        delete_addresses = [address for address, _ in changes]
+        if len(delete_addresses) != len(set(delete_addresses)) or set(
+            delete_addresses
+        ) != prior_managed_addresses(document):
+            raise ValueError("destroy delete set does not match complete prior state")
         for address, actions in changes:
             if actions != ["delete"]:
                 raise ValueError(f"destroy contains a non-delete action: {address}")
@@ -278,6 +345,10 @@ def validate(
                     if "mcn-owner-id" in labels
                     else None
                 )
+                if item.get("type") == "xcsh_bgp" and legacy_kvm_bgp_owned(
+                    item["address"], before, backend_key, legacy
+                ):
+                    continue
                 if marker is None:
                     if item.get("type") in (
                         "azurerm_resource_group",

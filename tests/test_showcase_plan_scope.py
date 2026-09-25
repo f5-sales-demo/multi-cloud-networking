@@ -44,6 +44,19 @@ def plan(changes):
     }
 
 
+def prior(document, addresses):
+    document["prior_state"] = {
+        "values": {
+            "root_module": {
+                "resources": [
+                    {"mode": "managed", "address": address} for address in addresses
+                ]
+            }
+        }
+    }
+    return document
+
+
 class ShowcasePlanScopeTest(unittest.TestCase):
     def test_azure_approvals_require_six_scoped_creates(self):
         approvals = [
@@ -124,11 +137,13 @@ class ShowcasePlanScopeTest(unittest.TestCase):
 
     def test_destroy_rejects_shared_uplink(self):
         document = plan([("terraform_data.host_bridge_uplink", ["delete"])])
+        prior(document, ["terraform_data.host_bridge_uplink"])
         with self.assertRaisesRegex(ValueError, "shared host networking"):
             module.validate(document, "full-destroy", "a" * 40)
 
     def test_destroy_rejects_foreign_core_resource(self):
         document = plan([("azurerm_resource_group.hub", ["delete"])])
+        prior(document, ["azurerm_resource_group.hub"])
         document["resource_changes"][0]["type"] = "azurerm_resource_group"
         document["resource_changes"][0]["change"]["before"] = {
             "tags": {"mcn_owner_id": "foreign-team", "mcn_environment": "production"}
@@ -140,6 +155,7 @@ class ShowcasePlanScopeTest(unittest.TestCase):
 
     def test_destroy_accepts_exact_legacy_production_owner(self):
         document = plan([("aws_vpc.aws[0]", ["delete"])])
+        prior(document, ["aws_vpc.aws[0]"])
         document["resource_changes"][0]["type"] = "aws_vpc"
         document["resource_changes"][0]["change"]["before"] = {
             "tags": {
@@ -177,6 +193,86 @@ class ShowcasePlanScopeTest(unittest.TestCase):
                 "foreign/backend.tfstate",
                 legacy,
             )
+
+    def test_destroy_requires_complete_prior_state(self):
+        document = plan([("aws_security_group.ce[0]", ["delete"])])
+        with self.assertRaisesRegex(ValueError, "prior state"):
+            module.validate(document, "full-destroy", "a" * 40)
+        prior(document, ["aws_security_group.other[0]"])
+        with self.assertRaisesRegex(ValueError, "prior state"):
+            module.validate(document, "full-destroy", "a" * 40)
+
+    def test_destroy_requires_recursive_exact_set_without_duplicates(self):
+        address = 'module.site["01"].aws_instance.ce[0]'
+        document = plan([(address, ["delete"])])
+        prior(document, [])
+        document["prior_state"]["values"]["root_module"]["child_modules"] = [
+            {"resources": [{"mode": "managed", "address": address}]}
+        ]
+        self.assertEqual(module.validate(document, "full-destroy", "a" * 40), 1)
+        document["prior_state"]["values"]["root_module"]["resources"].append(
+            {"mode": "managed", "address": address}
+        )
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            module.validate(document, "full-destroy", "a" * 40)
+        document["prior_state"]["values"]["root_module"]["resources"] = []
+        document["resource_changes"].append(document["resource_changes"][0].copy())
+        with self.assertRaisesRegex(ValueError, "prior state"):
+            module.validate(document, "full-destroy", "a" * 40)
+
+    def test_destroy_accepts_only_exact_legacy_kvm_poc_bgp(self):
+        address = "xcsh_bgp.onprem_ebgp[0]"
+        document = prior(plan([(address, ["delete"])]), [address])
+        document["resource_changes"][0]["type"] = "xcsh_bgp"
+        before = {
+            "name": "onprem-kvm-ebgp",
+            "namespace": "system",
+            "labels": {
+                "mcn-owner-id": "kvm-poc",
+                "mcn-environment": "production",
+                "mcn-deployment-generation": "smsv2-current",
+                "mcn-xc-tenant": "f5-sales-demo",
+                "mcn-topology": "mcn-ce-ha-smsv2-current-kvm",
+            },
+            "where": {
+                "site": {
+                    "ref": [
+                        {
+                            "name": "mcn-ce-ha-smsv2-current-kvm",
+                            "namespace": "system",
+                        }
+                    ]
+                }
+            },
+        }
+        document["resource_changes"][0]["change"]["before"] = before
+        legacy = {
+            "deployer": "operator",
+            "environment": "lab",
+            "generation": "smsv2-current",
+            "tenant": "f5-sales-demo",
+        }
+        args = (
+            document,
+            "full-destroy",
+            "a" * 40,
+            "production",
+            "showcase-team",
+            "mcn-ce-ha-smsv2/showcase.tfstate",
+            legacy,
+        )
+        self.assertEqual(module.validate(*args), 1)
+        before["where"]["site"]["ref"][0]["name"] = "foreign-kvm"
+        with self.assertRaisesRegex(ValueError, "ownership marker mismatch"):
+            module.validate(*args)
+        before["where"]["site"]["ref"][0]["name"] = "mcn-ce-ha-smsv2-current-kvm"
+        before["labels"]["mcn-owner-id"] = "foreign-team"
+        with self.assertRaisesRegex(ValueError, "ownership marker mismatch"):
+            module.validate(*args)
+        before["labels"]["mcn-owner-id"] = "kvm-poc"
+        args = (*args[:5], "foreign/backend.tfstate", legacy)
+        with self.assertRaisesRegex(ValueError, "ownership marker mismatch"):
+            module.validate(*args)
 
     def test_source_mismatch_rejected(self):
         with self.assertRaisesRegex(ValueError, "source commit"):
