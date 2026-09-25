@@ -129,6 +129,44 @@ class LegacyDestroyScopeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "provider action invocation"):
             check(state, events)
 
+    def test_kvm_poc_bgp_requires_exact_legacy_owner_and_site(self):
+        state, events = fixture()
+        resource = state["resources"][1]
+        resource["type"] = "xcsh_bgp"
+        resource["name"] = "onprem_ebgp"
+        resource["instances"][0]["attributes"] = {
+            "name": "onprem-kvm-ebgp",
+            "namespace": "system",
+            "labels": {
+                "mcn-owner-id": "kvm-poc",
+                "mcn-environment": "production",
+                "mcn-deployment-generation": "smsv2-current",
+                "mcn-xc-tenant": "f5-sales-demo",
+                "mcn-topology": "mcn-ce-ha-smsv2-current-kvm",
+            },
+            "where": {
+                "site": {
+                    "ref": [
+                        {
+                            "name": "mcn-ce-ha-smsv2-current-kvm",
+                            "namespace": "system",
+                        }
+                    ]
+                }
+            },
+        }
+        events[0]["change"]["resource"]["addr"] = "xcsh_bgp.onprem_ebgp[0]"
+        self.assertEqual(check(state, events), 1)
+        resource["instances"][0]["attributes"]["labels"]["mcn-owner-id"] = "foreign"
+        with self.assertRaisesRegex(ValueError, "ownership marker mismatch"):
+            check(state, events)
+        resource["instances"][0]["attributes"]["labels"]["mcn-owner-id"] = "kvm-poc"
+        resource["instances"][0]["attributes"]["where"]["site"]["ref"][0]["name"] = (
+            "foreign"
+        )
+        with self.assertRaisesRegex(ValueError, "ownership marker mismatch"):
+            check(state, events)
+
 
 if __name__ == "__main__":
     unittest.main()
