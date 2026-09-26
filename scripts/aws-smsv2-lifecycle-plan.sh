@@ -17,6 +17,7 @@ CONFIGURED_TGW=true
 CLEANUP_PRIVATE_INPUTS=false
 PREFLIGHT_ARGS=()
 EXPECTED_AWS_REGION=""
+AWS_PROFILE=${AWS_PROFILE:-sso}
 SOURCE_REPOSITORY=""
 SOURCE_REF=""
 SOURCE_COMMIT_SHA=""
@@ -191,7 +192,7 @@ else
   [ -z "$MAPPING_FILE$REGISTRATION_PROJECTION$ENI_PROJECTION" ] || die "mapping inputs are valid only for configured"
 fi
 
-TF_RUNNER=("$REPO_ROOT/scripts/terraform-with-aws-sso.sh" --profile sso --region "$EXPECTED_AWS_REGION")
+TF_RUNNER=("$REPO_ROOT/scripts/terraform-with-aws-sso.sh" --profile "$AWS_PROFILE" --region "$EXPECTED_AWS_REGION")
 TF_IDENTITY_ARGS=(
   -var="source_repository=$SOURCE_REPOSITORY"
   -var="source_ref=$SOURCE_REF"

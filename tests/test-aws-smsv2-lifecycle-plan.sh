@@ -42,7 +42,8 @@ if "$SCRIPT" --phase configured --plan-file "$SCRATCH/plan" --evidence-dir "$SCR
 fi
 grep -Fq 'configured requires --mapping-file' "$SCRATCH/out" || fail "mapping rejection reason"
 
-require 'terraform-with-aws-sso.sh" --profile sso --region "$EXPECTED_AWS_REGION"' "$SCRIPT"
+require 'AWS_PROFILE=${AWS_PROFILE:-sso}' "$SCRIPT"
+require 'terraform-with-aws-sso.sh" --profile "$AWS_PROFILE" --region "$EXPECTED_AWS_REGION"' "$SCRIPT"
 require 'aws_site_configuration_phase=$PHASE' "$SCRIPT"
 require 'enable_aws_tgw_connect=$CONFIGURED_TGW' "$SCRIPT"
 require '--configured-tgw must be true or false' "$SCRIPT"
