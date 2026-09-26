@@ -202,6 +202,18 @@ esac
 EOF
 chmod +x "$fake_bin/curl"
 
+cat >"$fake_bin/docker" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ ${FAKE_LOCAL_COLLISION:-} == docker ]]; then printf 'mcn-kvm-frr-router\n'; fi
+EOF
+cat >"$fake_bin/virsh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ ${FAKE_LOCAL_COLLISION:-} == pool ]]; then printf 'mcn-kvm-showcase\n'; fi
+EOF
+chmod +x "$fake_bin/docker" "$fake_bin/virsh"
+
 set +e
 output=$(PATH="$fake_bin:$PATH" CURL_BIN="$fake_bin/curl" \
   XCSH_API_URL=https://f5-sales-demo.console.ves.volterra.io XCSH_API_TOKEN=test-token \
@@ -281,6 +293,30 @@ if ! FAKE_ABSENT=true PATH="$fake_bin:$PATH" CURL_BIN="$fake_bin/curl" \
 fi
 jq -e '.status == "ready" and .collisions == []' "$empty_manifest" >/dev/null ||
   fail "no-collision manifest must be explicitly ready and empty"
+
+cat >"$scratch/kvm-local-plan.json" <<'JSON'
+{"resource_changes":[
+  {"address":"docker_container.kvm_frr[0]","type":"docker_container","change":{"actions":["create"],"after":{"name":"mcn-kvm-frr-router"}}},
+  {"address":"libvirt_pool.kvm[0]","type":"libvirt_pool","change":{"actions":["create"],"after":{"name":"mcn-kvm-showcase"}}},
+  {"address":"terraform_data.kvm_ce_image_cache[0]","type":"terraform_data","change":{"actions":["create"],"after":{"input":"reviewed"}}}
+]}
+JSON
+if ! FAKE_ABSENT=true PATH="$fake_bin:$PATH" CURL_BIN="$fake_bin/curl" \
+  XCSH_API_URL=https://f5-sales-demo.console.ves.volterra.io XCSH_API_TOKEN=test-token \
+  "$script" --plan-json "$scratch/kvm-local-plan.json" --aws-region ap-northeast-1 --xc-tenant f5-sales-demo \
+  --aws-account-id 123456789012 --deployment-generation gen-01 --component mcn-ce-ha \
+  --creator-id tester@example.test --manifest "$scratch/kvm-local-ready.json" >/dev/null; then
+  fail "absent owned Docker and libvirt names must be accepted"
+fi
+for collision in docker pool; do
+  if FAKE_ABSENT=true FAKE_LOCAL_COLLISION="$collision" PATH="$fake_bin:$PATH" CURL_BIN="$fake_bin/curl" \
+    XCSH_API_URL=https://f5-sales-demo.console.ves.volterra.io XCSH_API_TOKEN=test-token \
+    "$script" --plan-json "$scratch/kvm-local-plan.json" --aws-region ap-northeast-1 --xc-tenant f5-sales-demo \
+    --aws-account-id 123456789012 --deployment-generation gen-01 --component mcn-ce-ha \
+    --creator-id tester@example.test --manifest "$scratch/kvm-local-$collision.json" >/dev/null 2>&1; then
+    fail "existing $collision name must block the KVM create plan"
+  fi
+done
 
 replacement_plan="$scratch/replacement-plan.json"
 jq '(.resource_changes[] | select(.type == "xcsh_securemesh_site_v2")).change.actions = ["delete", "create"] |
