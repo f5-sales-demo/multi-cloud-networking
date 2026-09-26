@@ -824,29 +824,34 @@ observe_refresh_only_drift() {
     -var='kvm_lan_configuration_phase=hardware' \
     -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE"
   drift_json=$(tf show -json "$PLAN_FILE")
-  jq -e --arg address "$expected_address" '
+  jq -e '
     [.resource_changes[]? |
+      select(.change.actions != ["no-op"] and .change.actions != ["read"])] |
+    length == 0' <<<"$drift_json" >/dev/null ||
+    die "refresh-only plan contains a normal resource action"
+  jq -e --arg address "$expected_address" '
+    [.resource_drift[]? |
       select(.change.actions != ["no-op"] and .change.actions != ["read"])] as $changes |
     ($changes | length) == 1 and
     $changes[0].address == $address and
     $changes[0].change.actions == ["update"]' <<<"$drift_json" >/dev/null ||
     die "refresh-only plan did not isolate the expected drift"
   jq -e '
-    [.resource_changes[]? |
+    [.resource_drift[]? |
       select(.change.actions != ["no-op"] and .change.actions != ["read"]) |
       select(.type | startswith("azurerm_") or startswith("azuread_") or startswith("azapi_"))] |
     length == 0' <<<"$drift_json" >/dev/null || die "refresh-only plan contains an Azure action"
   case "$drift_kind" in
   eni_name)
     jq -e --arg address "$expected_address" --arg expected "$expected_value" --arg observed "$observed_value" '
-      first(.resource_changes[] | select(.address == $address)) as $change |
+      first(.resource_drift[] | select(.address == $address)) as $change |
       $change.change.before.tags.Name == $expected and
       $change.change.after.tags.Name == $observed' <<<"$drift_json" >/dev/null ||
       die "refresh-only plan did not observe the managed ENI Name-tag drift"
     ;;
   kvm_autostart)
     jq -e --arg address "$expected_address" '
-      first(.resource_changes[] | select(.address == $address)) as $change |
+      first(.resource_drift[] | select(.address == $address)) as $change |
       $change.change.before.autostart == true and
       $change.change.after.autostart == false' <<<"$drift_json" >/dev/null ||
       die "refresh-only plan did not observe the KVM domain autostart drift"

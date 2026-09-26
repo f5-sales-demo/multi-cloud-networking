@@ -408,14 +408,6 @@ class ShowcasePlanScopeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "outside its scope"):
             module.validate(document, "kvm-configured", "a" * 40)
 
-    def test_refresh_only_rejects_unowned_drift(self):
-        with self.assertRaisesRegex(ValueError, "one owned drift"):
-            module.validate(
-                plan([("azurerm_resource_group.hub", ["update"])]),
-                "refresh-only",
-                "a" * 40,
-            )
-
     def test_aws_kvm_zero_rejects_hidden_azure_action(self):
         document = plan(
             [
@@ -430,6 +422,40 @@ class ShowcasePlanScopeTest(unittest.TestCase):
         document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
         with self.assertRaisesRegex(ValueError, "not zero-change"):
             module.validate(document, "aws-kvm-zero", "a" * 40)
+
+
+class RefreshOnlyPlanScopeTest(unittest.TestCase):
+    def test_refresh_only_rejects_unowned_drift(self):
+        document = plan([])
+        document["resource_drift"] = [
+            {
+                "address": "azurerm_resource_group.hub",
+                "change": {"actions": ["update"]},
+            }
+        ]
+        with self.assertRaisesRegex(ValueError, "one owned drift"):
+            module.validate(document, "refresh-only", "a" * 40)
+
+    def test_refresh_only_accepts_terraform_resource_drift(self):
+        document = plan([])
+        document["resource_drift"] = [
+            {
+                "address": "aws_network_interface.slo[0]",
+                "change": {"actions": ["update"]},
+            }
+        ]
+        self.assertEqual(module.validate(document, "refresh-only", "a" * 40), 1)
+
+    def test_refresh_only_rejects_normal_action_alongside_drift(self):
+        document = plan([("aws_network_interface.slo[0]", ["update"])])
+        document["resource_drift"] = [
+            {
+                "address": "aws_network_interface.slo[0]",
+                "change": {"actions": ["update"]},
+            }
+        ]
+        with self.assertRaisesRegex(ValueError, "normal resource action"):
+            module.validate(document, "refresh-only", "a" * 40)
 
 
 if __name__ == "__main__":
