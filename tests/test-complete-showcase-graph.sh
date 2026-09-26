@@ -43,4 +43,10 @@ check 'kvm_lan=var.enable_kvm_lan' scripts/showcase-lifecycle.sh
 check 'scope_plan zero-change' scripts/showcase-lifecycle.sh
 check 'apply_scoped_plan azure-build' scripts/showcase-lifecycle.sh
 check 'az account show --subscription' scripts/showcase-lifecycle.sh
+check 'default_route_table_association[[:space:]]*=[[:space:]]*"enable"' terraform/modules/aws-tgw-connect/main.tf
+check 'transit_gateway_default_route_table_association[[:space:]]*=[[:space:]]*true' terraform/modules/aws-tgw-connect/main.tf
+check 'value[[:space:]]*=[[:space:]]*aws_ec2_transit_gateway.this.association_default_route_table_id' terraform/modules/aws-tgw-connect/outputs.tf
+check 'transit_gateway_default_route_table_association[[:space:]]*=[[:space:]]*true' terraform/aws_vpc.tf
+reject 'resource "aws_ec2_transit_gateway_route_table_association"' terraform/modules/aws-tgw-connect/main.tf
+reject 'resource "aws_ec2_transit_gateway_route_table_association"' terraform/aws_vpc.tf
 echo 'PASS: complete showcase graph contract'

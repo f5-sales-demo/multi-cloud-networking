@@ -303,7 +303,6 @@ data "xcsh_site_bgp_status" "aws" {
   depends_on = [
     xcsh_bgp.aws_tgw,
     module.aws_tgw_connect,
-    aws_ec2_transit_gateway_route_table_association.workload,
     aws_ec2_transit_gateway_route_table_propagation.workload,
     xcsh_http_loadbalancer.aws,
   ]

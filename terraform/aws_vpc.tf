@@ -236,16 +236,10 @@ resource "aws_ec2_transit_gateway_vpc_attachment" "workload" {
   count                                           = var.enable_aws && var.enable_aws_tgw_connect ? 1 : 0
   subnet_ids                                      = [aws_subnet.workload[0].id]
   transit_gateway_id                              = module.aws_tgw_connect[0].transit_gateway_id
-  transit_gateway_default_route_table_association = false
+  transit_gateway_default_route_table_association = true
   transit_gateway_default_route_table_propagation = false
   vpc_id                                          = aws_vpc.workload[0].id
   tags                                            = merge(local.tags, { Name = "${local.aws_resource_prefix}-aws-workload-tgw" })
-}
-
-resource "aws_ec2_transit_gateway_route_table_association" "workload" {
-  count                          = var.enable_aws && var.enable_aws_tgw_connect ? 1 : 0
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.workload[0].id
-  transit_gateway_route_table_id = module.aws_tgw_connect[0].route_table_id
 }
 
 resource "aws_ec2_transit_gateway_route_table_propagation" "workload" {

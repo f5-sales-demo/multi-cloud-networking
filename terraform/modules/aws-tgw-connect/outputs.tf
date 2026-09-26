@@ -11,6 +11,6 @@ output "connect_attachment_ids" {
   value       = { for role, attachment in aws_ec2_transit_gateway_connect.role : role => attachment.id }
 }
 output "route_table_id" {
-  description = "Transit Gateway route table used by transport and Connect attachments."
-  value       = aws_ec2_transit_gateway_route_table.this.id
+  description = "Default Transit Gateway route table used by transport and Connect attachments."
+  value       = aws_ec2_transit_gateway.this.association_default_route_table_id
 }
