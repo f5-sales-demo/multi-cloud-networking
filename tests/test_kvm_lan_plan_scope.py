@@ -54,6 +54,66 @@ def plan(stage, changes, resources):
 
 
 class PlanScopeTests(unittest.TestCase):
+    def test_hardware_stage_accepts_owned_unknown_slo_network_id(self):
+        document = plan(
+            "hardware",
+            [
+                {
+                    "address": 'libvirt_domain.ce_node["01"]',
+                    "change": {
+                        "actions": ["create"],
+                        "after_unknown": {
+                            "network_interface": [{"network_id": True}, {}]
+                        },
+                    },
+                }
+            ],
+            [
+                {
+                    "address": 'libvirt_domain.ce_node["01"]',
+                    "values": {
+                        "network_interface": [
+                            {"mac": "52:54:00:10:00:11"},
+                            {"mac": "52:54:00:20:00:11", "bridge": "br-lan-demo"},
+                        ]
+                    },
+                }
+            ],
+        )
+        document["configuration"] = {
+            "root_module": {
+                "resources": [
+                    {
+                        "address": "libvirt_domain.ce_node",
+                        "expressions": {
+                            "network_interface": [
+                                {
+                                    "network_id": {
+                                        "references": [
+                                            "libvirt_network.ce_bgp_net[0].id",
+                                            "libvirt_network.ce_bgp_net[0]",
+                                            "libvirt_network.ce_bgp_net",
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                    }
+                ]
+            }
+        }
+        self.assertEqual(
+            MODULE.validate_plan(document, "hardware")["domain_action"], "create"
+        )
+        document["configuration"]["root_module"]["resources"][0]["expressions"][
+            "network_interface"
+        ][0]["network_id"]["references"] = ["libvirt_network.foreign[0].id"]
+        with self.assertRaisesRegex(ValueError, "libvirt-network SLO"):
+            MODULE.validate_plan(document, "hardware")
+        document["resource_changes"][0]["change"]["after_unknown"] = {}
+        with self.assertRaisesRegex(ValueError, "libvirt-network SLO"):
+            MODULE.validate_plan(document, "hardware")
+
     def test_hardware_stage_accepts_initial_two_nic_create(self):
         document = plan(
             "hardware",
