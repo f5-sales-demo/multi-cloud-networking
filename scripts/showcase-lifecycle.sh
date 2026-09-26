@@ -180,6 +180,7 @@ if [ "$MODE" = kvm-lan-preflight ]; then
   exit 0
 fi
 
+export AWS_PROFILE
 for command_name in aws az curl getent gh jq python3 stat sudo systemctl tar terraform sha256sum virsh; do
   command -v "$command_name" >/dev/null 2>&1 || die "required command is unavailable: $command_name"
 done
