@@ -27,6 +27,7 @@ on:
       - 'tests/test-aws-smsv2-lifecycle-plan.sh'
       - 'tests/test-generate-aws-smsv2-device-mapping.sh'
       - 'tests/test-aws-smsv2-owned-collision-preflight.sh'
+      - 'tests/test-aws-tgw-default-table-preflight.sh'
       - 'tests/test-aws-deployment-generation.sh'
       - 'tests/test-aws-smsv2-orphan-recovery.sh'
       - 'tests/test-aws-root-owned-resource-tags.sh'
@@ -75,6 +76,7 @@ on:
       - 'tests/test-aws-smsv2-lifecycle-plan.sh'
       - 'tests/test-generate-aws-smsv2-device-mapping.sh'
       - 'tests/test-aws-smsv2-owned-collision-preflight.sh'
+      - 'tests/test-aws-tgw-default-table-preflight.sh'
       - 'tests/test-aws-deployment-generation.sh'
       - 'tests/test-aws-smsv2-orphan-recovery.sh'
       - 'tests/test-aws-root-owned-resource-tags.sh'
@@ -160,7 +162,9 @@ jobs:
 
       - name: AWS owned collision preflight unit tests
         working-directory: .
-        run: bash tests/test-aws-smsv2-owned-collision-preflight.sh
+        run: |
+          bash tests/test-aws-smsv2-owned-collision-preflight.sh
+          bash tests/test-aws-tgw-default-table-preflight.sh
 
       - name: AWS immutable deployment generation contract
         working-directory: .

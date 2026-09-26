@@ -136,7 +136,8 @@ case "$*" in
       exit 255
     fi
     generation=${FAKE_AWS_GENERATION:-gen-01}
-    printf '{"KeyPairs":[{"KeyPairId":"key-0123456789abcdef0","CreateTime":"2026-09-16T12:00:00Z","Tags":[{"Key":"component","Value":"mcn-ce-ha"},{"Key":"deployment_generation","Value":"%s"},{"Key":"deployer","Value":"tester"},{"Key":"managed_by","Value":"terraform"}]}]}\n' "$generation"
+    component=${FAKE_AWS_COMPONENT:-mcn-ce-ha}
+    printf '{"KeyPairs":[{"KeyPairId":"key-0123456789abcdef0","CreateTime":"2026-09-16T12:00:00Z","Tags":[{"Key":"component","Value":"%s"},{"Key":"deployment_generation","Value":"%s"},{"Key":"deployer","Value":"tester"},{"Key":"managed_by","Value":"terraform"}]}]}\n' "$component" "$generation"
     ;;
   *"describe-addresses"*)
     if [[ ${FAKE_ABSENT:-false} == true ]]; then
@@ -358,6 +359,7 @@ expect_rejection() {
 
 expect_rejection account-mismatch "caller account does not match" FAKE_ACCOUNT_ID=999999999999
 expect_rejection aws-generation-mismatch "unowned or ambiguous AWS collision" FAKE_AWS_GENERATION=gen-02
+expect_rejection aws-component-mismatch "unowned or ambiguous AWS collision" FAKE_AWS_COMPONENT=other
 expect_rejection eip-generation-mismatch "unowned or ambiguous AWS collision" FAKE_EIP_GENERATION=gen-02
 expect_rejection f5-generation-mismatch "unowned or ambiguous F5 collision" FAKE_F5_GENERATION=gen-02
 
