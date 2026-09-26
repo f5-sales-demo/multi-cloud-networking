@@ -87,6 +87,33 @@ require 'kvm-lan-plan-scope.py' "$lifecycle"
 test -x "$repo_root/scripts/kvm-lan-live-acceptance.py" || fail 'KVM LAN live acceptance driver is missing'
 require 'shared bridge/uplink resources survive' "$lifecycle"
 require 'exercise_managed_drift "$cycle"' "$lifecycle"
+# Exercise the exact state lookup used before ENI tag mutation. Terraform's
+# human-readable state output aligns `id` with spaces, so only state JSON is
+# a reliable identity boundary.
+eni_lookup_source=$(mktemp)
+trap 'rm -f "$eni_lookup_source"' EXIT
+sed -n '/^resolve_owned_eni_id() {/,/^}/p' "$lifecycle" >"$eni_lookup_source"
+test -s "$eni_lookup_source" || fail 'managed ENI lookup must use an executable state JSON resolver'
+# shellcheck source=/dev/null
+source "$eni_lookup_source"
+tf() {
+  [ "$*" = 'state pull' ] || return 1
+  printf '%s\n' "$FAKE_STATE"
+}
+valid_eni_state='{"resources":[{"mode":"managed","type":"aws_network_interface","name":"slo","instances":[{"index_key":0,"attributes":{"id":"eni-0123456789abcdef0"}}]}]}'
+[ "$(FAKE_STATE="$valid_eni_state" resolve_owned_eni_id)" = eni-0123456789abcdef0 ] ||
+  fail 'managed ENI lookup did not select the exact indexed state identity'
+for invalid_eni_state in \
+  '{"resources":[]}' \
+  '{"resources":[{"mode":"managed","type":"aws_network_interface","name":"slo","instances":[{"index_key":1,"attributes":{"id":"eni-0123456789abcdef0"}}]}]}' \
+  '{"resources":[{"mode":"managed","type":"aws_network_interface","name":"slo","instances":[{"index_key":0,"attributes":{"id":"eni-0123456789abcdef0"}},{"index_key":0,"attributes":{"id":"eni-11111111111111111"}}]}]}' \
+  '{"resources":[{"mode":"managed","type":"aws_network_interface","name":"slo","instances":[{"index_key":0,"attributes":{"id":"not-an-eni"}}]}]}'
+do
+  if FAKE_STATE="$invalid_eni_state" resolve_owned_eni_id >/dev/null 2>&1; then
+    fail 'managed ENI lookup accepted a missing, wrong-index, duplicate, or malformed identity'
+  fi
+done
+require 'eni_id=$(resolve_owned_eni_id) || die "managed ENI identity is unavailable"' "$lifecycle"
 require 'apply_scoped_plan kvm-configured' "$lifecycle"
 require 'apply_scoped_plan aws-status-output-refresh' "$lifecycle"
 require 'apply_scoped_plan azure-build' "$lifecycle"

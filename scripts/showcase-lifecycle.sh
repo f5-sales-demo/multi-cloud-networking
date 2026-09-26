@@ -866,10 +866,22 @@ observe_refresh_only_drift() {
   rm -f -- "$PLAN_FILE"
 }
 
+resolve_owned_eni_id() {
+  local eni_id
+  eni_id=$(tf state pull | jq -er '
+    [.resources[]? |
+      select(.module == null and .mode == "managed" and
+             .type == "aws_network_interface" and .name == "slo") |
+      .instances[]? | select(.index_key == 0) | .attributes.id] |
+    select(length == 1) | .[0] |
+    select(type == "string" and test("^eni-[0-9a-f]+$"))
+  ') || return 1
+  printf '%s\n' "$eni_id"
+}
+
 repair_eni_tag_drift() {
   local cycle=$1 eni_id drift_name expected_name repaired_name
-  eni_id=$(tf state show -no-color 'aws_network_interface.slo[0]' | awk -F' = ' '$1 ~ /^[[:space:]]*id$/ {gsub(/\"/, "", $2); print $2; exit}')
-  [ -n "$eni_id" ] || die "managed ENI identity is unavailable"
+  eni_id=$(resolve_owned_eni_id) || die "managed ENI identity is unavailable"
   expected_name="${AWS_RESOURCE_PREFIX}-aws-ce-1-slo"
   drift_name="${expected_name}-drift-check"
   AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_SDK_LOAD_CONFIG=1 \
