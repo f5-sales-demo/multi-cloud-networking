@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Evaluate one refresh-enabled showcase registration plan without exposing identities."""
-# pylint: disable=missing-function-docstring
+# pylint: disable=invalid-name,missing-function-docstring,too-many-locals,too-many-branches
 # ruff: noqa: D103, EM101, EM102, TRY003, TRY004
 
 from __future__ import annotations
