@@ -153,7 +153,7 @@ module "kvm_registration_mapping" {
 # KVM registration, and Terraform-owned MAC. Names and guest devices are always
 # observed from XC rather than derived from hostname conventions.
 data "xcsh_smsv2_kvm_runtime" "kvm_slo" {
-  count = var.enable_kvm ? 1 : 0
+  count = var.enable_kvm && var.aws_site_configuration_phase == "configured" ? 1 : 0
 
   namespace             = "system"
   site                  = local.kvm_site_name
@@ -240,7 +240,7 @@ data "external" "kvm_bgp_observer" {
 
 # eBGP Peering configuration for On-Prem KVM Site
 resource "xcsh_bgp" "onprem_ebgp" {
-  count = var.enable_kvm ? 1 : 0
+  count = var.enable_kvm && var.aws_site_configuration_phase == "configured" ? 1 : 0
 
   name      = "onprem-kvm-ebgp"
   namespace = "system"

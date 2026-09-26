@@ -33,6 +33,25 @@ variables {
   enable_kvm             = true
 }
 
+run "kvm_bootstrap_defers_online_runtime_and_bgp" {
+  command = plan
+
+  variables {
+    aws_site_configuration_phase = "bootstrap"
+  }
+
+  assert {
+    condition = (
+      length(libvirt_domain.ce_node) == 1 &&
+      length(xcsh_securemesh_site_v2.onprem_kvm) == 1 &&
+      length(xcsh_token.kvm) == 1 &&
+      length(data.xcsh_smsv2_kvm_runtime.kvm_slo) == 0 &&
+      length(xcsh_bgp.onprem_ebgp) == 0
+    )
+    error_message = "KVM bootstrap must create hardware and identity without waiting for an ONLINE runtime or creating BGP before registration approval."
+  }
+}
+
 run "kvm_frr_and_ce_identity_plan" {
   command = plan
 
@@ -90,20 +109,6 @@ run "kvm_frr_and_ce_identity_plan" {
       contains([for network in docker_container.kvm_frr[0].networks_advanced : network.ipv4_address], "10.100.0.2")
     )
     error_message = "FRR must be Terraform-owned on the KVM bridge at the declared peer IP."
-  }
-
-  assert {
-    condition     = xcsh_bgp.onprem_ebgp[0].peers[0].external.address == output.kvm_bgp_fabric.router_ip
-    error_message = "The F5-side KVM BGP object must peer with the Terraform-owned FRR router."
-  }
-
-  assert {
-    condition = (
-      length(data.xcsh_smsv2_kvm_runtime.kvm_slo) == 1 &&
-      data.xcsh_smsv2_kvm_runtime.kvm_slo[0].site == local.kvm_site_name &&
-      data.xcsh_smsv2_kvm_runtime.kvm_slo[0].expected_mac == local.kvm_ce_nodes["01"].mac
-    )
-    error_message = "KVM BGP must use exactly one provider-owned runtime SLO lookup keyed by site and MAC."
   }
 
   assert {

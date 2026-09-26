@@ -138,6 +138,19 @@ require 'expected_mac          = local.kvm_ce_nodes["01"].mac' "$onprem"
 require 'data.xcsh_smsv2_kvm_runtime.kvm_slo[0].interface_name' "$onprem"
 require 'data "xcsh_smsv2_kvm_runtime" "kvm_slo"' "$module_onprem"
 require 'data.xcsh_smsv2_kvm_runtime.kvm_slo[0].interface_name' "$module_onprem"
+for file in "$onprem" "$module_onprem"; do
+  runtime_block=$(sed -n '/^data "xcsh_smsv2_kvm_runtime" "kvm_slo" {/,/^}/p' "$file")
+  bgp_block=$(sed -n '/^resource "xcsh_bgp" "onprem_ebgp" {/,/^}/p' "$file")
+  if [ "$file" = "$onprem" ]; then
+    phase='var.aws_site_configuration_phase'
+  else
+    phase='var.acceptance_phase'
+  fi
+  grep -Fq "count = var.enable_kvm && $phase == \"configured\" ? 1 : 0" <<<"$runtime_block" ||
+    fail "KVM runtime lookup must wait for configured approval phase in $file"
+  grep -Fq "count = var.enable_kvm && $phase == \"configured\" ? 1 : 0" <<<"$bgp_block" ||
+    fail "KVM BGP peer must wait for configured approval phase in $file"
+done
 reject 'name      = "eth0"' "$module_onprem"
 require 'resource "xcsh_smsv2_kvm_runtime_interface" "kvm_lan_sli"' "$onprem"
 require 'site         = local.kvm_site_name' "$onprem"
