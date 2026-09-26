@@ -65,6 +65,9 @@ reject '--legacy-generation "$GENERATION"' "$lifecycle"
 [ "$(grep -Fc -- '--legacy-generation "$LEGACY_GENERATION"' "$lifecycle")" -eq 2 ] ||
   fail 'both destroy validators must receive the reviewed predecessor generation'
 require 'wait_for_approvals bootstrap 3 1' "$lifecycle"
+require 'showcase-registration-gate.py' "$lifecycle"
+require 'REGISTRATION_APPROVAL_COUNT=$(jq -er' "$lifecycle"
+require 'registration-wait-receipt.json' "$lifecycle"
 require '.registration_count == 1 and .online_count == 1' "$lifecycle"
 require 'systemctl enable --now' "$lifecycle"
 require 'terraform plan' "$lifecycle"
@@ -95,3 +98,4 @@ reject "-target='data.xcsh_site_image.kvm'" "$lifecycle"
 reject 'maurice_config_cardinality_exactly_one' "$lifecycle"
 
 printf 'PASS: unified AWS, KVM, and Azure lifecycle contract is enforced\n'
+python3 -m unittest tests/test_showcase_registration_gate.py

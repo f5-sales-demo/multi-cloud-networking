@@ -498,7 +498,7 @@ run_phase() {
 
 wait_for_approvals() {
   local phase=$1 expected_aws=$2 expected_kvm=$3 deadline=$((SECONDS + 5400))
-  local probe="$PRIVATE_ROOT/registration-wait.tfplan" aws_count kvm_count
+  local probe="$PRIVATE_ROOT/registration-wait.tfplan" gate digest
   local -a args=(-input=false -no-color -lock=false -var-file="$TFVARS"
     -var="aws_site_configuration_phase=$phase" -var='enable_aws_tgw_connect=false'
     -var='enable_azure=false' -var='enable_canada=false'
@@ -509,10 +509,19 @@ wait_for_approvals() {
   fi
   while ((SECONDS < deadline)); do
     if tf_plan "${args[@]}" -out="$probe" >/dev/null 2>&1; then
-      read -r aws_count kvm_count < <(tf show -json "$probe" | jq -r '
-        [([.resource_changes[]? | select(.type == "xcsh_registration_approval" and .name == "aws" and .change.actions == ["create"])] | length),
-         ([.resource_changes[]? | select(.type == "xcsh_registration_approval" and .name == "kvm" and .change.actions == ["create"])] | length)] | @tsv')
-      if [ "$aws_count" -eq "$expected_aws" ] && [ "$kvm_count" -eq "$expected_kvm" ]; then
+      digest="sha256:$(sha256sum "$probe" | awk '{print $1}')"
+      gate=$(tf show -json "$probe" | python3 "$REPO_ROOT/scripts/showcase-registration-gate.py" \
+        --phase "$phase" --expected-aws "$expected_aws" --expected-kvm "$expected_kvm" \
+        --source-commit "$SOURCE_COMMIT_SHA") || die "registration plan gate failed"
+      [ "$digest" = "sha256:$(sha256sum "$probe" | awk '{print $1}')" ] ||
+        die "registration plan digest changed during review"
+      if jq -e '.ready == true' <<<"$gate" >/dev/null; then
+        jq -n --arg phase "$phase" --arg source_commit "$SOURCE_COMMIT_SHA" \
+          --arg plan_sha256 "$digest" --argjson gate "$gate" \
+          '{phase:$phase,source_commit:$source_commit,plan_sha256:$plan_sha256,gate:$gate}' \
+          >"$CYCLE_DIR/$phase-registration-wait-receipt.json"
+        chmod 600 "$CYCLE_DIR/$phase-registration-wait-receipt.json"
+        REGISTRATION_APPROVAL_COUNT=$(jq -er '.approval_creates' <<<"$gate")
         rm -f -- "$probe"
         return 0
       fi
@@ -576,12 +585,16 @@ build_cycle() {
   chmod 700 "$CYCLE_DIR"
   run_phase "$cycle" bootstrap create
   wait_for_approvals bootstrap 3 1
-  run_phase "$cycle" bootstrap approvals
+  if [ "$REGISTRATION_APPROVAL_COUNT" -gt 0 ]; then
+    run_phase "$cycle" bootstrap approvals
+  fi
   capture_bootstrap_mapping_inputs
   run_phase "$cycle" bootstrap_retirement retire
   run_phase "$cycle" configured create false
   wait_for_approvals configured 3 0
-  run_phase "$cycle" configured approvals false
+  if [ "$REGISTRATION_APPROVAL_COUNT" -gt 0 ]; then
+    run_phase "$cycle" configured approvals false
+  fi
   run_phase "$cycle" configured tgw true
   verify_configured "$cycle" healthy "$run_uat"
   exercise_managed_drift "$cycle"
