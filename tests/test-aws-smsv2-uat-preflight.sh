@@ -875,6 +875,8 @@ for region_flag in enable_azure enable_canada enable_azure_ilb enable_canada_ilb
   grep -Fxq -- "-var=${region_flag}=false" "$scope_calls" ||
     fail "AWS UAT refresh-only plan must disable ${region_flag} before Azure build"
 done
+grep -Fxq -- '-var=kvm_lan_configuration_phase=hardware' "$scope_calls" ||
+  fail 'AWS UAT refresh-only plan must retain the KVM hardware stage before LAN configuration'
 echo "ok - AWS UAT status refresh stays inside the AWS/KVM stage"
 
 mkdir "$INSIDE_EVIDENCE"

@@ -678,6 +678,7 @@ tf_plan() {
     -var='enable_canada=false'
     -var='enable_azure_ilb=false'
     -var='enable_canada_ilb=false'
+    -var='kvm_lan_configuration_phase=hardware'
   )
   if [ "$LIFECYCLE_PHASE" = configured ]; then
     [ -n "$MAPPING_FILE" ] && [ -r "$MAPPING_FILE" ] || return 1
