@@ -408,6 +408,23 @@ class ShowcasePlanScopeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "outside its scope"):
             module.validate(document, "kvm-configured", "a" * 40)
 
+    def test_aws_kvm_zero_rejects_hidden_azure_action(self):
+        document = plan(
+            [
+                (
+                    'module.azure_frr_us[0].azurerm_linux_virtual_machine.frr["20"]',
+                    ["create"],
+                )
+            ]
+        )
+        document["variables"]["enable_azure"]["value"] = False
+        document["variables"]["enable_canada"]["value"] = False
+        document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
+        with self.assertRaisesRegex(ValueError, "not zero-change"):
+            module.validate(document, "aws-kvm-zero", "a" * 40)
+
+
+class RefreshOnlyPlanScopeTest(unittest.TestCase):
     def test_refresh_only_rejects_unowned_drift(self):
         document = plan([])
         document["resource_drift"] = [
@@ -439,21 +456,6 @@ class ShowcasePlanScopeTest(unittest.TestCase):
         ]
         with self.assertRaisesRegex(ValueError, "normal resource action"):
             module.validate(document, "refresh-only", "a" * 40)
-
-    def test_aws_kvm_zero_rejects_hidden_azure_action(self):
-        document = plan(
-            [
-                (
-                    'module.azure_frr_us[0].azurerm_linux_virtual_machine.frr["20"]',
-                    ["create"],
-                )
-            ]
-        )
-        document["variables"]["enable_azure"]["value"] = False
-        document["variables"]["enable_canada"]["value"] = False
-        document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
-        with self.assertRaisesRegex(ValueError, "not zero-change"):
-            module.validate(document, "aws-kvm-zero", "a" * 40)
 
 
 if __name__ == "__main__":
