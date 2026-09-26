@@ -570,14 +570,27 @@ capture_bootstrap_mapping_inputs() {
 
 verify_configured() {
   local cycle=$1 step=$2 execute_uat=${3:-false}
-  local -a args=("${common_phase_args[@]}" --phase configured --configured-tgw true
-    --mapping-file "$MAPPING_FILE" --registration-projection "$REGISTRATION_PROJECTION"
-    --eni-projection "$ENI_PROJECTION")
-  phase_paths "$cycle" configured "$step"
-  args+=(--plan-file "$PLAN_FILE" --evidence-dir "$EVIDENCE_DIR")
-  for site in "${final_sites[@]}"; do args+=(--expected-site "$site"); done
-  "$REPO_ROOT/scripts/aws-smsv2-lifecycle-plan.sh" "${args[@]}"
-  scope_plan aws-kvm-zero
+  local attempt step_name
+  local -a args=()
+  for attempt in 1 2 3; do
+    step_name=$step
+    [ "$attempt" -eq 1 ] || step_name="$step-settle-$attempt"
+    phase_paths "$cycle" configured "$step_name"
+    args=("${common_phase_args[@]}" --phase configured --configured-tgw true
+      --mapping-file "$MAPPING_FILE" --registration-projection "$REGISTRATION_PROJECTION"
+      --eni-projection "$ENI_PROJECTION" --plan-file "$PLAN_FILE" --evidence-dir "$EVIDENCE_DIR")
+    for site in "${final_sites[@]}"; do args+=(--expected-site "$site"); done
+    "$REPO_ROOT/scripts/aws-smsv2-lifecycle-plan.sh" "${args[@]}"
+    if tf show -json "$PLAN_FILE" | jq -e '
+      ([.resource_changes[]? | select(.change.actions != ["no-op"] and .change.actions != ["read"])] | length == 0) and
+      ([.output_changes[]? | select(.actions != ["no-op"] and .actions != ["read"])] | length == 0)
+    ' >/dev/null; then
+      scope_plan aws-kvm-zero
+      break
+    fi
+    [ "$attempt" -lt 3 ] || die "AWS/KVM status output did not settle after two reviewed refreshes"
+    apply_scoped_plan aws-status-output-refresh
+  done
   tf show -json "$PLAN_FILE" | jq -e \
     '[.resource_changes[]? | select(.change.actions != ["no-op"] and .change.actions != ["read"])] | length == 0' >/dev/null ||
     die "configured verification plan is not zero-change"
