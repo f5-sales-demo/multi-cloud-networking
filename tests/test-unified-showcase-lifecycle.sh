@@ -88,6 +88,7 @@ test -x "$repo_root/scripts/kvm-lan-live-acceptance.py" || fail 'KVM LAN live ac
 require 'shared bridge/uplink resources survive' "$lifecycle"
 require 'exercise_managed_drift "$cycle"' "$lifecycle"
 require 'apply_scoped_plan kvm-configured' "$lifecycle"
+require 'apply_scoped_plan aws-status-output-refresh' "$lifecycle"
 require 'apply_scoped_plan azure-build' "$lifecycle"
 require 'scope_plan zero-change' "$lifecycle"
 require 'verify-azure-failover.sh' "$lifecycle"

@@ -203,7 +203,7 @@ def validate(
     output_changes = [
         name
         for name, item in (document.get("output_changes") or {}).items()
-        if item.get("change", {}).get("actions") not in (["no-op"], ["read"])
+        if item.get("actions") not in (["no-op"], ["read"])
     ]
 
     if scope == "azure-approvals":
@@ -319,6 +319,53 @@ def validate(
             raise ValueError("AWS/KVM verification must disable Azure")
         if _value(document, "kvm_lan_configuration_phase") != "hardware":
             raise ValueError("AWS/KVM verification must preserve the hardware phase")
+    elif scope == "aws-status-output-refresh":
+        if changes or output_changes != ["aws_site_upgrade_status"]:
+            raise ValueError("AWS status refresh must change only its status output")
+        if (
+            _value(document, "enable_azure") is not False
+            or _value(document, "enable_canada") is not False
+            or _value(document, "kvm_lan_configuration_phase") != "hardware"
+        ):
+            raise ValueError("AWS status refresh must preserve the AWS/KVM stage")
+        status_change = document["output_changes"]["aws_site_upgrade_status"]
+        before = status_change.get("before")
+        after = status_change.get("after")
+        if (
+            status_change.get("actions") != ["update"]
+            or not isinstance(before, dict)
+            or not isinstance(after, dict)
+            or set(before) != {"01", "02", "03"}
+            or set(after) != set(before)
+        ):
+            raise ValueError("AWS status refresh has an unexpected output shape")
+        changed_sites = 0
+        status_fields = {"os_deployment_phase", "os_deployment_result"}
+        for site in before:
+            old, new = before[site], after[site]
+            if not isinstance(old, dict) or not isinstance(new, dict):
+                raise ValueError("AWS status refresh has a malformed site status")
+            if old == new:
+                continue
+            old_other = {
+                key: value for key, value in old.items() if key not in status_fields
+            }
+            new_other = {
+                key: value for key, value in new.items() if key not in status_fields
+            }
+            if (
+                old_other != new_other
+                or old.get("os_deployment_phase") != "UPGRADE_IN_PROGRESS"
+                or old.get("os_deployment_result") != "inProgress"
+                or new.get("os_deployment_phase") != "UPGRADE_COMPLETED"
+                or new.get("os_deployment_result") != "success"
+            ):
+                raise ValueError(
+                    "AWS status refresh is not a successful upgrade transition"
+                )
+            changed_sites += 1
+        if changed_sites == 0:
+            raise ValueError("AWS status refresh has no successful transition")
     elif scope == "refresh-only":
         if (
             len(changes) != 1
@@ -443,6 +490,7 @@ def main() -> int:
         choices=(
             "aws-kvm-build",
             "aws-kvm-zero",
+            "aws-status-output-refresh",
             "kvm-configured",
             "azure-build",
             "azure-approvals",

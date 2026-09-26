@@ -1,6 +1,7 @@
 # pylint: disable=missing-module-docstring,missing-class-docstring,missing-function-docstring,duplicate-code
 # ruff: noqa: INP001, I001, PT009, PT027, RUF005
 import importlib.util
+import copy
 from pathlib import Path
 from typing import Any
 import unittest
@@ -58,6 +59,59 @@ def prior(document, addresses):
     return document
 
 
+class AWSStatusOutputScopeTest(unittest.TestCase):
+    def test_aws_status_output_refresh_accepts_only_successful_settlement(self):
+        document = plan([])
+        document["variables"]["enable_azure"]["value"] = False
+        document["variables"]["enable_canada"]["value"] = False
+        document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
+        before = {
+            site: {
+                "os_deployment_phase": "UPGRADE_COMPLETED",
+                "os_deployment_result": "success",
+                "version": "6.0.1",
+            }
+            for site in ("01", "02", "03")
+        }
+        before["03"]["os_deployment_phase"] = "UPGRADE_IN_PROGRESS"
+        before["03"]["os_deployment_result"] = "inProgress"
+        after = copy.deepcopy(before)
+        after["03"]["os_deployment_phase"] = "UPGRADE_COMPLETED"
+        after["03"]["os_deployment_result"] = "success"
+        document["output_changes"] = {
+            "aws_site_upgrade_status": {
+                "actions": ["update"],
+                "before": before,
+                "after": after,
+            },
+            "stable_output": {"actions": ["no-op"]},
+        }
+        self.assertEqual(
+            module.validate(document, "aws-status-output-refresh", "a" * 40), 0
+        )
+        with self.assertRaisesRegex(ValueError, "not zero-change"):
+            module.validate(document, "aws-kvm-zero", "a" * 40)
+
+        for mutation in (
+            lambda value: value["resource_changes"].append(
+                {"address": "aws_instance.ce[0]", "change": {"actions": ["update"]}}
+            ),
+            lambda value: value["output_changes"].update(
+                {"unrelated": {"actions": ["update"]}}
+            ),
+            lambda value: value["output_changes"]["aws_site_upgrade_status"]["after"][
+                "03"
+            ].update({"os_deployment_result": "failed"}),
+            lambda value: value["output_changes"]["aws_site_upgrade_status"]["after"][
+                "02"
+            ].update({"version": "unexpected"}),
+        ):
+            invalid = copy.deepcopy(document)
+            mutation(invalid)
+            with self.assertRaises(ValueError):
+                module.validate(invalid, "aws-status-output-refresh", "a" * 40)
+
+
 class ShowcasePlanScopeTest(unittest.TestCase):
     def test_aws_kvm_stage_accepts_exact_saved_plan_boolean_strings(self):
         document = plan([("aws_vpc.aws[0]", ["create"])])
@@ -80,6 +134,7 @@ class ShowcasePlanScopeTest(unittest.TestCase):
         document = plan([])
         for name in module.FULL_FLAGS:
             document["variables"][name]["value"] = "true"
+        document["output_changes"] = {"stable": {"actions": ["no-op"]}}
         self.assertEqual(module.validate(document, "zero-change", "a" * 40), 0)
 
     def test_saved_plan_rejects_non_boolean_flag_value(self):
@@ -326,7 +381,7 @@ class ShowcasePlanScopeTest(unittest.TestCase):
 
     def test_zero_change_rejects_output_only_drift(self):
         document = plan([])
-        document["output_changes"] = {"status": {"change": {"actions": ["update"]}}}
+        document["output_changes"] = {"status": {"actions": ["update"]}}
         with self.assertRaisesRegex(ValueError, "not zero-change"):
             module.validate(document, "zero-change", "a" * 40)
 
