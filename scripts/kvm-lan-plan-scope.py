@@ -108,6 +108,51 @@ def _lan_contract(document: dict[str, Any], stage: str) -> dict[str, Any]:
     return lan
 
 
+def _owned_unknown_slo_network(document: dict[str, Any]) -> bool:
+    """Bind an unknown first-NIC network ID to the owned libvirt network."""
+    change: dict[str, Any] = next(
+        (
+            item
+            for item in _items(document.get("resource_changes"))
+            if _mapping(item).get("address") == DOMAIN
+        ),
+        {},
+    )
+    unknown = _mapping(_mapping(_mapping(change).get("change")).get("after_unknown"))
+    unknown_interfaces = _items(unknown.get("network_interface"))
+    if (
+        len(unknown_interfaces) != 2
+        or _mapping(unknown_interfaces[0]).get("network_id") is not True
+        or _mapping(unknown_interfaces[0]).get("bridge") is True
+    ):
+        return False
+    resources = _resources(
+        _mapping(_mapping(document.get("configuration")).get("root_module"))
+    )
+    domain = next(
+        (
+            resource
+            for resource in resources
+            if resource.get("address") == "libvirt_domain.ce_node"
+        ),
+        {},
+    )
+    interfaces = _items(_mapping(domain.get("expressions")).get("network_interface"))
+    if len(interfaces) != 1:
+        return False
+    references = _items(
+        _mapping(_mapping(interfaces[0]).get("network_id")).get("references")
+    )
+    allowed = {
+        "libvirt_network.ce_bgp_net[0].id",
+        "libvirt_network.ce_bgp_net[0]",
+        "libvirt_network.ce_bgp_net",
+    }
+    return "libvirt_network.ce_bgp_net[0].id" in references and all(
+        reference in allowed for reference in references
+    )
+
+
 def validate_plan(document: object, stage: str) -> dict[str, Any]:
     """Return a secret-free receipt or reject an unsafe plan."""
     if stage not in {"hardware", "configured"}:
@@ -144,7 +189,9 @@ def validate_plan(document: object, stage: str) -> dict[str, Any]:
         if len(interfaces) != 2:
             raise ValueError("hardware plan must create exactly two ordered CE NICs")
         slo, sli = (_mapping(interface) for interface in interfaces)
-        if not slo.get("network_id") or slo.get("bridge"):
+        if (
+            not slo.get("network_id") and not _owned_unknown_slo_network(document)
+        ) or slo.get("bridge"):
             raise ValueError("first CE NIC must remain the libvirt-network SLO")
         if (
             not sli.get("bridge")
