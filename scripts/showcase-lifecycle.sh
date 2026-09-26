@@ -900,16 +900,28 @@ repair_eni_tag_drift() {
   verify_configured "$cycle" eni-tag-drift-zero-change false
 }
 
+kvm_autostart_state() {
+  local observed
+  observed=$(virsh --connect qemu:///system dominfo "$1" |
+    awk -F: '$1 ~ /^[[:space:]]*Autostart[[:space:]]*$/ {gsub(/[[:space:]]/, "", $2); print tolower($2)}') ||
+    return 1
+  case "$observed" in
+  enable | yes) printf 'yes\n' ;;
+  disable | no) printf 'no\n' ;;
+  *) return 1 ;;
+  esac
+}
+
 repair_kvm_autostart_drift() {
   local cycle=$1 domain=onprem-ce-01 autostart
-  autostart=$(virsh --connect qemu:///system dominfo "$domain" | awk -F: '$1 ~ /^Autostart/ {gsub(/[[:space:]]/, "", $2); print tolower($2)}')
+  autostart=$(kvm_autostart_state "$domain") || die "managed KVM autostart state is unavailable"
   [ "$autostart" = yes ] || die "managed KVM domain is not autostart-enabled before drift injection"
   virsh --connect qemu:///system autostart --disable "$domain" >/dev/null
-  autostart=$(virsh --connect qemu:///system dominfo "$domain" | awk -F: '$1 ~ /^Autostart/ {gsub(/[[:space:]]/, "", $2); print tolower($2)}')
+  autostart=$(kvm_autostart_state "$domain") || die "managed KVM autostart state is unavailable"
   [ "$autostart" = no ] || die "KVM domain autostart drift injection failed"
   observe_refresh_only_drift "$cycle" kvm-autostart-drift 'libvirt_domain.ce_node["01"]' kvm_autostart true false
   run_phase "$cycle" configured kvm-autostart-drift-repair true
-  autostart=$(virsh --connect qemu:///system dominfo "$domain" | awk -F: '$1 ~ /^Autostart/ {gsub(/[[:space:]]/, "", $2); print tolower($2)}')
+  autostart=$(kvm_autostart_state "$domain") || die "managed KVM autostart state is unavailable"
   [ "$autostart" = yes ] || die "managed KVM domain autostart drift was not repaired"
   verify_configured "$cycle" kvm-autostart-drift-zero-change false
 }

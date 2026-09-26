@@ -93,7 +93,8 @@ require 'exercise_managed_drift "$cycle"' "$lifecycle"
 eni_lookup_source=$(mktemp)
 refresh_scope_source=$(mktemp)
 refresh_scope_calls=$(mktemp)
-trap 'rm -f "$eni_lookup_source" "$refresh_scope_source" "$refresh_scope_calls"' EXIT
+autostart_source=$(mktemp)
+trap 'rm -f "$eni_lookup_source" "$refresh_scope_source" "$refresh_scope_calls" "$autostart_source"' EXIT
 sed -n '/^resolve_owned_eni_id() {/,/^}/p' "$lifecycle" >"$eni_lookup_source"
 test -s "$eni_lookup_source" || fail 'managed ENI lookup must use an executable state JSON resolver'
 # shellcheck source=/dev/null
@@ -139,6 +140,22 @@ for stage_flag in \
   grep -Fxq -- "-var=$stage_flag" "$refresh_scope_calls" ||
     fail "drift refresh plan must retain AWS/KVM stage flag $stage_flag"
 done
+sed -n '/^kvm_autostart_state() {/,/^}/p' "$lifecycle" >"$autostart_source"
+test -s "$autostart_source" || fail 'KVM autostart must normalize the observed libvirt state'
+# shellcheck source=/dev/null
+source "$autostart_source"
+# Invoked by the sourced KVM autostart function.
+# shellcheck disable=SC2329
+virsh() { printf 'Autostart: %s\n' "$FAKE_AUTOSTART"; }
+[ "$(FAKE_AUTOSTART=enable kvm_autostart_state onprem-ce-01)" = yes ] ||
+  fail 'libvirt enable must normalize to yes'
+[ "$(FAKE_AUTOSTART=disable kvm_autostart_state onprem-ce-01)" = no ] ||
+  fail 'libvirt disable must normalize to no'
+[ "$(FAKE_AUTOSTART=yes kvm_autostart_state onprem-ce-01)" = yes ] ||
+  fail 'libvirt yes must remain yes'
+if FAKE_AUTOSTART=unknown kvm_autostart_state onprem-ce-01 >/dev/null 2>&1; then
+  fail 'unknown libvirt autostart state must be rejected'
+fi
 require 'apply_scoped_plan kvm-configured' "$lifecycle"
 require 'apply_scoped_plan aws-status-output-refresh' "$lifecycle"
 require 'apply_scoped_plan azure-build' "$lifecycle"
