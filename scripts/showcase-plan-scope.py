@@ -154,7 +154,7 @@ def _value(document: dict[str, Any], name: str) -> Any:
         raise ValueError(f"saved plan is missing variable {name}")
     value = item["value"]
     if name in FULL_FLAGS:
-        if type(value) is bool:
+        if isinstance(value, bool):
             return value
         if value == "true":
             return True
