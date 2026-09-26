@@ -176,8 +176,8 @@ run "plans_three_sites_six_peers_and_workload_attachment" {
     error_message = "Runtime and BGP convergence must be observed independently for all sites."
   }
   assert {
-    condition     = length(aws_ec2_transit_gateway_vpc_attachment.workload) == 1 && length(aws_ec2_transit_gateway_route_table_association.workload) == 1 && length(aws_ec2_transit_gateway_route_table_propagation.workload) == 1
-    error_message = "The workload VPC must have explicit TGW attachment, association, and propagation."
+    condition     = length(aws_ec2_transit_gateway_vpc_attachment.workload) == 1 && aws_ec2_transit_gateway_vpc_attachment.workload[0].transit_gateway_default_route_table_association == true && length(aws_ec2_transit_gateway_route_table_propagation.workload) == 1
+    error_message = "The workload VPC must attach to the TGW default route table and propagate its routes."
   }
   assert {
     condition = alltrue([

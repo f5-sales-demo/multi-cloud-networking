@@ -55,7 +55,6 @@ grep -Fq 'timeout_seconds          = var.aws_bgp_convergence_timeout_seconds' <<
 }
 for dependency in \
   'module.aws_tgw_connect' \
-  'aws_ec2_transit_gateway_route_table_association.workload' \
   'aws_ec2_transit_gateway_route_table_propagation.workload' \
   'xcsh_http_loadbalancer.aws'; do
   grep -Fq "$dependency" <<<"$bgp_status" || {

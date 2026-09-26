@@ -2,7 +2,7 @@
 # intentionally absent and are composed by the root module.
 mock_provider "aws" {}
 
-run "plans_two_role_connect_attachments_and_explicit_routing" {
+run "plans_two_role_connect_attachments_and_default_associations" {
   command = plan
 
   module {
@@ -34,13 +34,13 @@ run "plans_two_role_connect_attachments_and_explicit_routing" {
   }
 
   assert {
-    condition     = length(aws_ec2_transit_gateway_route_table_association.connect) == 2 && length(aws_ec2_transit_gateway_route_table_propagation.connect) == 2
-    error_message = "Each role attachment must have an explicit association and propagation."
+    condition     = length(aws_ec2_transit_gateway_route_table_propagation.connect) == 2 && alltrue([for attachment in values(aws_ec2_transit_gateway_connect.role) : attachment.transit_gateway_default_route_table_association == true])
+    error_message = "Each role attachment must use automatic default association and explicit propagation."
   }
 
   assert {
-    condition     = aws_ec2_transit_gateway.this.default_route_table_association == "disable" && aws_ec2_transit_gateway.this.default_route_table_propagation == "disable"
-    error_message = "The TGW must use explicit route-table associations and propagations only."
+    condition     = aws_ec2_transit_gateway.this.default_route_table_association == "enable" && aws_ec2_transit_gateway.this.default_route_table_propagation == "disable" && aws_ec2_transit_gateway_vpc_attachment.transport.transit_gateway_default_route_table_association == true
+    error_message = "The TGW and transport attachment must use automatic default association while retaining explicit propagation."
   }
 }
 

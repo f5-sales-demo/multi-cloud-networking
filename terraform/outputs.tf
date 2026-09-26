@@ -392,7 +392,7 @@ output "aws_tgw_id" {
 }
 
 output "aws_tgw_route_table_id" {
-  description = "TGW route table used for explicit workload association and propagation."
+  description = "TGW default route table used for workload association and explicit propagation."
   value       = try(module.aws_tgw_connect[0].route_table_id, null)
 }
 
