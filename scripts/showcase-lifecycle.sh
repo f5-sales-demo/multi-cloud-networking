@@ -498,7 +498,7 @@ run_phase() {
 
 wait_for_approvals() {
   local phase=$1 expected_aws=$2 expected_kvm=$3 deadline=$((SECONDS + 5400))
-  local probe="$PRIVATE_ROOT/registration-wait.tfplan" gate digest
+  local probe="$PRIVATE_ROOT/registration-wait.tfplan" gate digest projection_tmp projection_digest
   local -a args=(-input=false -no-color -lock=false -var-file="$TFVARS"
     -var="aws_site_configuration_phase=$phase" -var='enable_aws_tgw_connect=false'
     -var='enable_azure=false' -var='enable_canada=false'
@@ -516,9 +516,26 @@ wait_for_approvals() {
       [ "$digest" = "sha256:$(sha256sum "$probe" | awk '{print $1}')" ] ||
         die "registration plan digest changed during review"
       if jq -e '.ready == true' <<<"$gate" >/dev/null; then
+        projection_digest=""
+        if [ "$phase" = bootstrap ]; then
+          # The output in state can lag the registration data source when every
+          # CE is already ONLINE and the approval apply is correctly skipped.
+          # Keep the projection from this exact reviewed, refresh-enabled plan.
+          projection_tmp=$(mktemp "$CYCLE_DIR/.aws-registration-projection.XXXXXX")
+          chmod 600 "$projection_tmp"
+          tf show -json "$probe" |
+            jq -e '.planned_values.outputs.aws_smsv2_bootstrap_registration_projection.value' \
+              >"$projection_tmp" || die "bootstrap registration projection is missing from reviewed plan"
+          [ "$digest" = "sha256:$(sha256sum "$probe" | awk '{print $1}')" ] ||
+            die "registration plan digest changed while capturing projection"
+          REGISTRATION_PROJECTION="$CYCLE_DIR/aws-registration-projection.json"
+          mv -- "$projection_tmp" "$REGISTRATION_PROJECTION"
+          projection_digest="sha256:$(sha256sum "$REGISTRATION_PROJECTION" | awk '{print $1}')"
+        fi
         jq -n --arg phase "$phase" --arg source_commit "$SOURCE_COMMIT_SHA" \
-          --arg plan_sha256 "$digest" --argjson gate "$gate" \
-          '{phase:$phase,source_commit:$source_commit,plan_sha256:$plan_sha256,gate:$gate}' \
+          --arg plan_sha256 "$digest" --arg registration_projection_sha256 "$projection_digest" \
+          --argjson gate "$gate" \
+          '{phase:$phase,source_commit:$source_commit,plan_sha256:$plan_sha256,registration_projection_sha256:$registration_projection_sha256,gate:$gate}' \
           >"$CYCLE_DIR/$phase-registration-wait-receipt.json"
         chmod 600 "$CYCLE_DIR/$phase-registration-wait-receipt.json"
         REGISTRATION_APPROVAL_COUNT=$(jq -er '.approval_creates' <<<"$gate")
@@ -536,7 +553,15 @@ capture_bootstrap_mapping_inputs() {
   REGISTRATION_PROJECTION="$CYCLE_DIR/aws-registration-projection.json"
   ENI_PROJECTION="$CYCLE_DIR/aws-eni-projection.json"
   MAPPING_FILE="$CYCLE_DIR/aws-device-mapping.json"
-  tf output -json aws_smsv2_bootstrap_registration_projection >"$REGISTRATION_PROJECTION"
+  [ -s "$REGISTRATION_PROJECTION" ] || die "reviewed bootstrap registration projection is missing"
+  local projection_digest
+  projection_digest="sha256:$(sha256sum "$REGISTRATION_PROJECTION" | awk '{print $1}')"
+  jq -e --arg source_commit "$SOURCE_COMMIT_SHA" --arg projection_digest "$projection_digest" \
+    '.phase == "bootstrap" and .source_commit == $source_commit and
+     .registration_projection_sha256 == $projection_digest and
+     (.plan_sha256 | test("^sha256:[0-9a-f]{64}$"))' \
+    "$CYCLE_DIR/bootstrap-registration-wait-receipt.json" >/dev/null ||
+    die "bootstrap registration projection does not match its reviewed plan receipt"
   tf output -json aws_smsv2_owned_eni_projection >"$ENI_PROJECTION"
   chmod 600 "$REGISTRATION_PROJECTION" "$ENI_PROJECTION"
   "$REPO_ROOT/scripts/generate-aws-smsv2-device-mapping.py" \
