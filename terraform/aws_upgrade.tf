@@ -22,7 +22,7 @@ action "xcsh_site_upgrade_os" "aws" {
 data "xcsh_site_upgrade_status" "aws" {
   for_each = {
     for key, site in local.aws_sites : key => site
-    if var.aws_site_configuration_phase == "configured" && contains(var.aws_upgrade_observed_sites, key)
+    if var.aws_site_configuration_phase == "configured" && var.enable_aws_tgw_connect && contains(var.aws_upgrade_observed_sites, key)
   }
 
   site                      = xcsh_securemesh_site_v2.aws[each.key].name
@@ -32,10 +32,9 @@ data "xcsh_site_upgrade_status" "aws" {
   timeout_seconds           = var.aws_upgrade_timeout_seconds
   poll_interval_seconds     = var.aws_upgrade_poll_interval_seconds
 
-  # A fresh site has no status object until its CE runtime is published.  The
-  # runtime gate is the authoritative readiness boundary; polling an upgrade
-  # status sooner can fail independently and mask an otherwise recoverable
-  # first-boot installation.
+  # A fresh site has no status object until its CE runtime is published. The
+  # TGW-disabled configured creation phase has no runtime gate (count zero),
+  # so select observations only after TGW enables that readiness boundary.
   depends_on = [terraform_data.aws_tgw_runtime_gate]
 }
 
