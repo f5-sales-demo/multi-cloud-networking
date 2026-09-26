@@ -367,13 +367,30 @@ def validate(
         if changed_sites == 0:
             raise ValueError("AWS status refresh has no successful transition")
     elif scope == "refresh-only":
+        if changes:
+            raise ValueError("refresh-only plan contains a normal resource action")
+        if output_changes:
+            raise ValueError("refresh-only plan contains an output action")
+        drift = document.get("resource_drift") or []
+        if not isinstance(drift, list):
+            raise ValueError("refresh-only plan has malformed resource drift")
+        drift_changes = []
+        for item in drift:
+            if not isinstance(item, dict) or not isinstance(item.get("address"), str):
+                raise ValueError("refresh-only plan has malformed resource drift")
+            actions = item.get("change", {}).get("actions")
+            if not isinstance(actions, list):
+                raise ValueError("refresh-only plan has malformed resource drift")
+            if actions != ["no-op"]:
+                drift_changes.append((item["address"], actions))
         if (
-            len(changes) != 1
-            or changes[0][0]
+            len(drift_changes) != 1
+            or drift_changes[0][0]
             not in ("aws_network_interface.slo[0]", 'libvirt_domain.ce_node["01"]')
-            or changes[0][1] != ["update"]
+            or drift_changes[0][1] != ["update"]
         ):
             raise ValueError("refresh-only plan must isolate one owned drift update")
+        return 1
     elif scope == "full-destroy":
         if not changes:
             raise ValueError("destroy plan has no actions")
