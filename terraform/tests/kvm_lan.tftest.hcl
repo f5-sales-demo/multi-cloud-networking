@@ -190,13 +190,13 @@ run "configured_phase_adopts_and_changes_only_the_runtime_sli" {
       xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli["sli"].ipv4_cidr == "192.0.2.2/24" &&
       xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli["sli"].device == "ens4" &&
       xcsh_smsv2_kvm_runtime_interface.kvm_lan_sli["sli"].configured &&
-      length(xcsh_bgp.onprem_ebgp) == 1 &&
+      length(xcsh_bgp.onprem_ebgp) == 0 &&
       xcsh_http_loadbalancer.kvm_lan[0].http.port == 80 &&
       xcsh_http_loadbalancer.kvm_lan[0].advertise_custom.advertise_where[0].port == 80 &&
       xcsh_http_loadbalancer.kvm_lan[0].advertise_custom.advertise_where[0].virtual_site_with_vip.ip == "192.0.2.10" &&
       xcsh_http_loadbalancer.kvm_lan[0].advertise_custom.advertise_where[0].virtual_site_with_vip.network == "SITE_NETWORK_SPECIFIED_VIP_INSIDE"
     )
-    error_message = "Configured KVM LAN must leave the site payload empty, adopt only the exact runtime SLI child, and bind the exact site to the inside VIP and real LAN origin."
+    error_message = "Configured KVM LAN during bootstrap must adopt only the runtime SLI child and bind the inside VIP and origin, while BGP waits for CE approval."
   }
 }
 

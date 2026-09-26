@@ -108,7 +108,7 @@ module "kvm_registration_mapping" {
 }
 
 data "xcsh_smsv2_kvm_runtime" "kvm_slo" {
-  count = var.enable_kvm ? 1 : 0
+  count = var.enable_kvm && var.acceptance_phase == "configured" ? 1 : 0
 
   namespace             = "system"
   site                  = local.kvm_site_name
@@ -158,7 +158,7 @@ data "external" "kvm_bgp_observer" {
 
 # eBGP Peering configuration for On-Prem KVM Site
 resource "xcsh_bgp" "onprem_ebgp" {
-  count = var.enable_kvm ? 1 : 0
+  count = var.enable_kvm && var.acceptance_phase == "configured" ? 1 : 0
 
   name      = "onprem-kvm-ebgp"
   namespace = "system"
