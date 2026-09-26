@@ -109,8 +109,7 @@ for invalid_eni_state in \
   '{"resources":[]}' \
   '{"resources":[{"mode":"managed","type":"aws_network_interface","name":"slo","instances":[{"index_key":1,"attributes":{"id":"eni-0123456789abcdef0"}}]}]}' \
   '{"resources":[{"mode":"managed","type":"aws_network_interface","name":"slo","instances":[{"index_key":0,"attributes":{"id":"eni-0123456789abcdef0"}},{"index_key":0,"attributes":{"id":"eni-11111111111111111"}}]}]}' \
-  '{"resources":[{"mode":"managed","type":"aws_network_interface","name":"slo","instances":[{"index_key":0,"attributes":{"id":"not-an-eni"}}]}]}'
-do
+  '{"resources":[{"mode":"managed","type":"aws_network_interface","name":"slo","instances":[{"index_key":0,"attributes":{"id":"not-an-eni"}}]}]}'; do
   if FAKE_STATE="$invalid_eni_state" resolve_owned_eni_id >/dev/null 2>&1; then
     fail 'managed ENI lookup accepted a missing, wrong-index, duplicate, or malformed identity'
   fi
@@ -123,15 +122,20 @@ source "$refresh_scope_source"
   TFVARS=/tmp/showcase-test.tfvars
   MAPPING_FILE=/tmp/showcase-test-mapping.json
   PLAN_FILE=/tmp/showcase-test.tfplan
+  # Both mocks are invoked by the sourced lifecycle function.
+  # shellcheck disable=SC2329
   phase_paths() { :; }
-  tf_plan() { printf '%s\n' "$@" >"$refresh_scope_calls"; exit 47; }
+  # shellcheck disable=SC2329
+  tf_plan() {
+    printf '%s\n' "$@" >"$refresh_scope_calls"
+    exit 47
+  }
   observe_refresh_only_drift first eni-tag-drift 'aws_network_interface.slo[0]' eni_name expected observed
 ) >/dev/null 2>&1 || :
 for stage_flag in \
   enable_azure=false enable_canada=false \
   enable_azure_ilb=false enable_canada_ilb=false \
-  kvm_lan_configuration_phase=hardware
-do
+  kvm_lan_configuration_phase=hardware; do
   grep -Fxq -- "-var=$stage_flag" "$refresh_scope_calls" ||
     fail "drift refresh plan must retain AWS/KVM stage flag $stage_flag"
 done
