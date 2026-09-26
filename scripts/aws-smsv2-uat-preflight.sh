@@ -670,7 +670,15 @@ tf_plan() {
     [ -r "$TFVARS" ] || return 1
     tfvars_args=(-var-file="$TFVARS")
   fi
-  phase_args=(-var="aws_site_configuration_phase=$LIFECYCLE_PHASE")
+  # This UAT runs before the full-showcase Azure build. Every refresh plan must
+  # retain the AWS/KVM stage even when the private tfvars enable both regions.
+  phase_args=(
+    -var="aws_site_configuration_phase=$LIFECYCLE_PHASE"
+    -var='enable_azure=false'
+    -var='enable_canada=false'
+    -var='enable_azure_ilb=false'
+    -var='enable_canada_ilb=false'
+  )
   if [ "$LIFECYCLE_PHASE" = configured ]; then
     [ -n "$MAPPING_FILE" ] && [ -r "$MAPPING_FILE" ] || return 1
     phase_args+=(-var='enable_aws_tgw_connect=true')
