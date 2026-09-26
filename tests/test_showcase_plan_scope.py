@@ -59,7 +59,7 @@ def prior(document, addresses):
     return document
 
 
-class ShowcasePlanScopeTest(unittest.TestCase):
+class AWSStatusOutputScopeTest(unittest.TestCase):
     def test_aws_status_output_refresh_accepts_only_successful_settlement(self):
         document = plan([])
         document["variables"]["enable_azure"]["value"] = False
@@ -111,6 +111,8 @@ class ShowcasePlanScopeTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 module.validate(invalid, "aws-status-output-refresh", "a" * 40)
 
+
+class ShowcasePlanScopeTest(unittest.TestCase):
     def test_aws_kvm_stage_accepts_exact_saved_plan_boolean_strings(self):
         document = plan([("aws_vpc.aws[0]", ["create"])])
         document["variables"]["enable_azure"]["value"] = "false"
