@@ -704,6 +704,40 @@ fi
 assert_sanitized "$evidence" "$output"
 echo "ok - the exact KVM registration mapping gate is accepted"
 
+evidence="${TMP_ROOT}/kvm-token"
+mkdir "$evidence"
+output="${TMP_ROOT}/kvm-token.out"
+if ! FAKE_EXTRA_CHANGE=',{"address":"xcsh_token.kvm[0]","type":"xcsh_token","name":"kvm","index":0,"change":{"actions":["create"],"after":{"name":"mcn-ce-ha-gen-01-kvm-registration","namespace":"system","site_name":"mcn-ce-ha-gen-01-kvm","labels":{"mcn-deployment-generation":"gen-01"}}}}' \
+  "$SCRIPT" --evidence-dir "$evidence" "${common[@]}" >"$output" 2>&1; then
+  cat "$output" >&2
+  fail "the owned KVM token must be accepted"
+fi
+[ "$(jq -r .status "$evidence/summary.json")" = ready ] || fail "KVM token ready status not recorded"
+assert_sanitized "$evidence" "$output"
+echo "ok - the exact KVM token is accepted"
+
+evidence="${TMP_ROOT}/foreign-token"
+mkdir "$evidence"
+output="${TMP_ROOT}/foreign-token.out"
+if FAKE_EXTRA_CHANGE=',{"address":"xcsh_token.foreign[0]","type":"xcsh_token","name":"foreign","index":0,"change":{"actions":["create"],"after":{}}}' \
+  "$SCRIPT" --evidence-dir "$evidence" "${common[@]}" >"$output" 2>&1; then
+  fail "a foreign token must remain outside the allowlist"
+fi
+[ "$(jq -r .reason "$evidence/summary.json")" = plan_resource_outside_showcase_allowlist ] || fail "foreign-token blocker not recorded"
+assert_sanitized "$evidence" "$output"
+echo "ok - foreign tokens remain outside the allowlist"
+
+evidence="${TMP_ROOT}/extra-kvm-token"
+mkdir "$evidence"
+output="${TMP_ROOT}/extra-kvm-token.out"
+if FAKE_EXTRA_CHANGE=',{"address":"xcsh_token.kvm[1]","type":"xcsh_token","name":"kvm","index":1,"change":{"actions":["create"],"after":{"name":"mcn-ce-ha-gen-01-kvm-registration-extra","namespace":"system","site_name":"mcn-ce-ha-gen-01-kvm","labels":{"mcn-deployment-generation":"gen-01"}}}}' \
+  "$SCRIPT" --evidence-dir "$evidence" "${common[@]}" >"$output" 2>&1; then
+  fail "an extra KVM token must remain outside the allowlist"
+fi
+[ "$(jq -r .reason "$evidence/summary.json")" = plan_resource_outside_showcase_allowlist ] || fail "extra KVM-token blocker not recorded"
+assert_sanitized "$evidence" "$output"
+echo "ok - extra KVM tokens remain outside the allowlist"
+
 evidence="${TMP_ROOT}/outside-allowlist"
 mkdir "$evidence"
 output="${TMP_ROOT}/outside-allowlist.out"

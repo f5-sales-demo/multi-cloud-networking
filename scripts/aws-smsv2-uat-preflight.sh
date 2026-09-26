@@ -466,7 +466,7 @@ jq -e '
 jq -e '
   [.resource_changes[]? |
     select(.change.actions != ["no-op"] and .change.actions != ["read"]) |
-    select((.address | test("^(aws_|module\\.aws_tgw_connect|module\\.kvm_registration_mapping\\.terraform_data\\.gate|libvirt_|docker_|terraform_data\\.deployment_identity_guard$|terraform_data\\.(aws|kvm)|xcsh_token\\.(aws|ce)|xcsh_securemesh_site_v2\\.(aws|onprem_kvm)|xcsh_site_cloud_init\\.aws|xcsh_registration_approval\\.(aws|kvm)|xcsh_virtual_site\\.aws|xcsh_origin_pool\\.aws|xcsh_http_loadbalancer\\.aws|xcsh_external_connector\\.aws_tgw|xcsh_bgp\\.(aws_tgw|onprem_ebgp))")) | not)
+    select((.address | test("^(aws_|module\\.aws_tgw_connect|module\\.kvm_registration_mapping\\.terraform_data\\.gate|libvirt_|docker_|terraform_data\\.deployment_identity_guard$|terraform_data\\.(aws|kvm)|xcsh_token\\.(aws|ce|kvm\\[0\\]$)|xcsh_securemesh_site_v2\\.(aws|onprem_kvm)|xcsh_site_cloud_init\\.aws|xcsh_registration_approval\\.(aws|kvm)|xcsh_virtual_site\\.aws|xcsh_origin_pool\\.aws|xcsh_http_loadbalancer\\.aws|xcsh_external_connector\\.aws_tgw|xcsh_bgp\\.(aws_tgw|onprem_ebgp))")) | not)
   ] | length == 0' <<<"$DEPLOYMENT_PLAN" >/dev/null || block plan_resource_outside_showcase_allowlist
 EXPECTED_SITES_JSON=$(printf '%s\n' "${EXPECTED_SITES[@]}" | jq -Rsc 'split("\n") | map(select(length > 0)) | sort')
 jq -e --argjson sites "$EXPECTED_SITES_JSON" '

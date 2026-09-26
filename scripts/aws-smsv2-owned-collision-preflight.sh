@@ -36,6 +36,15 @@ die() {
   exit 2
 }
 
+require_local_name_absent() {
+  local address=$1 name=$2 inventory
+  shift 2
+  inventory=$("$@") || die "cannot inspect local KVM candidates for $address"
+  if printf '%s\n' "$inventory" | grep -Fxq -- "$name"; then
+    die "unowned local KVM collision: $address ($name)"
+  fi
+}
+
 while (($#)); do
   case "$1" in
   --plan-json)
@@ -455,12 +464,55 @@ while IFS= read -r item; do
         die "planned deployment identity guard does not match its provenance: $address"
       continue
       ;;
-    terraform_data.aws_tgw_contract_gate[[]0[]] | terraform_data.aws_tgw_runtime_gate[[]0[]] | terraform_data.aws_tgw_site_route_gate[[]*[]] | module.kvm_registration_mapping.terraform_data.gate[[]0[]])
+    terraform_data.aws_tgw_contract_gate[[]0[]] | terraform_data.aws_tgw_runtime_gate[[]0[]] | terraform_data.aws_tgw_site_route_gate[[]*[]] | module.kvm_registration_mapping.terraform_data.gate[[]0[]] | terraform_data.kvm_ce_image_cache[[]0[]] | terraform_data.kvm_network_identity[[]0[]] | terraform_data.kvm_workload_image_cache[[]0[]])
       continue
       ;;
     *) die "preflight has no complete ownership adapter for internal Terraform data resource: $address" ;;
     esac
   fi
+  case "$type" in
+  docker_container)
+    [[ $address == 'docker_container.kvm_frr[0]' ]] || die "unexpected local KVM container: $address"
+    name=$(jq -er '.name | select(type == "string" and length > 0)' <<<"$after") || die "planned container name is unavailable for $address"
+    require_local_name_absent "$address" "$name" docker container ls --all --format '{{.Names}}'
+    continue
+    ;;
+  docker_network)
+    [[ $address == 'docker_network.kvm_frr[0]' ]] || die "unexpected local KVM network: $address"
+    name=$(jq -er '.name | select(type == "string" and length > 0)' <<<"$after") || die "planned Docker network name is unavailable for $address"
+    require_local_name_absent "$address" "$name" docker network ls --format '{{.Name}}'
+    continue
+    ;;
+  docker_image)
+    [[ $address == 'docker_image.kvm_frr[0]' ]] || die "unexpected local KVM image: $address"
+    jq -e '.name == "frrouting/frr@sha256:990e83490108b686fd6df3b1cafa6bdbb2714acb00eedb9a89693946f46f45ce"' <<<"$after" >/dev/null ||
+      die "planned FRR image digest is unexpected for $address"
+    # An immutable image already in the local cache is safe to reuse.
+    continue
+    ;;
+  libvirt_pool | libvirt_domain | libvirt_network)
+    case "$address:$type" in
+    'libvirt_pool.kvm[0]:libvirt_pool') inventory_args=(pool-list --all --name) ;;
+    'libvirt_domain.ce_node["01"]:libvirt_domain' | 'libvirt_domain.workload[0]:libvirt_domain') inventory_args=(list --all --name) ;;
+    'libvirt_network.ce_bgp_net[0]:libvirt_network') inventory_args=(net-list --all --name) ;;
+    *) die "unexpected local KVM resource: $address" ;;
+    esac
+    name=$(jq -er '.name | select(type == "string" and length > 0)' <<<"$after") || die "planned libvirt name is unavailable for $address"
+    require_local_name_absent "$address" "$name" virsh --connect qemu:///system "${inventory_args[@]}"
+    continue
+    ;;
+  libvirt_volume | libvirt_cloudinit_disk)
+    case "$address:$type" in
+    'libvirt_volume.base_cloud[0]:libvirt_volume' | 'libvirt_volume.ce_disk["01"]:libvirt_volume' | 'libvirt_volume.workload_base[0]:libvirt_volume' | 'libvirt_volume.workload_disk[0]:libvirt_volume' | 'libvirt_cloudinit_disk.ce_cloudinit["01"]:libvirt_cloudinit_disk' | 'libvirt_cloudinit_disk.workload[0]:libvirt_cloudinit_disk') ;;
+    *) die "unexpected local KVM volume: $address" ;;
+    esac
+    pool=$(jq -er '.pool | select(type == "string" and length > 0)' <<<"$after") || die "planned libvirt pool is unavailable for $address"
+    planned_pool=$(jq -er '.resource_changes[] | select(.address == "libvirt_pool.kvm[0]" and .change.actions == ["create"]) | .change.after.name' "$PLAN_JSON") ||
+      die "planned KVM pool create is unavailable for $address"
+    [[ $pool == "$planned_pool" ]] || die "planned KVM volume is outside the new owned pool: $address"
+    continue
+    ;;
+  esac
   if [[ $type == aws_lb_target_group_attachment ]]; then
     attachment_config_address=${address%%\[*}
     target_group_reference=$(jq -er --arg address "$attachment_config_address" '.configuration.root_module.resources[] | select(.address == $address) | .expressions.target_group_arn.references[0] // empty' "$PLAN_JSON") || die "planned target attachment target-group reference is unavailable for $address"
