@@ -87,6 +87,75 @@ require 'kvm-lan-plan-scope.py' "$lifecycle"
 test -x "$repo_root/scripts/kvm-lan-live-acceptance.py" || fail 'KVM LAN live acceptance driver is missing'
 require 'shared bridge/uplink resources survive' "$lifecycle"
 require 'exercise_managed_drift "$cycle"' "$lifecycle"
+# Exercise the exact state lookup used before ENI tag mutation. Terraform's
+# human-readable state output aligns `id` with spaces, so only state JSON is
+# a reliable identity boundary.
+eni_lookup_source=$(mktemp)
+refresh_scope_source=$(mktemp)
+refresh_scope_calls=$(mktemp)
+autostart_source=$(mktemp)
+trap 'rm -f "$eni_lookup_source" "$refresh_scope_source" "$refresh_scope_calls" "$autostart_source"' EXIT
+sed -n '/^resolve_owned_eni_id() {/,/^}/p' "$lifecycle" >"$eni_lookup_source"
+test -s "$eni_lookup_source" || fail 'managed ENI lookup must use an executable state JSON resolver'
+# shellcheck source=/dev/null
+source "$eni_lookup_source"
+tf() {
+  [ "$*" = 'state pull' ] || return 1
+  printf '%s\n' "$FAKE_STATE"
+}
+valid_eni_state='{"resources":[{"mode":"managed","type":"aws_network_interface","name":"slo","instances":[{"index_key":0,"attributes":{"id":"eni-0123456789abcdef0"}}]}]}'
+[ "$(FAKE_STATE="$valid_eni_state" resolve_owned_eni_id)" = eni-0123456789abcdef0 ] ||
+  fail 'managed ENI lookup did not select the exact indexed state identity'
+for invalid_eni_state in \
+  '{"resources":[]}' \
+  '{"resources":[{"mode":"managed","type":"aws_network_interface","name":"slo","instances":[{"index_key":1,"attributes":{"id":"eni-0123456789abcdef0"}}]}]}' \
+  '{"resources":[{"mode":"managed","type":"aws_network_interface","name":"slo","instances":[{"index_key":0,"attributes":{"id":"eni-0123456789abcdef0"}},{"index_key":0,"attributes":{"id":"eni-11111111111111111"}}]}]}' \
+  '{"resources":[{"mode":"managed","type":"aws_network_interface","name":"slo","instances":[{"index_key":0,"attributes":{"id":"not-an-eni"}}]}]}'; do
+  if FAKE_STATE="$invalid_eni_state" resolve_owned_eni_id >/dev/null 2>&1; then
+    fail 'managed ENI lookup accepted a missing, wrong-index, duplicate, or malformed identity'
+  fi
+done
+require 'eni_id=$(resolve_owned_eni_id) || die "managed ENI identity is unavailable"' "$lifecycle"
+sed -n '/^observe_refresh_only_drift() {/,/^}/p' "$lifecycle" >"$refresh_scope_source"
+# shellcheck source=/dev/null
+source "$refresh_scope_source"
+(
+  TFVARS=/tmp/showcase-test.tfvars
+  MAPPING_FILE=/tmp/showcase-test-mapping.json
+  PLAN_FILE=/tmp/showcase-test.tfplan
+  # Both mocks are invoked by the sourced lifecycle function.
+  # shellcheck disable=SC2329
+  phase_paths() { :; }
+  # shellcheck disable=SC2329
+  tf_plan() {
+    printf '%s\n' "$@" >"$refresh_scope_calls"
+    exit 47
+  }
+  observe_refresh_only_drift first eni-tag-drift 'aws_network_interface.slo[0]' eni_name expected observed
+) >/dev/null 2>&1 || :
+for stage_flag in \
+  enable_azure=false enable_canada=false \
+  enable_azure_ilb=false enable_canada_ilb=false \
+  kvm_lan_configuration_phase=hardware; do
+  grep -Fxq -- "-var=$stage_flag" "$refresh_scope_calls" ||
+    fail "drift refresh plan must retain AWS/KVM stage flag $stage_flag"
+done
+sed -n '/^kvm_autostart_state() {/,/^}/p' "$lifecycle" >"$autostart_source"
+test -s "$autostart_source" || fail 'KVM autostart must normalize the observed libvirt state'
+# shellcheck source=/dev/null
+source "$autostart_source"
+# Invoked by the sourced KVM autostart function.
+# shellcheck disable=SC2329
+virsh() { printf 'Autostart: %s\n' "$FAKE_AUTOSTART"; }
+[ "$(FAKE_AUTOSTART=enable kvm_autostart_state onprem-ce-01)" = yes ] ||
+  fail 'libvirt enable must normalize to yes'
+[ "$(FAKE_AUTOSTART=disable kvm_autostart_state onprem-ce-01)" = no ] ||
+  fail 'libvirt disable must normalize to no'
+[ "$(FAKE_AUTOSTART=yes kvm_autostart_state onprem-ce-01)" = yes ] ||
+  fail 'libvirt yes must remain yes'
+if FAKE_AUTOSTART=unknown kvm_autostart_state onprem-ce-01 >/dev/null 2>&1; then
+  fail 'unknown libvirt autostart state must be rejected'
+fi
 require 'apply_scoped_plan kvm-configured' "$lifecycle"
 require 'apply_scoped_plan aws-status-output-refresh' "$lifecycle"
 require 'apply_scoped_plan azure-build' "$lifecycle"
