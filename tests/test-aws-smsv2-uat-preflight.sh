@@ -846,6 +846,37 @@ fi
 assert_sanitized "$evidence" "$output"
 echo "ok - XC mixed-case Established status counts toward twelve sessions"
 
+# The live status refresh occurs before Azure creation while the private
+# full-showcase tfvars already enable both regions. Execute the actual plan
+# wrapper with a fake Terraform command and inspect its exact arguments.
+scope_probe="${TMP_ROOT}/uat-scope-probe.sh"
+scope_calls="${TMP_ROOT}/uat-scope-calls.txt"
+scope_mapping="${TMP_ROOT}/uat-scope-mapping.json"
+: >"$scope_mapping"
+{
+  printf '#!/usr/bin/env bash\nset -euo pipefail\n'
+  sed -n '/^tf_plan() {/,/^}/p' "$SCRIPT"
+  cat <<'SH'
+tf() { printf '%s\n' "$@" >"$SCOPE_CALLS"; }
+TFVARS=""
+LIFECYCLE_PHASE=configured
+MAPPING_FILE=$SCOPE_MAPPING
+SOURCE_REPOSITORY=f5-sales-demo/multi-cloud-networking
+SOURCE_REF=refs/heads/main
+SOURCE_COMMIT_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+DEPLOYMENT_OWNER_ID=showcase-team
+DEPLOYMENT_ACTOR_ID=terraform-cli
+tf_plan -refresh-only -out="$SCOPE_PLAN"
+SH
+} >"$scope_probe"
+SCOPE_CALLS="$scope_calls" SCOPE_MAPPING="$scope_mapping" SCOPE_PLAN="${TMP_ROOT}/status.tfplan" \
+  bash "$scope_probe"
+for region_flag in enable_azure enable_canada enable_azure_ilb enable_canada_ilb; do
+  grep -Fxq -- "-var=${region_flag}=false" "$scope_calls" ||
+    fail "AWS UAT refresh-only plan must disable ${region_flag} before Azure build"
+done
+echo "ok - AWS UAT status refresh stays inside the AWS/KVM stage"
+
 mkdir "$INSIDE_EVIDENCE"
 if "$SCRIPT" --evidence-dir "$INSIDE_EVIDENCE" "${common[@]}" >/dev/null 2>&1; then
   fail "repository-local evidence directory must be rejected"
