@@ -819,6 +819,9 @@ observe_refresh_only_drift() {
   phase_paths "$cycle" refresh_only "$step"
   tf_plan -refresh-only -input=false -no-color -var-file="$TFVARS" \
     -var='aws_site_configuration_phase=configured' -var='enable_aws_tgw_connect=true' \
+    -var='enable_azure=false' -var='enable_canada=false' \
+    -var='enable_azure_ilb=false' -var='enable_canada_ilb=false' \
+    -var='kvm_lan_configuration_phase=hardware' \
     -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE"
   drift_json=$(tf show -json "$PLAN_FILE")
   jq -e --arg address "$expected_address" '

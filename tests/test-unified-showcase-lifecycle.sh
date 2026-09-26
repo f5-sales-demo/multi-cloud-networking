@@ -91,7 +91,9 @@ require 'exercise_managed_drift "$cycle"' "$lifecycle"
 # human-readable state output aligns `id` with spaces, so only state JSON is
 # a reliable identity boundary.
 eni_lookup_source=$(mktemp)
-trap 'rm -f "$eni_lookup_source"' EXIT
+refresh_scope_source=$(mktemp)
+refresh_scope_calls=$(mktemp)
+trap 'rm -f "$eni_lookup_source" "$refresh_scope_source" "$refresh_scope_calls"' EXIT
 sed -n '/^resolve_owned_eni_id() {/,/^}/p' "$lifecycle" >"$eni_lookup_source"
 test -s "$eni_lookup_source" || fail 'managed ENI lookup must use an executable state JSON resolver'
 # shellcheck source=/dev/null
@@ -114,6 +116,25 @@ do
   fi
 done
 require 'eni_id=$(resolve_owned_eni_id) || die "managed ENI identity is unavailable"' "$lifecycle"
+sed -n '/^observe_refresh_only_drift() {/,/^}/p' "$lifecycle" >"$refresh_scope_source"
+# shellcheck source=/dev/null
+source "$refresh_scope_source"
+(
+  TFVARS=/tmp/showcase-test.tfvars
+  MAPPING_FILE=/tmp/showcase-test-mapping.json
+  PLAN_FILE=/tmp/showcase-test.tfplan
+  phase_paths() { :; }
+  tf_plan() { printf '%s\n' "$@" >"$refresh_scope_calls"; exit 47; }
+  observe_refresh_only_drift first eni-tag-drift 'aws_network_interface.slo[0]' eni_name expected observed
+) >/dev/null 2>&1 || :
+for stage_flag in \
+  enable_azure=false enable_canada=false \
+  enable_azure_ilb=false enable_canada_ilb=false \
+  kvm_lan_configuration_phase=hardware
+do
+  grep -Fxq -- "-var=$stage_flag" "$refresh_scope_calls" ||
+    fail "drift refresh plan must retain AWS/KVM stage flag $stage_flag"
+done
 require 'apply_scoped_plan kvm-configured' "$lifecycle"
 require 'apply_scoped_plan aws-status-output-refresh' "$lifecycle"
 require 'apply_scoped_plan azure-build' "$lifecycle"
