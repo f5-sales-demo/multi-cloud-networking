@@ -65,7 +65,8 @@ require "ignore_changes = [user_data]" "$aws_ce"
 
 # Discovery is intentionally pre-registration. Upgrade status is meaningful
 # only in the configured phase after the runtime gate can succeed.
-require 'var.aws_site_configuration_phase == "configured" && contains(var.aws_upgrade_observed_sites, key)' "$aws_upgrade"
+require 'var.aws_site_configuration_phase == "configured" && var.enable_aws_tgw_connect && contains(var.aws_upgrade_observed_sites, key)' "$aws_upgrade"
+reject 'var.aws_site_configuration_phase == "configured" && contains(var.aws_upgrade_observed_sites, key)' "$aws_upgrade"
 reject 'for key, site in local.aws_sites : key => site if contains(var.aws_upgrade_observed_sites, key)' "$aws_upgrade"
 
 printf "PASS: AWS SMSv2 device discovery is staged, exact-MAC-bound, fail-closed, and replacement-safe\\n"
