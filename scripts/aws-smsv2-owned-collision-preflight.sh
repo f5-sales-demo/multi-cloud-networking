@@ -184,7 +184,7 @@ require_aws_ownership() {
     ([$expected.component, $expected.deployer, $expected.managed_by] |
       all(type == "string" and length > 0)) and
     $expected.component == $component and
-    ($expected | to_entries | all(.[]; $actual[.key] == .value))' >/dev/null
+    ($expected | to_entries | all(.[]; $actual[.key] == .value))' >/dev/null || return 1
   if [[ $RECOVERY_MODE == strict ]]; then
     jq -ne --arg generation "$DEPLOYMENT_GENERATION" --argjson expected "$expected" --argjson actual "$actual" '
       $expected.deployment_generation == $generation and
@@ -391,17 +391,60 @@ while IFS= read -r item; do
       .configuration.root_module | .. | objects | select(.address? == $address) |
       .expressions.transit_gateway_route_table_id.references[0] // empty
     ' "$PLAN_JSON") || die "planned TGW relation route-table reference is unavailable for $address"
-    route_address=${route_reference%.id}
-    if [[ $route_address == module.*.route_table_id ]]; then
-      module_prefix=${route_address%.route_table_id}
-      route_address="${module_prefix}.aws_ec2_transit_gateway_route_table.this"
-    elif [[ $route_address == aws_ec2_transit_gateway_route_table.* ]]; then
+    if [[ $route_reference == module.*.route_table_id ]]; then
+      # A root relation uses the child module's output. Resolve that exact
+      # output in the saved plan rather than assuming a standalone table.
+      module_prefix=${route_reference%.route_table_id}
+      module_name=${module_prefix#module.}
+      module_name=${module_name%%[*}
+      route_reference=$(jq -er --arg module "$module_name" '
+        .configuration.root_module.module_calls[$module].module.outputs.route_table_id.expression.references[0] // empty
+      ' "$PLAN_JSON") || die "planned TGW module route-table output is unavailable for $address"
+    else
       module_prefix=${address%%.aws_ec2_transit_gateway_route_table_*}
-      route_address="${module_prefix}.${route_address}"
+      [[ $address == module.* ]] || module_prefix=""
     fi
-    jq -e --arg address "$route_address" '
-      .resource_changes[] | select(.address == $address and .type == "aws_ec2_transit_gateway_route_table" and .change.actions == ["create"])
-    ' "$PLAN_JSON" >/dev/null || die "planned TGW relation is not bound to a collision-checked route table: $address"
+    case "$route_reference" in
+    aws_ec2_transit_gateway.*.association_default_route_table_id)
+      route_address=${route_reference%.association_default_route_table_id}
+      [[ -n $module_prefix ]] && route_address="${module_prefix}.${route_address}"
+      route_tags=$(jq -ec --arg address "$route_address" '
+        .resource_changes[] | select(
+          .address == $address and .type == "aws_ec2_transit_gateway" and
+          .change.actions == ["create"] and
+          .change.after.default_route_table_association == "enable") |
+        .change.after.tags
+      ' "$PLAN_JSON") ||
+        die "planned TGW relation is not bound to a collision-checked route table: $address"
+      route_name=$(jq -er '.Name' <<<"$route_tags") ||
+        die "planned TGW relation is not bound to a collision-checked route table: $address"
+      jq -e --argjson tags "$route_tags" --arg component "$COMPONENT" '
+        .planned_values.outputs.deployment_provenance.value as $provenance |
+        $provenance.repository == "f5-sales-demo/multi-cloud-networking" and
+        $tags.component == $component and
+        ($tags.deployer | type == "string" and length > 0) and
+        $tags.managed_by == "terraform" and
+        $tags.mcn_repository == "multi-cloud-networking" and
+        $tags.mcn_environment == $provenance.environment_key and
+        $tags.mcn_source_commit == $provenance.source_commit and
+        $tags.mcn_source_ref_sha256 == $provenance.source_ref_sha256 and
+        $tags.mcn_owner_id == $provenance.owner_id and
+        $tags.mcn_actor_id == $provenance.actor_id and
+        $provenance.source_commit == .variables.source_commit_sha.value and
+        $provenance.owner_id == .variables.deployment_owner_id.value
+      ' "$PLAN_JSON" >/dev/null ||
+        die "planned TGW relation is not bound to a collision-checked route table: $address"
+      ;;
+    aws_ec2_transit_gateway_route_table.*.id)
+      route_address=${route_reference%.id}
+      [[ -n $module_prefix ]] && route_address="${module_prefix}.${route_address}"
+      jq -e --arg address "$route_address" '
+        .resource_changes[] | select(.address == $address and .type == "aws_ec2_transit_gateway_route_table" and .change.actions == ["create"])
+      ' "$PLAN_JSON" >/dev/null ||
+        die "planned TGW relation is not bound to a collision-checked route table: $address"
+      ;;
+    *) die "planned TGW relation is not bound to a collision-checked route table: $address" ;;
+    esac
     continue
   fi
   if [[ $type == aws_lb_listener ]]; then
