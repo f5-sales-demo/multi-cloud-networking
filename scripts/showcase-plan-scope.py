@@ -152,7 +152,16 @@ def _value(document: dict[str, Any], name: str) -> Any:
     item = document.get("variables", {}).get(name, {})
     if not isinstance(item, dict) or "value" not in item:
         raise ValueError(f"saved plan is missing variable {name}")
-    return item["value"]
+    value = item["value"]
+    if name in FULL_FLAGS:
+        if isinstance(value, bool):
+            return value
+        if value == "true":
+            return True
+        if value == "false":
+            return False
+        raise ValueError(f"saved plan has invalid boolean variable {name}")
+    return value
 
 
 def validate(
@@ -169,6 +178,8 @@ def validate(
         raise ValueError("unexpected Terraform version")
     if _value(document, "source_commit_sha") != source_commit:
         raise ValueError("source commit does not match saved plan")
+    for name in FULL_FLAGS:
+        _value(document, name)
     providers = document.get("configuration", {}).get("provider_config", {})
     xcsh = providers.get("xcsh", {})
     if xcsh.get("full_name") != "registry.terraform.io/f5-sales-demo/xcsh" or xcsh.get(

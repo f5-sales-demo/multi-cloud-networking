@@ -59,6 +59,46 @@ def prior(document, addresses):
 
 
 class ShowcasePlanScopeTest(unittest.TestCase):
+    def test_aws_kvm_stage_accepts_exact_saved_plan_boolean_strings(self):
+        document = plan([("aws_vpc.aws[0]", ["create"])])
+        document["variables"]["enable_azure"]["value"] = "false"
+        document["variables"]["enable_canada"]["value"] = "false"
+        document["variables"]["enable_kvm_lan"]["value"] = "true"
+        document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
+        self.assertEqual(module.validate(document, "aws-kvm-build", "a" * 40), 1)
+
+    def test_saved_plan_boolean_strings_must_be_exact(self):
+        document = plan([("aws_vpc.aws[0]", ["create"])])
+        document["variables"]["enable_azure"]["value"] = "False"
+        document["variables"]["enable_canada"]["value"] = "false"
+        document["variables"]["enable_kvm_lan"]["value"] = "true"
+        document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
+        with self.assertRaisesRegex(ValueError, "invalid boolean"):
+            module.validate(document, "aws-kvm-build", "a" * 40)
+
+    def test_final_scope_accepts_exact_true_strings(self):
+        document = plan([])
+        for name in module.FULL_FLAGS:
+            document["variables"][name]["value"] = "true"
+        self.assertEqual(module.validate(document, "zero-change", "a" * 40), 0)
+
+    def test_saved_plan_rejects_non_boolean_flag_value(self):
+        document = plan([])
+        document["variables"]["enable_azure"]["value"] = 1
+        with self.assertRaisesRegex(ValueError, "invalid boolean"):
+            module.validate(document, "zero-change", "a" * 40)
+
+    def test_stage_rejects_malformed_unreferenced_boolean_flag(self):
+        document = plan([("aws_vpc.aws[0]", ["create"])])
+        document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
+        document["variables"]["enable_azure"]["value"] = "false"
+        document["variables"]["enable_canada"]["value"] = "false"
+        document["variables"]["enable_azure_ilb"]["value"] = "FALSE"
+        with self.assertRaisesRegex(
+            ValueError, "invalid boolean variable enable_azure_ilb"
+        ):
+            module.validate(document, "aws-kvm-build", "a" * 40)
+
     def test_azure_approvals_require_six_scoped_creates(self):
         approvals = [
             (
