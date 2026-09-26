@@ -110,7 +110,7 @@ def _lan_contract(document: dict[str, Any], stage: str) -> dict[str, Any]:
 
 def _owned_unknown_slo_network(document: dict[str, Any]) -> bool:
     """Bind an unknown first-NIC network ID to the owned libvirt network."""
-    change = next(
+    change: dict[str, Any] = next(
         (
             item
             for item in _items(document.get("resource_changes"))
