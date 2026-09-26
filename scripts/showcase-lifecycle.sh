@@ -554,7 +554,8 @@ capture_bootstrap_mapping_inputs() {
   ENI_PROJECTION="$CYCLE_DIR/aws-eni-projection.json"
   MAPPING_FILE="$CYCLE_DIR/aws-device-mapping.json"
   [ -s "$REGISTRATION_PROJECTION" ] || die "reviewed bootstrap registration projection is missing"
-  local projection_digest="sha256:$(sha256sum "$REGISTRATION_PROJECTION" | awk '{print $1}')"
+  local projection_digest
+  projection_digest="sha256:$(sha256sum "$REGISTRATION_PROJECTION" | awk '{print $1}')"
   jq -e --arg source_commit "$SOURCE_COMMIT_SHA" --arg projection_digest "$projection_digest" \
     '.phase == "bootstrap" and .source_commit == $source_commit and
      .registration_projection_sha256 == $projection_digest and
