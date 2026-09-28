@@ -70,6 +70,8 @@ terraform/modules/azure-hub/main.tf -> terraform/modules/azure-hub/main.tf
 terraform/modules/azure-hub/outputs.tf -> terraform/modules/azure-hub/outputs.tf
 terraform/modules/azure-hub/variables.tf -> terraform/modules/azure-hub/variables.tf
 terraform/modules/azure-hub/versions.tf -> terraform/modules/azure-hub/versions.tf
+docs-fixtures/terraform/modules/azure-route-server-bgp/main.tf -> terraform/modules/azure-route-server-bgp/main.tf
+docs-fixtures/terraform/modules/azure-route-server-bgp/versions.tf -> terraform/modules/azure-route-server-bgp/versions.tf
 terraform/modules/azure-frr/main.tf -> terraform/modules/azure-frr/main.tf
 terraform/modules/azure-frr/variables.tf -> terraform/modules/azure-frr/variables.tf
 terraform/modules/azure-frr/versions.tf -> terraform/modules/azure-frr/versions.tf
