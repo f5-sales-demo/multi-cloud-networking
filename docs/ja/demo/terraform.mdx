@@ -36,8 +36,6 @@ import modulesAzureHubMain from "../../_data/terraform/modules/azure-hub/main.tf
 import modulesAzureHubOutputs from "../../_data/terraform/modules/azure-hub/outputs.tf?raw";
 import modulesAzureHubVariables from "../../_data/terraform/modules/azure-hub/variables.tf?raw";
 import modulesAzureHubVersions from "../../_data/terraform/modules/azure-hub/versions.tf?raw";
-import modulesAzureRouteServerBgpMain from "../../_data/terraform/modules/azure-route-server-bgp/main.tf?raw";
-import modulesAzureRouteServerBgpVersions from "../../_data/terraform/modules/azure-route-server-bgp/versions.tf?raw";
 import modulesCeNodeMain from "../../_data/terraform/modules/ce-node/main.tf?raw";
 import modulesCeNodeOutputs from "../../_data/terraform/modules/ce-node/outputs.tf?raw";
 import modulesCeNodeVariables from "../../_data/terraform/modules/ce-node/variables.tf?raw";
@@ -210,13 +208,6 @@ Resource group, hub VNet, the four subnets, the Azure Route Server and the optio
 
 <Code code={modulesAzureHubVersions} lang="hcl" title="terraform/modules/azure-hub/versions.tf" />
 
-### `terraform/modules/azure-route-server-bgp/`
-
-The Azure side of each eBGP session — one bgpConnection per CE, peering the Route Server to that CE eth0/SLO address.
-
-<Code code={modulesAzureRouteServerBgpMain} lang="hcl" title="terraform/modules/azure-route-server-bgp/main.tf" />
-
-<Code code={modulesAzureRouteServerBgpVersions} lang="hcl" title="terraform/modules/azure-route-server-bgp/versions.tf" />
 
 ### `terraform/modules/ce-node/`
 
