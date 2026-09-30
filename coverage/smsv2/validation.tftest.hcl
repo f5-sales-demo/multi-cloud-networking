@@ -20,7 +20,7 @@ run "accept_valid_bounds" {
 
   variables {
     probe_name      = "cov-probe-s1-ok"
-    mtu             = 1500                # AtMost(16384)
+    mtu             = 1500                # API v9: 0 or 512-8000
     priority        = 0                   # Between(0, 255)   lower bound
     vlan_id         = 4095                # Between(1, 4095)  upper bound
     proxy_port      = 0                   # Between(0, 65535) lower bound

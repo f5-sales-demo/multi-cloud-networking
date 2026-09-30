@@ -57,7 +57,7 @@ disk. `.gitignore` is managed by docs-control, so the rule cannot be fixed from 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `probe_name` | `cov-probe-01` | Throwaway site name (override per run). |
-| `mtu` | `1500` | eth0 interface MTU. Validator `AtMost(16384)`. |
+| `mtu` | `1500` | eth0 interface MTU. API v9 validator: `0` or `512–8000`. |
 | `priority` | `10` | eth0 interface priority. Validator `Between(0, 255)`. |
 | `vlan_id` | `100` | vlan_interface VLAN tag. Validator `Between(1, 4095)`. |
 | `proxy_port` | `8080` | custom_proxy port. Validator `Between(0, 65535)`. |
