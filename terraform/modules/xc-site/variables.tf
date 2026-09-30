@@ -18,13 +18,12 @@ variable "mgmt_nic_mac" {
   type        = string
 }
 
-variable "ce_vm_instance_id" {
-  description = "128-bit unique id of the CE VM instance this site's node runs on (azurerm_linux_virtual_machine.virtual_machine_id — the same value the CE reports as the registration's infra.instance_id). Required, and deliberately NOT the ARM resource id, which is name-derived and identical after a replacement. The site object's lifecycle is coupled to it so that rebuilding the node rebuilds the site instead of leaving a registration bound to a destroyed instance (issue #674)."
+variable "ce_generation_id" {
+  description = "Pre-boot generation shared by the XC site and Azure CE VM."
   type        = string
-
   validation {
-    condition     = trimspace(var.ce_vm_instance_id) != ""
-    error_message = "ce_vm_instance_id must be the CE VM's virtual_machine_id; an empty value would couple every node's site to the same key."
+    condition     = trimspace(var.ce_generation_id) != ""
+    error_message = "ce_generation_id must identify the exact planned CE generation."
   }
 }
 

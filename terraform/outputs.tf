@@ -104,7 +104,7 @@ output "ce_mgmt_private_ips" {
 
 output "ce_vm_names" {
   description = "Per-CE VM names."
-  value       = { for k, m in module.ce_node : k => m.vm_name }
+  value       = { for k, m in module.ce_vm : k => m.vm_name }
 }
 
 output "ce_sli_private_ips" {
@@ -114,7 +114,7 @@ output "ce_sli_private_ips" {
 
 output "ce_vm_ids" {
   description = "Per-CE VM resource IDs — the --target-resource-id of `az network bastion tunnel` when opening the Site Console web UI on 65500."
-  value       = { for k, m in module.ce_node : k => m.vm_id }
+  value       = { for k, m in module.ce_vm : k => m.vm_id }
 }
 
 output "site_console_admin_passwords" {
@@ -178,7 +178,7 @@ output "ca_xc_site_names" {
 
 output "ca_ce_vm_names" {
   description = "Per-CE Canadian VM names used for Azure runtime and extension verification."
-  value       = { for k, m in module.ce_node_ca : k => m.vm_name }
+  value       = { for k, m in module.ce_vm_ca : k => m.vm_name }
 }
 
 # Makes the site-to-node binding that closes #674 observable from the CLI. Each
@@ -189,7 +189,7 @@ output "ca_ce_vm_names" {
 # xcsh_site_registration data source yet: provider issue #1376.)
 output "ce_bound_instance_ids" {
   description = "Per-CE VM instance id each XC site object is bound to. Compare with the registration's infra.instance_id to spot a site still bound to a destroyed node."
-  value       = { for k, m in module.xc_site : k => m.bound_vm_instance_id }
+  value       = { for k, m in module.ce_vm : k => m.vm_instance_id }
 }
 
 output "xc_interface_names" {

@@ -8,7 +8,7 @@ run "ce_vm_and_nics" {
   command = plan
 
   module {
-    source = "./modules/ce-node"
+    source = "./modules/ce-vm"
   }
 
   variables {
@@ -17,39 +17,22 @@ run "ce_vm_and_nics" {
     location            = "eastus"
     zone                = "1"
     vm_size             = "Standard_D8_v4"
-    mgmt_subnet_id      = "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/hub-vnet/subnets/snet-hub-management"
-    external_subnet_id  = "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/hub-vnet/subnets/snet-hub-external"
-    internal_subnet_id  = "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/hub-vnet/subnets/snet-hub-internal"
-    mgmt_private_ip     = "10.0.1.4"
     admin_username      = "azureuser"
     ssh_public_key      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l plan-test-only"
     custom_data         = "IyNjbG91ZC1jb25maWcK"
     tags                = {}
+    network = {
+      mgmt_nic_id     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.Network/networkInterfaces/mgmt"
+      external_nic_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.Network/networkInterfaces/external"
+      internal_nic_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.Network/networkInterfaces/internal"
+      identity_id     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/ce"
+      generation_id   = "example-generation"
+    }
   }
 
   assert {
     condition     = output.vm_name == "f5-xc-ce-vm-01"
     error_message = "CE VM name must equal the hostname."
-  }
-
-  assert {
-    condition     = azurerm_network_interface.mgmt.ip_forwarding_enabled == true
-    error_message = "The mgmt NIC must have IP forwarding enabled."
-  }
-
-  assert {
-    condition     = azurerm_network_interface.mgmt.accelerated_networking_enabled == false
-    error_message = "The mgmt NIC must have accelerated networking DISABLED (so eth0 comes up raw at the mgmt IP)."
-  }
-
-  assert {
-    condition     = azurerm_network_interface.external.ip_forwarding_enabled == true && azurerm_network_interface.internal.ip_forwarding_enabled == true
-    error_message = "All CE NICs must have IP forwarding enabled."
-  }
-
-  assert {
-    condition     = azurerm_network_interface.mgmt.ip_configuration[0].private_ip_address == "10.0.1.4"
-    error_message = "The mgmt NIC must use the static SLO/BGP local IP."
   }
 
   assert {
@@ -96,8 +79,8 @@ run "ce_vm_and_nics" {
 
 }
 
-# modules/xc-site couples the XC site object's lifecycle to vm_instance_id, so it
-# has to identify the VM INSTANCE. The ARM resource id looks like a perfectly
+# Runtime acceptance and console credential rotation require the actual VM
+# instance identity. The ARM resource id looks like a perfectly
 # good identifier and is the obvious thing to reach for, but it is
 # ".../virtualMachines/<hostname>" — byte-identical before and after a
 # replacement — so wiring it would leave the coupling permanently inert and bring
@@ -112,7 +95,7 @@ run "vm_instance_id_is_the_instance_id_not_the_arm_resource_id" {
   command = apply
 
   module {
-    source = "./modules/ce-node"
+    source = "./modules/ce-vm"
   }
 
   variables {
@@ -121,53 +104,23 @@ run "vm_instance_id_is_the_instance_id_not_the_arm_resource_id" {
     location            = "eastus"
     zone                = "1"
     vm_size             = "Standard_D8_v4"
-    mgmt_subnet_id      = "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/hub-vnet/subnets/snet-hub-management"
-    external_subnet_id  = "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/hub-vnet/subnets/snet-hub-external"
-    internal_subnet_id  = "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/hub-vnet/subnets/snet-hub-internal"
-    mgmt_private_ip     = "10.0.1.4"
     admin_username      = "azureuser"
     ssh_public_key      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l plan-test-only"
     custom_data         = "IyNjbG91ZC1jb25maWcK"
     tags                = {}
+    network = {
+      mgmt_nic_id     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.Network/networkInterfaces/mgmt"
+      external_nic_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.Network/networkInterfaces/external"
+      internal_nic_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.Network/networkInterfaces/internal"
+      identity_id     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/ce"
+      generation_id   = "example-generation"
+    }
   }
 
   # The mocked provider invents ids like "7251r305", and azurerm parses resource
   # ids client-side, so every id this module feeds into another resource needs a
   # well-formed one or the apply fails before any assertion runs.
-  override_resource {
-    target = azurerm_public_ip.mgmt
-    values = {
-      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/f5-xc-ce-vm-01-mgmt-pip"
-    }
-  }
 
-  override_resource {
-    target = azurerm_network_interface.mgmt
-    values = {
-      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/f5-xc-ce-vm-01-mgmt-nic"
-    }
-  }
-
-  override_resource {
-    target = azurerm_network_interface.external
-    values = {
-      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/f5-xc-ce-vm-01-external-nic"
-    }
-  }
-
-  override_resource {
-    target = azurerm_network_interface.internal
-    values = {
-      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/f5-xc-ce-vm-01-internal-nic"
-    }
-  }
-
-  override_resource {
-    target = azurerm_user_assigned_identity.this
-    values = {
-      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/f5-xc-ce-vm-01-identity"
-    }
-  }
 
   override_resource {
     target = azurerm_linux_virtual_machine.this
@@ -209,7 +162,7 @@ run "ce_os_disk_is_sized_for_the_advertised_versions" {
   command = plan
 
   module {
-    source = "./modules/ce-node"
+    source = "./modules/ce-vm"
   }
 
   variables {
@@ -218,14 +171,17 @@ run "ce_os_disk_is_sized_for_the_advertised_versions" {
     location            = "eastus"
     zone                = "1"
     vm_size             = "Standard_D8_v4"
-    mgmt_subnet_id      = "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/hub-vnet/subnets/snet-hub-management"
-    external_subnet_id  = "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/hub-vnet/subnets/snet-hub-external"
-    internal_subnet_id  = "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/hub-vnet/subnets/snet-hub-internal"
-    mgmt_private_ip     = "10.0.1.4"
     admin_username      = "azureuser"
     ssh_public_key      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l plan-test-only"
     custom_data         = "IyNjbG91ZC1jb25maWcK"
     tags                = {}
+    network = {
+      mgmt_nic_id     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.Network/networkInterfaces/mgmt"
+      external_nic_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.Network/networkInterfaces/external"
+      internal_nic_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.Network/networkInterfaces/internal"
+      identity_id     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/ce"
+      generation_id   = "example-generation"
+    }
   }
 
   assert {

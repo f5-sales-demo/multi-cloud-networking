@@ -56,3 +56,10 @@ check 'mcn-topology in' terraform/modules/azure-ilb-app/main.tf
 reject 'ves.io/siteName' terraform/kvm_lan.tf
 reject 'ves.io/siteName' terraform/modules/azure-ilb-app/main.tf
 reject 'ves.io/siteName' terraform/main.tf
+
+check 'resource "random_uuid" "generation"' terraform/modules/ce-node/main.tf
+reject 'azurerm_linux_virtual_machine' terraform/modules/ce-node/main.tf
+check 'replace_triggered_by = \[terraform_data.generation\]' terraform/modules/ce-vm/main.tf
+check 'ce_generation_id[[:space:]]*=[[:space:]]*module.ce_node\[each.key\].generation_id' terraform/main.tf
+check 'depends_on[[:space:]]*= \[module.xc_site\]' terraform/main.tf
+reject 'ce_vm_instance_id[[:space:]]*=[[:space:]]*module.ce_node' terraform/main.tf

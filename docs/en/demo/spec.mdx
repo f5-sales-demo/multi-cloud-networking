@@ -103,7 +103,7 @@ Pure-computation module expanding `ce_count` (1..3) into per-CE node maps:
 ### F5 XC Site & BGP Binding (`modules/xc-site`)
 
 - **XC Site**: Resource `xcsh_securemesh_site_v2` with explicit `eth0` interface in `azure.not_managed.node_list.interface_list` with `ethernet_interface` and `network_option.site_local_network = {}` bound to mgmt NIC MAC.
-- **Node Rebuild Lifecycle Coupling**: Contains `terraform_data.ce_vm` parking the Azure VM instance ID with `lifecycle { replace_triggered_by = [terraform_data.ce_vm] }` inside `xcsh_securemesh_site_v2`. Rebuilding the VM destroys the site object, releasing its stale registration index and preventing `UniqueSecondaryIndexViolation` on re-boot.
+- **Node Rebuild Lifecycle Coupling**: Contains `terraform_data.ce_generation` parking the pre-boot CE generation with `lifecycle { replace_triggered_by = [terraform_data.ce_generation] }` inside `xcsh_securemesh_site_v2`. Rebuilding the VM destroys the site object, releasing its stale registration index and preventing `UniqueSecondaryIndexViolation` on re-boot.
 - **Registration Approval**: Data source `data.xcsh_site_registration` resolves runtime `r-<uuid>` registration name, approved automatically by `xcsh_registration_approval` with `name = data.xcsh_site_registration.this.name` and `namespace = "system"`.
 - **eBGP Peering**: Resource `xcsh_bgp` configures CE ASN `64512` to Azure Route Server ASN `65515` on port 179 bound to interface `var.interface_name` in `system` namespace,
   using `where.site.ref` (`network_type = "VIRTUAL_NETWORK_SITE_LOCAL"`, `disable_internet_vip = {}`), `bgp_parameters` with `asn = var.ce_asn` and `local_address = {}`,
