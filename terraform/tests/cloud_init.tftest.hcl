@@ -149,3 +149,15 @@ run "every_ce_node_gets_the_operator_key" {
     error_message = "ce_count=3 must render three cloud-init documents."
   }
 }
+
+run "azure_probe_bootstrap_is_exact" {
+  command = plan
+  assert {
+    condition     = trimspace(one([for item in yamldecode(local.ce_cloud_init["eastus01"]).write_files : item.content if item.path == "/etc/mcn/azure-probe-routing.sh"])) == trimspace(file("${path.module}/cloud-init/azure-probe-routing.sh"))
+    error_message = "Cloud-init must preserve the exact probe routing script."
+  }
+  assert {
+    condition     = contains([for command in yamldecode(local.ce_cloud_init["eastus01"]).runcmd : join(" ", command)], "systemctl enable --now mcn-azure-probes.timer")
+    error_message = "Clean boot must enable the probe convergence timer."
+  }
+}

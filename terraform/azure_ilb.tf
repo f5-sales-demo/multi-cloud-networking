@@ -35,16 +35,6 @@ resource "azurerm_network_interface_backend_address_pool_association" "azure_ce"
   backend_address_pool_id = azurerm_lb_backend_address_pool.azure_ce_backend[0].id
 }
 
-resource "azurerm_lb_probe" "azure_application" {
-  count               = var.enable_azure && var.enable_azure_ilb ? 1 : 0
-  name                = "application-probe"
-  loadbalancer_id     = azurerm_lb.azure_ilb[0].id
-  protocol            = "Tcp"
-  port                = 80
-  interval_in_seconds = 5
-  number_of_probes    = 2
-}
-
 resource "azurerm_lb_probe" "azure_site_console" {
   count               = var.enable_azure && var.enable_azure_ilb ? 1 : 0
   name                = "site-console-probe"
@@ -61,7 +51,7 @@ resource "azurerm_lb_rule" "azure_application" {
   loadbalancer_id                = azurerm_lb.azure_ilb[0].id
   frontend_ip_configuration_name = "application-frontend"
   backend_address_pool_ids       = [azurerm_lb_backend_address_pool.azure_ce_backend[0].id]
-  probe_id                       = azurerm_lb_probe.azure_application[0].id
+  probe_id                       = azurerm_lb_probe.azure_site_console[0].id
   protocol                       = "Tcp"
   frontend_port                  = 80
   backend_port                   = 80

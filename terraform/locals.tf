@@ -174,8 +174,9 @@ locals {
   # be read. See tests/cloud_init.tftest.hcl.
   ce_cloud_init = {
     for key, node in module.ce_topology.ce_nodes : key => templatefile("${path.module}/cloud-init/ce-node.yaml", {
-      cluster_name = node.site_name
-      token        = local.ce_registration_token
+      probe_routing_script = file("${path.module}/cloud-init/azure-probe-routing.sh")
+      cluster_name         = node.site_name
+      token                = local.ce_registration_token
       # chomp: a key read from a .pub file ends in a newline, which would render a
       # second, empty line into authorized_keys under `content: |`.
       ssh_public_key = chomp(local.ssh_public_key)
@@ -185,9 +186,10 @@ locals {
   # --- Canada CE cloud-init, rendered once per node ---
   ca_ce_cloud_init = {
     for key, node in try(module.ce_topology_ca[0].ce_nodes, {}) : key => templatefile("${path.module}/cloud-init/ce-node.yaml", {
-      cluster_name   = node.site_name
-      token          = local.ce_registration_token
-      ssh_public_key = chomp(local.ssh_public_key)
+      probe_routing_script = file("${path.module}/cloud-init/azure-probe-routing.sh")
+      cluster_name         = node.site_name
+      token                = local.ce_registration_token
+      ssh_public_key       = chomp(local.ssh_public_key)
     })
   }
 }

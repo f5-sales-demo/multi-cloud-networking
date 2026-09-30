@@ -42,3 +42,31 @@ write_files:
     owner: admin:admin
     content: |
       ${ssh_public_key}
+  - path: /etc/mcn/azure-probe-routing.sh
+    permissions: "0700"
+    owner: root
+    content: |
+      ${indent(6, probe_routing_script)}
+  - path: /etc/systemd/system/mcn-azure-probes.service
+    permissions: "0644"
+    owner: root
+    content: |
+      [Unit]
+      Description=Converge Azure CE secondary reverse-path validation
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/bash /etc/mcn/azure-probe-routing.sh
+  - path: /etc/systemd/system/mcn-azure-probes.timer
+    permissions: "0644"
+    owner: root
+    content: |
+      [Unit]
+      Description=Retain Azure health probes after CE interfaces are recreated
+      [Timer]
+      OnBootSec=15s
+      OnUnitActiveSec=15s
+      [Install]
+      WantedBy=timers.target
+runcmd:
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, --now, mcn-azure-probes.timer]
