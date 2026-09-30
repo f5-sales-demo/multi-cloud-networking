@@ -640,6 +640,7 @@ build_cycle() {
     -var='enable_azure=false' -var='enable_canada=false' \
     -var='enable_azure_ilb=false' -var='enable_canada_ilb=false' \
     -var='kvm_lan_configuration_phase=configured' \
+    -var='azure_site_configuration_phase=configured' \
     -var='aws_site_configuration_phase=configured' \
     -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE"
   apply_scoped_plan kvm-configured
@@ -661,9 +662,9 @@ build_cycle() {
 }
 
 bind_azure_interfaces() {
-  local cycle=$1 attempt
+  local cycle=$1 deadline=$((SECONDS + 1800))
   phase_paths "$cycle" azure_bindings observed-macs
-  for attempt in 1 2 3 4; do
+  while ((SECONDS < deadline)); do
     if tf_plan -input=false -no-color -var-file="$TFVARS" \
       -var='azure_site_configuration_phase=configured' -var='approve_registration=false' \
       -var='kvm_lan_configuration_phase=configured' -var='aws_site_configuration_phase=configured' \
@@ -684,6 +685,7 @@ wait_for_azure_approvals() {
   while ((SECONDS < deadline)); do
     if tf_plan -input=false -no-color -var-file="$TFVARS" \
       -var='kvm_lan_configuration_phase=configured' \
+      -var='azure_site_configuration_phase=configured' \
       -var='aws_site_configuration_phase=configured' \
       -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE" \
       >"$EVIDENCE_DIR/registration-plan.log" 2>&1; then
@@ -736,6 +738,7 @@ settle_azure() {
     phase_paths "$cycle" azure_converge "$attempt"
     tf_plan -input=false -no-color -refresh=true -var-file="$TFVARS" \
       -var='kvm_lan_configuration_phase=configured' \
+      -var='azure_site_configuration_phase=configured' \
       -var='aws_site_configuration_phase=configured' \
       -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE"
     active_count=$(tf show -json "$PLAN_FILE" |
@@ -762,6 +765,7 @@ verify_final() {
   fi
   tf_plan -input=false -no-color -refresh=true -var-file="$TFVARS" \
     -var='kvm_lan_configuration_phase=configured' \
+    -var='azure_site_configuration_phase=configured' \
     -var='aws_site_configuration_phase=configured' \
     -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE"
   scope_plan zero-change

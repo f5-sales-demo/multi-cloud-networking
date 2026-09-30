@@ -177,6 +177,7 @@ def validate_azure_site_bindings(item: dict[str, Any]) -> None:
     if not isinstance(interfaces, list) or len(interfaces) != 3:
         raise ValueError("Azure MAC binding requires all three registered interfaces")
     macs = []
+    inside_count = 0
     for index, interface in enumerate(interfaces):
         ethernet = interface.get("ethernet_interface") or {}
         mac = str(ethernet.get("mac", "")).lower().replace("-", ":")
@@ -187,10 +188,14 @@ def validate_azure_site_bindings(item: dict[str, Any]) -> None:
                 "Azure MAC binding has a missing or incorrect hardware identity"
             )
         role = interface.get("network_option") or {}
-        expected = "site_local_inside_network" if index == 1 else "site_local_network"
-        if role.get(expected) is None:
-            raise ValueError("Azure MAC binding changes the registered interface role")
+        inside = role.get("site_local_inside_network") is not None
+        outside = role.get("site_local_network") is not None
+        if inside == outside or (index == 0 and not outside):
+            raise ValueError("Azure MAC binding changes the primary interface role")
+        inside_count += int(inside)
         macs.append(mac)
+    if inside_count != 1:
+        raise ValueError("Azure MAC binding requires exactly one inside interface")
     if len(set(macs)) != 3:
         raise ValueError("Azure MAC binding contains duplicate hardware identities")
 

@@ -94,12 +94,18 @@ variable "sw_version" {
 }
 
 variable "inside_nic_mac" {
-  description = "Observed MAC of eth1/SLI; null before VM attachment."
+  description = "Observed MAC of the Azure internal/SLI NIC; null before VM attachment."
   type        = string
   default     = null
 }
 variable "external_nic_mac" {
-  description = "Observed MAC of eth2/external SLO; null before VM attachment."
+  description = "Observed MAC of the Azure external SLO NIC; null before VM attachment."
   type        = string
   default     = null
+}
+
+variable "bind_registered_interfaces" {
+  description = "Resolve guest devices from the current registration and owned Azure NIC MACs in the separate configured plan."
+  type        = bool
+  default     = false
 }

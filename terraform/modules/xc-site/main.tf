@@ -1,3 +1,46 @@
+# Hardware is read by static site name so it cannot defer approval count or
+# create a site/VM dependency cycle. The configured phase is a separate plan.
+data "xcsh_site_registrations_by_site" "hardware" {
+  count     = var.bind_registered_interfaces ? 1 : 0
+  namespace = "system"
+  site_name = var.site_name
+}
+
+locals {
+  role_macs = {
+    slo      = lower(replace(coalesce(var.mgmt_nic_mac, "unbound"), "-", ":"))
+    sli      = lower(replace(coalesce(var.inside_nic_mac, "unbound"), "-", ":"))
+    external = lower(replace(coalesce(var.external_nic_mac, "unbound"), "-", ":"))
+  }
+  registration_records = var.bind_registered_interfaces ? [
+    for item in coalesce(try(data.xcsh_site_registrations_by_site.hardware[0].items, null), []) : {
+      site     = coalesce(try(item.get_spec.passport.cluster_name, null), "unknown")
+      hostname = coalesce(try(item.get_spec.infra.hostname, null), "unknown")
+      provider = coalesce(try(item.get_spec.infra.provider_ref, null), "unknown")
+      state    = coalesce(try(item.object.status.current_state, null), "unknown")
+      network = [for nic in coalesce(try(item.get_spec.infra.hw_info.network, null), []) : {
+        device = coalesce(nic.name, "unknown")
+        mac    = coalesce(nic.mac_address, "unbound")
+      }]
+    }
+  ] : []
+  binding_valid = !var.bind_registered_interfaces || module.registration_mapping.valid
+  devices       = var.bind_registered_interfaces ? module.registration_mapping.devices : { slo = "eth0", sli = "eth1", external = "eth2" }
+  interfaces = [for device in ["eth0", "eth1", "eth2"] : {
+    device = device
+    mac    = var.bind_registered_interfaces ? try(one([for role, name in local.devices : local.role_macs[role] if name == device]), "") : ""
+    inside = device == local.devices.sli
+  }]
+}
+
+module "registration_mapping" {
+  source   = "../azure-registration-mapping"
+  site     = var.site_name
+  hostname = var.hostname
+  macs     = local.role_macs
+  records  = local.registration_records
+}
+
 # The pre-boot node generation couples site and VM replacement without waiting
 # for a running guest, which could register before its configuration exists.
 resource "terraform_data" "ce_generation" {
@@ -38,11 +81,7 @@ resource "xcsh_securemesh_site_v2" "this" {
         public_ip = null
 
         dynamic "interface_list" {
-          for_each = [
-            { device = "eth0", mac = var.mgmt_nic_mac, inside = false },
-            { device = "eth1", mac = var.inside_nic_mac, inside = true },
-            { device = "eth2", mac = var.external_nic_mac, inside = false },
-          ]
+          for_each = local.interfaces
           content {
             name = interface_list.value.device
             ethernet_interface {
@@ -147,6 +186,10 @@ resource "xcsh_securemesh_site_v2" "this" {
   # VM/site pair, recreates the site, then boots the replacement guest.
   lifecycle {
     replace_triggered_by = [terraform_data.ce_generation]
+    precondition {
+      condition     = local.binding_valid
+      error_message = "Azure interface binding requires one current owned registration with three unique NIC MACs and exact guest devices."
+    }
   }
 }
 

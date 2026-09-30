@@ -226,12 +226,13 @@ module "xc_site" {
   source   = "./modules/xc-site"
   for_each = module.ce_topology.ce_nodes
 
-  site_name        = each.value.site_name
-  hostname         = each.value.hostname
-  interface_name   = each.value.interface_name
-  mgmt_nic_mac     = var.azure_site_configuration_phase == "configured" ? module.ce_node[each.key].mgmt_nic_mac : null
-  inside_nic_mac   = var.azure_site_configuration_phase == "configured" ? module.ce_node[each.key].inside_nic_mac : null
-  external_nic_mac = var.azure_site_configuration_phase == "configured" ? module.ce_node[each.key].external_nic_mac : null
+  site_name                  = each.value.site_name
+  hostname                   = each.value.hostname
+  interface_name             = each.value.interface_name
+  bind_registered_interfaces = var.azure_site_configuration_phase == "configured"
+  mgmt_nic_mac               = var.azure_site_configuration_phase == "configured" ? module.ce_node[each.key].mgmt_nic_mac : null
+  inside_nic_mac             = var.azure_site_configuration_phase == "configured" ? module.ce_node[each.key].inside_nic_mac : null
+  external_nic_mac           = var.azure_site_configuration_phase == "configured" ? module.ce_node[each.key].external_nic_mac : null
   # The shared generation is created before VM boot and replaces both objects.
   ce_generation_id     = module.ce_node[each.key].generation_id
   peer_ips             = try(module.azure_frr_us[0].peer_ips, [])
@@ -501,22 +502,23 @@ module "xc_site_ca" {
   for_each = try(module.ce_topology_ca[0].ce_nodes, {})
   source   = "./modules/xc-site"
 
-  create_site          = true
-  site_name            = each.value.site_name
-  hostname             = each.value.hostname
-  interface_name       = each.value.interface_name
-  mgmt_nic_mac         = var.azure_site_configuration_phase == "configured" ? module.ce_node_ca[each.key].mgmt_nic_mac : null
-  inside_nic_mac       = var.azure_site_configuration_phase == "configured" ? module.ce_node_ca[each.key].inside_nic_mac : null
-  external_nic_mac     = var.azure_site_configuration_phase == "configured" ? module.ce_node_ca[each.key].external_nic_mac : null
-  ce_generation_id     = module.ce_node_ca[each.key].generation_id
-  peer_ips             = try(module.azure_frr_ca[0].peer_ips, [])
-  ce_asn               = var.ce_asn
-  peer_asn             = var.azure_frr_asn
-  os_version           = var.ce_os_version
-  sw_version           = var.ce_sw_version
-  enable_bgp           = var.enable_bgp
-  approve_registration = var.approve_registration && var.azure_site_configuration_phase == "configured"
-  labels               = local.ca_xc_labels
+  create_site                = true
+  site_name                  = each.value.site_name
+  hostname                   = each.value.hostname
+  interface_name             = each.value.interface_name
+  bind_registered_interfaces = var.azure_site_configuration_phase == "configured"
+  mgmt_nic_mac               = var.azure_site_configuration_phase == "configured" ? module.ce_node_ca[each.key].mgmt_nic_mac : null
+  inside_nic_mac             = var.azure_site_configuration_phase == "configured" ? module.ce_node_ca[each.key].inside_nic_mac : null
+  external_nic_mac           = var.azure_site_configuration_phase == "configured" ? module.ce_node_ca[each.key].external_nic_mac : null
+  ce_generation_id           = module.ce_node_ca[each.key].generation_id
+  peer_ips                   = try(module.azure_frr_ca[0].peer_ips, [])
+  ce_asn                     = var.ce_asn
+  peer_asn                   = var.azure_frr_asn
+  os_version                 = var.ce_os_version
+  sw_version                 = var.ce_sw_version
+  enable_bgp                 = var.enable_bgp
+  approve_registration       = var.approve_registration && var.azure_site_configuration_phase == "configured"
+  labels                     = local.ca_xc_labels
 }
 
 module "azure_frr_ca" {

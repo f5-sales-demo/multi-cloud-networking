@@ -214,6 +214,10 @@ class ShowcasePlanScopeTest(unittest.TestCase):
             }
         }
         self.assertEqual(module.validate(document, "azure-bindings", "a" * 40), 1)
+        swapped = copy.deepcopy(document)
+        secondary = swapped["resource_changes"][0]["change"]["after"]["azure"]["not_managed"]["node_list"][0]["interface_list"]
+        secondary[1]["network_option"], secondary[2]["network_option"] = secondary[2]["network_option"], secondary[1]["network_option"]
+        self.assertEqual(module.validate(swapped, "azure-bindings", "a" * 40), 1)
         missing = copy.deepcopy(document)
         missing["resource_changes"][0]["change"]["after"]["azure"]["not_managed"][
             "node_list"
