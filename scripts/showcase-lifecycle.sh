@@ -756,7 +756,7 @@ settle_azure() {
 verify_final() {
   local cycle=$1
   phase_paths "$cycle" final refresh-zero-change
-  "$REPO_ROOT/scripts/verify-deployment.sh" --terraform-dir "$TERRAFORM_DIR" \
+  bash "$REPO_ROOT/scripts/verify-deployment.sh" --terraform-dir "$TERRAFORM_DIR" \
     --evidence-dir "$PHASE_DIR/azure-uat" --subscription "$AZURE_SUBSCRIPTION" --skip-console
   if [ "$cycle" != verify ]; then
     "$REPO_ROOT/scripts/verify-azure-failover.sh" --terraform-dir "$TERRAFORM_DIR" \
