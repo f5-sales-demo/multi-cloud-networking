@@ -19,6 +19,23 @@ resource "azurerm_subnet" "management" {
   address_prefixes     = [var.mgmt_subnet_prefix]
 }
 
+# FRR advertises the VIP to Route Server for clients. Propagating that route
+# back onto its own subnet causes Azure to forward the next-hop packets to FRR
+# again, despite the guest route pointing at the CE.
+resource "azurerm_route_table" "management" {
+  count                         = var.enable_route_server ? 1 : 0
+  name                          = "${var.route_server_name}-management"
+  location                      = var.location
+  resource_group_name           = azurerm_resource_group.this.name
+  bgp_route_propagation_enabled = false
+  tags                          = var.tags
+}
+resource "azurerm_subnet_route_table_association" "management" {
+  count          = var.enable_route_server ? 1 : 0
+  subnet_id      = azurerm_subnet.management.id
+  route_table_id = azurerm_route_table.management[0].id
+}
+
 resource "azurerm_subnet" "external" {
   name                 = "snet-hub-external"
   resource_group_name  = azurerm_resource_group.this.name
