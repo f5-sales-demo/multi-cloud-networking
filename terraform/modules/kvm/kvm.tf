@@ -11,7 +11,7 @@ locals {
   }
   kvm_workload_node   = { address = "10.100.0.100", mac = "52:54:00:10:00:64" }
   kvm_network_hosts   = merge(local.kvm_ce_nodes, { workload = local.kvm_workload_node })
-  kvm_image_cache_dir = pathexpand("~/.cache/multi-cloud-networking/kvm")
+  kvm_image_cache_dir = "/data/multi-cloud-networking/cache/kvm"
   kvm_pool_name       = "mcn-kvm-showcase"
 
   kvm_network_generation = substr(sha256(jsonencode(local.kvm_network_hosts)), 0, 8)
@@ -70,7 +70,7 @@ resource "libvirt_pool" "kvm" {
   count = var.enable_kvm ? 1 : 0
   name  = local.kvm_pool_name
   type  = "dir"
-  target { path = "/var/lib/libvirt/images/${local.kvm_pool_name}" }
+  target { path = "/data/multi-cloud-networking/libvirt/${local.kvm_pool_name}" }
 }
 
 resource "terraform_data" "kvm_ce_image_cache" {
