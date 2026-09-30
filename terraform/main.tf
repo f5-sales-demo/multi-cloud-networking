@@ -182,7 +182,7 @@ resource "random_password" "site_console_admin" {
   override_special = "!#%*+-=?@^_~"
 
   keepers = {
-    ce_vm_instance_id = module.ce_node[each.key].vm_instance_id
+    ce_vm_instance_id = module.ce_vm[each.key].vm_instance_id
   }
 }
 
@@ -200,7 +200,7 @@ resource "azurerm_virtual_machine_extension" "site_console_password" {
   for_each = module.ce_topology.ce_nodes
 
   name                       = "site-console-admin-password"
-  virtual_machine_id         = module.ce_node[each.key].vm_id
+  virtual_machine_id         = module.ce_vm[each.key].vm_id
   publisher                  = "Microsoft.Azure.Extensions"
   type                       = "CustomScript"
   type_handler_version       = "2.1"
@@ -229,11 +229,8 @@ module "xc_site" {
   hostname       = each.value.hostname
   interface_name = each.value.interface_name
   mgmt_nic_mac   = module.ce_node[each.key].mgmt_nic_mac
-  # Couples the site object's lifecycle to the CE VM INSTANCE (issue #674):
-  # replacing the VM replaces the site, which takes the registration bound to the
-  # destroyed instance with it. Must be virtual_machine_id, not the ARM resource
-  # id — the latter is name-derived and identical after a replacement.
-  ce_vm_instance_id    = module.ce_node[each.key].vm_instance_id
+  # The shared generation is created before VM boot and replaces both objects.
+  ce_generation_id     = module.ce_node[each.key].generation_id
   peer_ips             = try(module.azure_frr_us[0].peer_ips, [])
   ce_asn               = var.ce_asn
   peer_asn             = var.azure_frr_asn
@@ -469,7 +466,7 @@ resource "random_password" "site_console_admin_ca" {
   override_special = "!#%*+-=?@^_~"
 
   keepers = {
-    ce_vm_instance_id = module.ce_node_ca[each.key].vm_instance_id
+    ce_vm_instance_id = module.ce_vm_ca[each.key].vm_instance_id
   }
 }
 
@@ -477,7 +474,7 @@ resource "azurerm_virtual_machine_extension" "site_console_password_ca" {
   for_each = try(module.ce_topology_ca[0].ce_nodes, {})
 
   name                       = "site-console-admin-password"
-  virtual_machine_id         = module.ce_node_ca[each.key].vm_id
+  virtual_machine_id         = module.ce_vm_ca[each.key].vm_id
   publisher                  = "Microsoft.Azure.Extensions"
   type                       = "CustomScript"
   type_handler_version       = "2.1"
@@ -506,7 +503,7 @@ module "xc_site_ca" {
   hostname             = each.value.hostname
   interface_name       = each.value.interface_name
   mgmt_nic_mac         = module.ce_node_ca[each.key].mgmt_nic_mac
-  ce_vm_instance_id    = module.ce_node_ca[each.key].vm_instance_id
+  ce_generation_id     = module.ce_node_ca[each.key].generation_id
   peer_ips             = try(module.azure_frr_ca[0].peer_ips, [])
   ce_asn               = var.ce_asn
   peer_asn             = var.azure_frr_asn
@@ -656,4 +653,36 @@ resource "xcsh_http_loadbalancer" "canada" {
   disable_malware_protection       = {}
   disable_threat_mesh              = {}
   default_sensitive_data_policy    = {}
+}
+
+module "ce_vm" {
+  source              = "./modules/ce-vm"
+  for_each            = module.ce_topology.ce_nodes
+  hostname            = each.value.hostname
+  resource_group_name = module.azure_hub[0].resource_group_name
+  location            = module.azure_hub[0].location
+  zone                = each.value.az
+  vm_size             = var.ce_vm_size
+  admin_username      = var.admin_username
+  ssh_public_key      = local.ssh_public_key
+  custom_data         = base64encode(local.ce_cloud_init[each.key])
+  network             = module.ce_node[each.key].network
+  tags                = local.tags
+  depends_on          = [module.xc_site]
+}
+
+module "ce_vm_ca" {
+  source              = "./modules/ce-vm"
+  for_each            = try(module.ce_topology_ca[0].ce_nodes, {})
+  hostname            = each.value.hostname
+  resource_group_name = module.azure_hub_ca[0].resource_group_name
+  location            = module.azure_hub_ca[0].location
+  zone                = each.value.az
+  vm_size             = var.ce_vm_size
+  admin_username      = var.admin_username
+  ssh_public_key      = local.ssh_public_key
+  custom_data         = base64encode(local.ca_ce_cloud_init[each.key])
+  network             = module.ce_node_ca[each.key].network
+  tags                = local.tags
+  depends_on          = [module.xc_site_ca]
 }

@@ -88,7 +88,7 @@ Write the complete, modular, production-grade Terraform codebase under `terrafor
       80GB `StandardSSD_LRS` OS disk (the pinned image requires at least 78 GiB),
       `custom_data = base64encode(cloud_init)`).
    - `xc-site`: `xcsh_securemesh_site_v2` (explicit eth0 interface in `azure.not_managed.node_list.interface_list` with `ethernet_interface` and `network_option.site_local_network` bound to mgmt NIC MAC,
-     `terraform_data.ce_vm` parking VM instance ID for `lifecycle { replace_triggered_by = [terraform_data.ce_vm] }`), `data.xcsh_site_registration`, and `xcsh_registration_approval` (when found). BGP is unavailable in this iteration because Azure Route Server requires unpublished eBGP multihop request semantics.
+     `terraform_data.ce_generation` parking pre-boot CE generation for `lifecycle { replace_triggered_by = [terraform_data.ce_generation] }`), `data.xcsh_site_registration`, and `xcsh_registration_approval` (when found). BGP is unavailable in this iteration because Azure Route Server requires unpublished eBGP multihop request semantics.
    - Azure Standard ILBs provide supported TCP/65500 CE Site Console health and traffic verification for both Azure regions.
    - `client-vm`: Ubuntu test client in `snet-hub-internal` (`private_ip_address_allocation = "Dynamic"`).
 
@@ -142,7 +142,7 @@ terraform plan -var="origin_ip=203.0.113.10" -var="lb_domain=example.com"
 | --- | --- |
 | `f5-sales-demo/xcsh = 12.0.0` | Provides the immutable SMSv2 contract, AWS node configuration, Azure NIC MAC-read stability, Customer Edge egress allowlists, and the Site-UID KVM image resolver. Azure multihop is implemented on the two FRR relays in each region. |
 | `data "external" "xc_env_tenant"` | Executes `scripts/xc-env-tenant.sh` to enforce `var.expected_xc_tenant` (`f5-sales-demo`) and prevent accidental tenant cross-contamination. |
-| `replace_triggered_by = [terraform_data.ce_vm]` | Couples `xcsh_securemesh_site_v2` lifecycle to the Azure VM instance ID, preventing `UniqueSecondaryIndexViolation` on node rebuilds. |
+| `replace_triggered_by = [terraform_data.ce_generation]` | Couples `xcsh_securemesh_site_v2` lifecycle to the shared pre-boot CE generation, preventing `UniqueSecondaryIndexViolation` on node rebuilds. |
 | `CertifiedHardwareEndpoint` in Cloud-Init | Renders `/etc/vpm/config.yaml` with `azure.yml` endpoint required by `vpmd` on marketplace `volterra-node` images. |
 | `namespace = ""` on `data.xcsh_namespace` | Required by the `xcsh_namespace` data source schema to prevent HCL validation errors. |
 | `private_ip_address_allocation` | Enforces explicit static/dynamic IP allocation syntax for Azure network interface resource blocks. |

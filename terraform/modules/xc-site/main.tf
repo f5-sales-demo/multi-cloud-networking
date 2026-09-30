@@ -1,26 +1,7 @@
-# Parks the identity of the CE VM instance the site's node runs on, so the site
-# object has something to be coupled to. Nothing else reads it — its only job is
-# to be named in the site's replace_triggered_by below.
-#
-# WHY A SEPARATE RESOURCE. replace_triggered_by may only name managed resources
-# declared in the SAME module as the resource carrying the lifecycle block, and
-# the CE VM lives in modules/ce-node. Parking the id here is the standard way to
-# carry an external value across that boundary.
-#
-# WHY input AND NOT triggers_replace. This resource must never itself be
-# replaced — only observed. A changed `input` is an in-place UPDATE, which is
-# what replace_triggered_by reacts to; that keeps the resource cheap and its
-# behaviour on ADOPTION correct (see below).
-#
-# ADOPTION IS INERT. Adding this resource to a deployment that already exists
-# plans it as a CREATE, and a create of the referenced resource does NOT fire
-# replace_triggered_by — only a subsequent change to its value does. Verified on
-# Terraform v1.10.5 and again on v1.15.0:
-# adding the pair to a populated state plans "1 to add, 0 to change,
-# 0 to destroy". So this fix does not itself trigger the fleet-wide rebuild it
-# exists to prevent — no import, no targeted apply, no seeding.
-resource "terraform_data" "ce_vm" {
-  input = var.ce_vm_instance_id
+# The pre-boot node generation couples site and VM replacement without waiting
+# for a running guest, which could register before its configuration exists.
+resource "terraform_data" "ce_generation" {
+  input = var.ce_generation_id
 }
 
 # Single-node Secure Mesh v2 CE site with an EXPLICIT eth0/SLO interface. The
@@ -158,30 +139,10 @@ resource "xcsh_securemesh_site_v2" "this" {
   # free. Deleting only the registration is not enough: the site keeps a status
   # object that then rejects the node's workload request.
   #
-  # THE ORDER IS THE POINT. Terraform runs this as: destroy site -> destroy VM
-  # -> create VM -> create site. The stale registration is therefore gone before
-  # the replacement node ever boots, and the site is back before the node
-  # finishes booting and registers. The outgoing node cannot slip a fresh
-  # registration into the gap: once its own registration is deleted it 404-loops
-  # against the name it persisted in registration-obj.yml instead of creating a
-  # new one.
-  #
-  # SAFE WHILE OTHER OBJECTS REFERENCE THE SITE. xcsh_bgp and the root HTTP load
-  # balancer's advertise_where both name this site, and F5 XC resolves those
-  # references lazily: deleting a site that both of them reference returns HTTP
-  # 200 and leaves them intact, and re-creating it under the same name re-binds
-  # them (verified against the live tenant with a throwaway site).
-  #
-  # THAT LAZINESS DOES NOT EXTEND TO CREATION, and the difference has bitten once.
-  # An EXISTING load balancer tolerates a dangling site reference; POSTing a NEW one
-  # whose advertise_where names a site that does not exist yet is rejected outright
-  # with `[BAD_REQUEST] Invalid request parameters`. Renaming the deployment does
-  # exactly that — every site is destroyed and re-created under a different name, so
-  # the load balancer is created fresh — which is why the root resource now carries
-  # an explicit `depends_on = [module.xc_site]`. Do not remove it on the strength of
-  # the paragraph above: it is about deletion, not creation.
+  # The VM waits for this managed site. A generation change destroys the old
+  # VM/site pair, recreates the site, then boots the replacement guest.
   lifecycle {
-    replace_triggered_by = [terraform_data.ce_vm]
+    replace_triggered_by = [terraform_data.ce_generation]
   }
 }
 

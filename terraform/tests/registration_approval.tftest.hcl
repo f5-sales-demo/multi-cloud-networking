@@ -23,14 +23,14 @@ run "no_approval_before_the_ce_registers" {
   }
 
   variables {
-    site_name         = "mcn-ce-ha-eastus01"
-    hostname          = "f5-xc-ce-vm-01"
-    interface_name    = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
-    mgmt_nic_mac      = "7c:1e:52:18:c1:77"
-    ce_vm_instance_id = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
-    peer_ips          = ["10.0.1.20", "10.0.1.21"]
-    ce_asn            = 64512
-    peer_asn          = 65020
+    site_name        = "mcn-ce-ha-eastus01"
+    hostname         = "f5-xc-ce-vm-01"
+    interface_name   = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
+    mgmt_nic_mac     = "7c:1e:52:18:c1:77"
+    ce_generation_id = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
+    peer_ips         = ["10.0.1.20", "10.0.1.21"]
+    ce_asn           = 64512
+    peer_asn         = 65020
     # Not under test here; the real 71-char interface name is covered by bgp.tftest.hcl.
     enable_bgp           = false
     approve_registration = true
@@ -75,7 +75,7 @@ run "new_registration_uses_the_resolved_registration_name" {
     hostname             = "f5-xc-ce-vm-01"
     interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
     mgmt_nic_mac         = "7c:1e:52:18:c1:77"
-    ce_vm_instance_id    = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
+    ce_generation_id     = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
     peer_ips             = ["10.0.1.20", "10.0.1.21"]
     ce_asn               = 64512
     peer_asn             = 65515
@@ -137,7 +137,7 @@ run "approve_registration_false_plans_no_approval" {
     hostname             = "f5-xc-ce-vm-01"
     interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
     mgmt_nic_mac         = "7c:1e:52:18:c1:77"
-    ce_vm_instance_id    = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
+    ce_generation_id     = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
     peer_ips             = ["10.0.1.20", "10.0.1.21"]
     ce_asn               = 64512
     peer_asn             = 65515
@@ -180,7 +180,7 @@ run "retired_registration_plans_no_approval" {
     hostname             = "f5-xc-ce-vm-01"
     interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
     mgmt_nic_mac         = "7c:1e:52:18:c1:77"
-    ce_vm_instance_id    = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
+    ce_generation_id     = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
     peer_ips             = ["10.0.1.20", "10.0.1.21"]
     ce_asn               = 64512
     peer_asn             = 65515

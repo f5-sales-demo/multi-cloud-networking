@@ -18,13 +18,10 @@ output "interface_name" {
   value       = var.interface_name
 }
 
-# The node identity the site object is currently coupled to. Compare it against
-# the registration's own infra.instance_id (visible in the F5 XC API, not yet on
-# the xcsh_site_registration data source — provider issue #1376) to tell whether
-# a site is still bound to a node that no longer exists.
-output "bound_vm_instance_id" {
-  description = "CE VM instance id the site object is bound to. Replacing that instance replaces the site (issue #674)."
-  value       = terraform_data.ce_vm.output
+# The shared pre-boot generation used for site and VM replacement.
+output "bound_generation_id" {
+  description = "Shared pre-boot CE generation that replaces the site and VM together."
+  value       = terraform_data.ce_generation.output
 }
 
 output "registration_name" {
