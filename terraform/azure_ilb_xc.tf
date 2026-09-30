@@ -4,7 +4,6 @@ module "azure_ilb_application" {
 
   name             = "${var.component}-us-inside${local.deployment_name_suffix}"
   namespace        = data.xcsh_namespace.mcn.name
-  site_names       = [for key in sort(keys(module.ce_topology.ce_nodes)) : module.ce_topology.ce_nodes[key].site_name]
   domain           = "ilb.${local.lb_domain}"
   vip              = cidrhost(var.internal_subnet_prefix, 10)
   origin_pool_name = xcsh_origin_pool.this[0].name
@@ -19,7 +18,6 @@ module "azure_ilb_application_ca" {
 
   name             = "${var.component}-ca-inside${local.deployment_name_suffix}"
   namespace        = data.xcsh_namespace.mcn.name
-  site_names       = [for key in sort(keys(module.ce_topology_ca[0].ce_nodes)) : module.ce_topology_ca[0].ce_nodes[key].site_name]
   domain           = "ilb.${local.ca_lb_domain}"
   vip              = cidrhost(var.ca_internal_subnet_prefix, 10)
   origin_pool_name = xcsh_origin_pool.canada[0].name

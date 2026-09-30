@@ -139,7 +139,7 @@ Pure-computation module expanding `ce_count` (1..3) into per-CE node maps:
 - Parallel Hub VNet (`10.200.0.0/16` in `canadacentral`), 3 Canadian CE VMs, Canada Route Server, Canadian eBGP connections, Client VM.
 - **Canadian Virtual Sites**:
   - `xcsh_virtual_site.canada_re`: Targets Regional Edge cities `toronto` and `montreal` (`ves.io/city in (toronto, montreal)`).
-  - `xcsh_virtual_site.canada_ce`: Targets Canadian CE site names (`ves.io/siteName`).
+  - `xcsh_virtual_site.canada_ce`: Targets the exact Canadian CE `mcn-topology` label.
 - **Canadian Origin Pool & Load Balancer**: `xcsh_origin_pool.canada` and `xcsh_http_loadbalancer.canada` serving `mcn-ce-ha.f5-sales-demo.ca` advertising VIP `10.250.1.10/32`.
 
 ---

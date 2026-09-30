@@ -5,7 +5,7 @@ resource "xcsh_virtual_site" "inside" {
   site_type = "CUSTOMER_EDGE"
 
   site_selector {
-    expressions = ["ves.io/siteName in (${join(", ", var.site_names)})"]
+    expressions = ["mcn-topology in (${var.labels["mcn-topology"]})"]
   }
 }
 

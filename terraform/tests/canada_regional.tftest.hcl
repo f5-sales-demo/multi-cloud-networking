@@ -40,6 +40,14 @@ variables {
 run "canada_regional_virtual_sites_and_lb" {
   command = plan
 
+  assert {
+    condition = (
+      one(xcsh_virtual_site.canada_ce[0].site_selector.expressions) == "mcn-topology in (${local.ca_xc_labels["mcn-topology"]})" &&
+      local.ca_xc_labels["mcn-topology"] != local.azure_xc_labels["mcn-topology"]
+    )
+    error_message = "Canada CE selection must use its distinct owned regional topology label."
+  }
+
   variables {
     ce_count    = 2
     ca_ce_count = 3

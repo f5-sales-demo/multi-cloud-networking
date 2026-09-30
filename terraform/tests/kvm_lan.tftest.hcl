@@ -174,7 +174,7 @@ run "configured_phase_adopts_and_changes_only_the_runtime_sli" {
       length(xcsh_virtual_site.kvm_lan) == 1 &&
       xcsh_virtual_site.kvm_lan[0].site_type == "CUSTOMER_EDGE" &&
       length(xcsh_virtual_site.kvm_lan[0].site_selector.expressions) == 1 &&
-      one(xcsh_virtual_site.kvm_lan[0].site_selector.expressions) == "ves.io/siteName in (${xcsh_securemesh_site_v2.onprem_kvm[0].name})" &&
+      one(xcsh_virtual_site.kvm_lan[0].site_selector.expressions) == "mcn-topology in (${xcsh_securemesh_site_v2.onprem_kvm[0].labels["mcn-topology"]})" &&
       xcsh_origin_pool.kvm_lan[0].port == 8080 &&
       length(xcsh_http_loadbalancer.kvm_lan[0].domains) == 1 &&
       one(xcsh_http_loadbalancer.kvm_lan[0].domains) == "app.example.com" &&
