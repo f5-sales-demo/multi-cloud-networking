@@ -166,7 +166,7 @@ data "xcsh_site_registration" "this" {
 # and registers via the token, so the first apply plans no approval; re-apply
 # once the CE has registered (see the deploy ordering in main.tf).
 #
-# The action only legitimately transitions a NEW registration. Retired and
+# The API approves NEW and PENDING registrations. Retired and
 # already-admitted registrations are observations, never approval targets.
 # Keeping the guard in the module rather than relying on provider selection also
 # protects installed provider versions that predate terminal-state filtering.
@@ -175,7 +175,7 @@ data "xcsh_site_registration" "this" {
 # explicit site creation. The data source deliberately has no dependency: its
 # result determines this resource's plan-known count.
 resource "xcsh_registration_approval" "this" {
-  count = var.approve_registration && data.xcsh_site_registration.this.found && data.xcsh_site_registration.this.state == "NEW" ? 1 : 0
+  count = var.approve_registration && data.xcsh_site_registration.this.found && contains(["NEW", "PENDING"], data.xcsh_site_registration.this.state) ? 1 : 0
 
   namespace    = "system"
   name         = data.xcsh_site_registration.this.name

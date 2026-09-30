@@ -677,7 +677,7 @@ wait_for_azure_approvals() {
     rm -f -- "$PLAN_FILE"
     sleep 30
   done
-  die "six Azure CE registrations did not reach NEW before the bounded deadline"
+  die "six Azure CE registrations did not reach an approvable state before the bounded deadline"
 }
 
 wait_for_azure_online() {
