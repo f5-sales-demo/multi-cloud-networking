@@ -30,8 +30,8 @@ require 'deployment_environment_key' "$locals_file"
 require 'source_ref_sha256' "$locals_file"
 require 'merge(var.tags, local.standard_tags)' "$locals_file"
 require 'xc_provenance_labels' "$locals_file"
-require 'labels               = local.azure_xc_labels' "$repo_root/terraform/main.tf"
-require 'labels               = local.ca_xc_labels' "$repo_root/terraform/main.tf"
+grep -Eq 'labels[[:space:]]*=[[:space:]]*local.azure_xc_labels' "$repo_root/terraform/main.tf" || fail 'missing Azure provenance labels'
+grep -Eq 'labels[[:space:]]*=[[:space:]]*local.ca_xc_labels' "$repo_root/terraform/main.tf" || fail 'missing Canada provenance labels'
 require 'output "deployment_provenance"' "$outputs"
 require '--source-ref' "$backend"
 require 'showcase_backend_key' "$backend"
