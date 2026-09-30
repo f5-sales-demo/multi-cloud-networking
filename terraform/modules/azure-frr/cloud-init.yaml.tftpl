@@ -8,6 +8,7 @@ write_files:
     content: |
       net.ipv4.ip_forward=1
   - path: /etc/frr/frr.conf
+    defer: true
     owner: frr:frr
     permissions: '0640'
     content: |

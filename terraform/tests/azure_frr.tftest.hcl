@@ -34,6 +34,7 @@ run "two_regional_relays_and_vip_only_export" {
 
   assert {
     condition = alltrue([for _, v in azurerm_linux_virtual_machine.frr :
+      strcontains(base64decode(v.custom_data), "defer: true") &&
       strcontains(base64decode(v.custom_data), "ip prefix-list VIP seq 10 permit 10.250.0.10/32") &&
       strcontains(base64decode(v.custom_data), "neighbor 10.0.4.4 peer-group RS") &&
       strcontains(base64decode(v.custom_data), "neighbor 10.0.4.5 peer-group RS") &&
