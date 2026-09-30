@@ -1,7 +1,11 @@
 # KVM LAN/SLI is an explicit staged opt-in. Mock plans prove the default
 # remains unchanged and the final topology is fully declared before live use.
 
-mock_provider "azurerm" {}
+mock_provider "azurerm" {
+  mock_resource "azurerm_network_interface" {
+    defaults = { mac_address = "52:54:00:10:00:11" }
+  }
+}
 mock_provider "azuread" {}
 mock_provider "xcsh" {}
 mock_provider "azapi" {}

@@ -4,7 +4,11 @@
 # resolves to xcsh_token.ce.uid by default, while an explicit
 # var.registration_token still overrides it.
 
-mock_provider "azurerm" {}
+mock_provider "azurerm" {
+  mock_resource "azurerm_network_interface" {
+    defaults = { mac_address = "52:54:00:10:00:11" }
+  }
+}
 mock_provider "azuread" {}
 mock_provider "xcsh" {}
 mock_provider "azapi" {}

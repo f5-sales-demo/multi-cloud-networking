@@ -1,6 +1,10 @@
 # Three independent one-node sites share two role-based TGW Connect
 # attachments, with one SLO and one SLI peer per site.
-mock_provider "azurerm" {}
+mock_provider "azurerm" {
+  mock_resource "azurerm_network_interface" {
+    defaults = { mac_address = "52:54:00:10:00:11" }
+  }
+}
 mock_provider "azuread" {}
 mock_provider "libvirt" {}
 mock_provider "random" {}

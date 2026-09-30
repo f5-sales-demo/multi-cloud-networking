@@ -2,7 +2,11 @@
 # admin_user_credentials field is inert for the built-in admin user, so each VM
 # must rotate that host account through an encrypted Azure VM extension.
 
-mock_provider "azurerm" {}
+mock_provider "azurerm" {
+  mock_resource "azurerm_network_interface" {
+    defaults = { mac_address = "52:54:00:10:00:11" }
+  }
+}
 mock_provider "azuread" {}
 mock_provider "xcsh" {}
 mock_provider "azapi" {}

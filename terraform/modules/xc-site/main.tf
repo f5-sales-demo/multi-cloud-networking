@@ -37,20 +37,24 @@ resource "xcsh_securemesh_site_v2" "this" {
         type      = "Control"
         public_ip = null
 
-        interface_list {
-          name = "eth0"
-
-          ethernet_interface {
-            device = "eth0"
-            mac    = var.mgmt_nic_mac
+        dynamic "interface_list" {
+          for_each = [
+            { device = "eth0", mac = var.mgmt_nic_mac, inside = false },
+            { device = "eth1", mac = var.inside_nic_mac, inside = true },
+            { device = "eth2", mac = var.external_nic_mac, inside = false },
+          ]
+          content {
+            name = interface_list.value.device
+            ethernet_interface {
+              device = interface_list.value.device
+              mac    = interface_list.value.mac == null ? "" : interface_list.value.mac
+            }
+            network_option {
+              site_local_network        = interface_list.value.inside ? null : {}
+              site_local_inside_network = interface_list.value.inside ? {} : null
+            }
+            dhcp_client = {}
           }
-
-          # Site Local Outside (SLO) — required on every site; BGP peers from here.
-          network_option {
-            site_local_network = {}
-          }
-
-          dhcp_client = {}
         }
       }
     }

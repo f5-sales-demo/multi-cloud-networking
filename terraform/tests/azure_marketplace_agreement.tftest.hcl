@@ -1,6 +1,10 @@
 # The Marketplace agreement is fixed to the one certified CE image.  This test
 # plans with mocks only: no Azure, Terraform state, or F5 API mutation occurs.
-mock_provider "azurerm" {}
+mock_provider "azurerm" {
+  mock_resource "azurerm_network_interface" {
+    defaults = { mac_address = "52:54:00:10:00:11" }
+  }
+}
 mock_provider "azuread" {}
 mock_provider "xcsh" {}
 mock_provider "azapi" {}

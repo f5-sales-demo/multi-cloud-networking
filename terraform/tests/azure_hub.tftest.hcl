@@ -2,7 +2,11 @@
 # are contacted. Asserts on the statically-known names (subnet/VNet/RS names are
 # literal; resource IDs are known-after-apply and are not asserted).
 
-mock_provider "azurerm" {}
+mock_provider "azurerm" {
+  mock_resource "azurerm_network_interface" {
+    defaults = { mac_address = "52:54:00:10:00:11" }
+  }
+}
 
 run "hub_names_and_subnets" {
   command = plan

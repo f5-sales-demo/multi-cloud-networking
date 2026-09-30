@@ -68,3 +68,7 @@ check 'labels[[:space:]]*=[[:space:]]*local.azure_token_labels' terraform/main.t
 check 'azure_token_labels' terraform/locals.tf
 
 check 'defer: true' terraform/modules/azure-frr/cloud-init.yaml.tftpl
+
+check 'azure_site_configuration_phase=bootstrap' scripts/showcase-lifecycle.sh
+check 'bind_azure_interfaces' scripts/showcase-lifecycle.sh
+check 'inside_nic_mac' terraform/modules/xc-site/main.tf

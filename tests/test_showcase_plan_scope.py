@@ -183,6 +183,59 @@ class ShowcasePlanScopeTest(unittest.TestCase):
                 "a" * 40,
             )
 
+    def test_azure_binding_accepts_only_configured_site_updates(self):
+        address = 'module.xc_site["01"].xcsh_securemesh_site_v2.this[0]'
+        document = plan([(address, ["update"])])
+        document["variables"]["azure_site_configuration_phase"] = {
+            "value": "configured"
+        }
+        document["resource_changes"][0]["change"]["after"] = {
+            "azure": {
+                "not_managed": {
+                    "node_list": [
+                        {
+                            "interface_list": [
+                                {
+                                    "ethernet_interface": {
+                                        "device": f"eth{i}",
+                                        "mac": f"52:54:00:10:00:{i + 1:02d}",
+                                    },
+                                    "network_option": {
+                                        "site_local_inside_network"
+                                        if i == 1
+                                        else "site_local_network": {}
+                                    },
+                                }
+                                for i in range(3)
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+        self.assertEqual(module.validate(document, "azure-bindings", "a" * 40), 1)
+        missing = copy.deepcopy(document)
+        missing["resource_changes"][0]["change"]["after"]["azure"]["not_managed"][
+            "node_list"
+        ][0]["interface_list"][1]["ethernet_interface"]["mac"] = ""
+        with self.assertRaisesRegex(ValueError, "hardware identity"):
+            module.validate(missing, "azure-bindings", "a" * 40)
+
+        for bad_address, actions in (
+            ("aws_instance.ce[0]", ["update"]),
+            (address, ["delete", "create"]),
+            ('module.ce_vm["01"].azurerm_linux_virtual_machine.this', ["update"]),
+        ):
+            invalid = plan([(bad_address, actions)])
+            invalid["variables"]["azure_site_configuration_phase"] = {
+                "value": "configured"
+            }
+            with self.assertRaisesRegex(ValueError, "outside its scope"):
+                module.validate(invalid, "azure-bindings", "a" * 40)
+        document["variables"]["azure_site_configuration_phase"]["value"] = "bootstrap"
+        with self.assertRaisesRegex(ValueError, "configured phase"):
+            module.validate(document, "azure-bindings", "a" * 40)
+
     def test_azure_build_allows_regional_relay_only(self):
         document = plan(
             [

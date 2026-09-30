@@ -529,3 +529,8 @@ output "canada_route_server_peer_ips" {
 output "azure_subscription_id" {
   value = var.subscription_id
 }
+
+output "azure_interface_contract" {
+  description = "Verified Azure device roles used by bootstrap and MAC-binding phases."
+  value       = local.azure_interface_contract
+}

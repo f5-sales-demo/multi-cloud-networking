@@ -648,14 +648,34 @@ build_cycle() {
     --source-commit "$SOURCE_COMMIT_SHA"
   phase_paths "$cycle" azure_build both-regions
   tf_plan -input=false -no-color -var-file="$TFVARS" \
+    -var='azure_site_configuration_phase=bootstrap' \
     -var='kvm_lan_configuration_phase=configured' \
     -var='aws_site_configuration_phase=configured' \
     -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE"
   apply_scoped_plan azure-build
+  bind_azure_interfaces "$cycle"
   wait_for_azure_approvals "$cycle"
   wait_for_azure_online "$cycle"
   settle_azure "$cycle"
   verify_final "$cycle"
+}
+
+bind_azure_interfaces() {
+  local cycle=$1 attempt
+  phase_paths "$cycle" azure_bindings observed-macs
+  for attempt in 1 2 3 4; do
+    if tf_plan -input=false -no-color -var-file="$TFVARS" \
+      -var='azure_site_configuration_phase=configured' -var='approve_registration=false' \
+      -var='kvm_lan_configuration_phase=configured' -var='aws_site_configuration_phase=configured' \
+      -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE" \
+      >"$EVIDENCE_DIR/binding-plan.log" 2>&1; then
+      apply_scoped_plan azure-bindings
+      return 0
+    fi
+    rm -f -- "$PLAN_FILE"
+    sleep 15
+  done
+  die "Azure post-boot NIC MAC binding did not produce a valid plan"
 }
 
 wait_for_azure_approvals() {
