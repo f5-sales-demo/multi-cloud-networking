@@ -15,9 +15,9 @@ require() {
 }
 
 # A registration approval is an action, not a long-lived object. It is legal
-# only while XC reports NEW. The explicit dependency prevents the approval API
+# only while XC reports NEW or PENDING. The explicit dependency prevents the approval API
 # from auto-provisioning a same-named site while Terraform is creating it.
-require 'count = var.approve_registration && data.xcsh_site_registration.this.found && data.xcsh_site_registration.this.state == "NEW" ? 1 : 0' "$module"
+require 'count = var.approve_registration && data.xcsh_site_registration.this.found && contains(["NEW", "PENDING"], data.xcsh_site_registration.this.state) ? 1 : 0' "$module"
 require 'depends_on = [xcsh_securemesh_site_v2.this]' "$module"
 
 # AWS has the same registration lifecycle. Its for_each remains plan-known
@@ -26,4 +26,4 @@ require 'depends_on = [xcsh_securemesh_site_v2.this]' "$module"
 require 'key => registration if registration.found && registration.state == "NEW"' "$aws"
 require 'depends_on = [xcsh_securemesh_site_v2.aws]' "$aws"
 
-printf 'PASS: registration approvals are NEW-only and ordered after site creation\n'
+printf 'PASS: Azure approvals include NEW/PENDING and AWS remains NEW-only and ordered after site creation\n'
