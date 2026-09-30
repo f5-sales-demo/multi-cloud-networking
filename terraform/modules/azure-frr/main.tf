@@ -33,6 +33,18 @@ resource "azurerm_network_security_group" "frr" {
   }
 
   security_rule {
+    name                       = "http-to-demo-vip"
+    priority                   = 110
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "80"
+    source_address_prefix      = "VirtualNetwork"
+    destination_address_prefix = var.vip
+  }
+
+  security_rule {
     name                       = "deny-other-inbound"
     priority                   = 4096
     direction                  = "Inbound"
