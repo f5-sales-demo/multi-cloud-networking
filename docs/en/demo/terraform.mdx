@@ -51,6 +51,10 @@ import modulesCeNodeMain from "../../_data/terraform/modules/ce-node/main.tf?raw
 import modulesCeNodeOutputs from "../../_data/terraform/modules/ce-node/outputs.tf?raw";
 import modulesCeNodeVariables from "../../_data/terraform/modules/ce-node/variables.tf?raw";
 import modulesCeNodeVersions from "../../_data/terraform/modules/ce-node/versions.tf?raw";
+import modulesCeVmMain from "../../_data/terraform/modules/ce-vm/main.tf?raw";
+import modulesCeVmOutputs from "../../_data/terraform/modules/ce-vm/outputs.tf?raw";
+import modulesCeVmVariables from "../../_data/terraform/modules/ce-vm/variables.tf?raw";
+import modulesCeVmVersions from "../../_data/terraform/modules/ce-vm/versions.tf?raw";
 import modulesCeTopologyMain from "../../_data/terraform/modules/ce-topology/main.tf?raw";
 import modulesClientVmMain from "../../_data/terraform/modules/client-vm/main.tf?raw";
 import modulesClientVmVariables from "../../_data/terraform/modules/client-vm/variables.tf?raw";
@@ -294,7 +298,7 @@ Route Server endpoints, and exports only the region's CE-learned VIP `/32`.
 
 ### `terraform/modules/ce-node/`
 
-One CE VM per node: three NICs with IP forwarding, the marketplace plan block, and the cloud-init handed over as custom_data.
+Prepare the three forwarding NICs, managed identity, and shared generation before the CE boots. The XC site uses that generation and the observed management NIC MAC.
 
 <Code code={modulesCeNodeMain} lang="hcl" title="terraform/modules/ce-node/main.tf" />
 
@@ -303,6 +307,20 @@ One CE VM per node: three NICs with IP forwarding, the marketplace plan block, a
 <Code code={modulesCeNodeVariables} lang="hcl" title="terraform/modules/ce-node/variables.tf" />
 
 <Code code={modulesCeNodeVersions} lang="hcl" title="terraform/modules/ce-node/versions.tf" />
+
+### `terraform/modules/ce-vm/`
+
+Boot the marketplace CE only after its managed XC site exists. A changed shared
+generation replaces the site and VM together. Runtime outputs retain Azure's
+actual VM instance ID for acceptance and console credential rotation.
+
+<Code code={modulesCeVmMain} lang="hcl" title="terraform/modules/ce-vm/main.tf" />
+
+<Code code={modulesCeVmOutputs} lang="hcl" title="terraform/modules/ce-vm/outputs.tf" />
+
+<Code code={modulesCeVmVariables} lang="hcl" title="terraform/modules/ce-vm/variables.tf" />
+
+<Code code={modulesCeVmVersions} lang="hcl" title="terraform/modules/ce-vm/versions.tf" />
 
 ### `terraform/modules/ce-topology/`
 

@@ -77,6 +77,10 @@ resource "random_uuid" "generation" {
     custom_data  = sha256(var.custom_data)
     image        = "f5xc-ce-crt-20260201/20260201.0178.1"
     vm_size      = var.vm_size
+    location     = var.location
+    zone         = var.zone
+    admin_user   = var.admin_username
+    ssh_key      = sha256(var.ssh_public_key)
     disk_size    = tostring(var.os_disk_size_gb)
     mgmt_nic     = azurerm_network_interface.mgmt.id
     external_nic = azurerm_network_interface.external.id
