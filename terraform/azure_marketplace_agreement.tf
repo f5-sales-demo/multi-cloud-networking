@@ -34,5 +34,11 @@ resource "azapi_resource_action" "f5xc_customer_edge_marketplace_agreement" {
 
   response_export_values = ["*"]
 
+  # Azure requires the current signed receipt on initial acceptance, but rotates
+  # it on every GET. Retain that creation receipt while still repairing accepted.
+  lifecycle {
+    ignore_changes = [body.properties.retrieveDatetime, body.properties.signature]
+  }
+
   depends_on = [data.azapi_resource_action.f5xc_customer_edge_marketplace_agreement]
 }
