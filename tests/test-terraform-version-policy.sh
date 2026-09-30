@@ -25,17 +25,17 @@ else
   bad "Terraform workflow jobs do not both pin 1.16.3"
 fi
 
-echo "2. every xcsh consumer pins exactly v12.0.0"
+echo "2. every xcsh consumer pins exactly v12.0.3"
 for relative in terraform/versions.tf \
   terraform/recovery/aws-smsv2-orphans/versions.tf \
   terraform/modules/xc-site/versions.tf \
   terraform/modules/kvm/providers.tf coverage/smsv2/versions.tf; do
   file="${REPO_ROOT}/${relative}"
   block=$(sed -n '/^[[:space:]]*xcsh = {/,/^[[:space:]]*}/p' "$file")
-  if printf '%s\n' "$block" | grep -Eq 'version[[:space:]]*=[[:space:]]*"= 12\.0\.0"'; then
-    ok "${relative} pins = 12.0.0"
+  if printf '%s\n' "$block" | grep -Eq 'version[[:space:]]*=[[:space:]]*"= 12\.0\.3"'; then
+    ok "${relative} pins = 12.0.3"
   else
-    bad "${relative} does not pin exactly = 12.0.0"
+    bad "${relative} does not pin exactly = 12.0.3"
   fi
   count=$(printf '%s\n' "$block" | grep -Ec '^[[:space:]]*version[[:space:]]*=' || true)
   [ "$count" -eq 1 ] || bad "${relative} has ${count} xcsh version constraints"
@@ -44,10 +44,10 @@ done
 for relative in .github/workflows/terraform.yml prompt.txt docs/en/demo/deploy.mdx \
   docs/en/demo/prompt.mdx docs/en/demo/spec.mdx docs/en/demo/terraform.mdx \
   tests/test-verify-deployment.sh; do
-  if grep -Fq '12.0.0' "${REPO_ROOT}/${relative}"; then
-    ok "${relative} references v12.0.0"
+  if grep -Fq '12.0.3' "${REPO_ROOT}/${relative}"; then
+    ok "${relative} references v12.0.3"
   else
-    bad "${relative} is missing the v12.0.0 reference"
+    bad "${relative} is missing the v12.0.3 reference"
   fi
 done
 legacy_version='7''.''4''.''1'
@@ -110,7 +110,7 @@ else
   bad "expected two workflow path filters, found ${trigger_count}"
 fi
 
-echo "7. provider v12.0.0 uses one immutable API release identity"
+echo "7. provider v12.0.3 uses one immutable API release identity"
 api_tag='v9.0.0'
 release_revision_left='f95183046197e6547a3ea'
 release_revision_right='123e324f53126eae440'
