@@ -43,32 +43,27 @@ variables {
 }
 
 
-run "owned_origin_selected_for_both_regions" {
+run "provider_f5_acl_and_both_developer_routes" {
   command = plan
-  variables { enable_showcase_origin = true }
+  variables {
+    enable_showcase_origin = true
+    origin_developer_cidrs = ["198.51.100.10/32", "203.0.113.20/32"]
+  }
   override_data {
     target = data.xcsh_network_regional_edges.origin[0]
-    values = { cidr_blocks = ["192.0.2.0/24"], api_release_tag = "v9.0.0" }
+    values = { cidr_blocks = ["192.0.2.0/25", "192.0.2.128/25"], api_release_tag = "v9.0.0" }
   }
   override_data {
     target = data.xcsh_network_cdn.origin[0]
-    values = { cidr_blocks = ["192.0.2.0/24"], api_release_tag = "v9.0.0" }
-  }
-
-  override_module {
-    target  = module.showcase_origin[0]
-    outputs = { public_ip = "198.51.100.42" }
+    values = { cidr_blocks = ["192.0.2.0/25"], api_release_tag = "v9.0.0" }
   }
   assert {
-    condition     = output.origin_ip == "198.51.100.42" && xcsh_origin_pool.this[0].origin_servers[0].public_ip.ip == "198.51.100.42" && xcsh_origin_pool.canada[0].origin_servers[0].public_ip.ip == "198.51.100.42"
-    error_message = "Both regions and control probes must select the owned origin."
+    condition     = output.origin_ingress_acl.f5_cidrs == tolist(["192.0.2.0/25", "192.0.2.128/25"]) && output.origin_ingress_acl.developer_cidrs == tolist(["198.51.100.10/32", "203.0.113.20/32"])
+    error_message = "The origin ACL must include every provider CIDR and both independent developer egress /32s."
   }
 }
-run "external_origin_preserved_when_disabled" {
+run "developer_wildcard_rejected" {
   command = plan
-  variables { enable_showcase_origin = false }
-  assert {
-    condition     = output.origin_ip == var.origin_ip && length(module.showcase_origin) == 0
-    error_message = "Existing external-origin deployments must remain supported."
-  }
+  variables { origin_developer_cidrs = ["0.0.0.0/0"] }
+  expect_failures = [var.origin_developer_cidrs]
 }

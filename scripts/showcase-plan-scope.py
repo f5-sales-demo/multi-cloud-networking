@@ -26,6 +26,7 @@ AZURE_PREFIXES = (
     "module.xc_site_ca[",
     "module.azure_frr_us[",
     "module.azure_frr_ca[",
+    "terraform_data.origin_f5_acl_gate[",
     "module.showcase_origin[",
     "module.client_vm[",
     "module.client_vm_ca[",

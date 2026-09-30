@@ -52,3 +52,23 @@ variable "serve_http" {
   type        = bool
   default     = false
 }
+
+variable "allow_ssh" {
+  type        = bool
+  description = "Allow SSH for test clients; the origin uses Azure Run Command instead."
+  default     = true
+}
+variable "restrict_ingress" {
+  type        = bool
+  description = "Deny unlisted origin ingress before Azure default rules."
+  default     = false
+}
+variable "http_source_cidrs" {
+  type        = list(string)
+  description = "Explicit HTTP source networks for the disposable origin."
+  default     = []
+  validation {
+    condition     = alltrue([for cidr in var.http_source_cidrs : can(cidrhost(cidr, 0)) && !contains(["0.0.0.0/0", "::/0"], cidr)])
+    error_message = "HTTP origin sources must be valid CIDRs and cannot allow the whole Internet."
+  }
+}
