@@ -5,7 +5,7 @@ variable "probe_name" {
 }
 
 variable "mtu" {
-  description = "SLO interface MTU. Provider validator: AtMost(16384) (API rule is 0 or 512-16384). S1 pushes >16384 to prove rejection."
+  description = "SLO interface MTU. Provider API v9 validator: 0 or 512-8000. The gate proves both inclusive bounds and rejects out-of-range values."
   type        = number
   default     = 1500
 }

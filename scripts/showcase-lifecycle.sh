@@ -283,6 +283,14 @@ caller_account=$(AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_SDK_LOAD_CONFIG=1 \
 [ "$caller_account" = "$AWS_ACCOUNT" ] || die "AWS account mismatch"
 unset caller_account
 
+# Resolve published providers through an isolated CLI configuration. Verify the
+# signed release, source and embedded API identity before any initialization.
+TF_CLI_CONFIG_FILE="$PRIVATE_ROOT/published-providers.tfrc"
+printf 'provider_installation { direct {} }\n' >"$TF_CLI_CONFIG_FILE"
+export TF_CLI_CONFIG_FILE
+python3 "$REPO_ROOT/scripts/verify-showcase-provider.py" --private-root "$PRIVATE_ROOT"
+PROVIDER_ZIP="$PRIVATE_ROOT/terraform-provider-xcsh_12.0.0_linux_amd64.zip"
+
 tf init -reconfigure -input=false -lockfile=readonly -backend-config="$BACKEND_CONFIG"
 # The old production state contains xcsh data attributes the current provider
 # cannot decode in terraform console. Evaluate only tracked source and private
@@ -315,18 +323,9 @@ if [ "$(grep -Ec '^[[:space:]]*enable_aws_tgw_connect[[:space:]]*=' "$TFVARS")" 
   ! grep -Eq '^[[:space:]]*enable_aws_tgw_connect[[:space:]]*=[[:space:]]*true[[:space:]]*(#.*)?$' "$TFVARS"; then
   die "private tfvars must explicitly enable AWS TGW Connect"
 fi
-latest_xcsh=$(gh release view --repo f5-sales-demo/terraform-provider-xcsh --json tagName --jq .tagName) || die "cannot check latest xcsh release"
-[ "$latest_xcsh" = v11.3.0 ] || die "xcsh release advanced beyond the pinned v11.3.0"
-PROVIDER_ZIP="$PRIVATE_ROOT/terraform-provider-xcsh_11.3.0_linux_amd64.zip"
-if [ ! -f "$PROVIDER_ZIP" ]; then
-  curl -fsSL --retry 3 --output "$PROVIDER_ZIP" \
-    'https://github.com/f5-sales-demo/terraform-provider-xcsh/releases/download/v11.3.0/terraform-provider-xcsh_11.3.0_linux_amd64.zip' ||
-    die "cannot download pinned xcsh provider artifact"
-fi
-[ "$(sha256sum "$PROVIDER_ZIP" | awk '{print $1}')" = 5dab6b26cbc2656bd7df2a8259564f238b1947d5cfdf9e9370243300c954d85d ] ||
-  die "xcsh release artifact digest mismatch"
 PREFLIGHT_DIR="$TERRAFORM_DIR/preflight/ce-egress"
-terraform -chdir="$PREFLIGHT_DIR" init -backend=false -input=false >/dev/null
+cp "$PREFLIGHT_DIR/provider-lock.hcl" "$PREFLIGHT_DIR/.terraform.lock.hcl"
+terraform -chdir="$PREFLIGHT_DIR" init -backend=false -input=false -lockfile=readonly >/dev/null
 PREFLIGHT_PLAN="$PRIVATE_ROOT/ce-egress.tfplan"
 PREFLIGHT_JSON="$PRIVATE_ROOT/ce-egress-plan.json"
 terraform -chdir="$PREFLIGHT_DIR" plan -input=false -no-color \
@@ -337,7 +336,7 @@ jq -e --arg commit "$SOURCE_COMMIT_SHA" --arg key "$SHOWCASE_BACKEND_KEY" '
   .planned_values.outputs.reviewed_identity.value.source_commit_sha == $commit and
   .planned_values.outputs.reviewed_identity.value.backend_key == $key and
   .configuration.provider_config.xcsh.full_name == "registry.terraform.io/f5-sales-demo/xcsh" and
-  (.configuration.provider_config.xcsh.version_constraint | . == "11.3.0" or . == "= 11.3.0") and
+  (.configuration.provider_config.xcsh.version_constraint | . == "12.0.0" or . == "= 12.0.0") and
   ([.resource_changes[]? | select(.change.actions != ["no-op"] and .change.actions != ["read"])] | length == 0) and
   ((.action_invocations // []) | length == 0)' "$PREFLIGHT_JSON" >/dev/null ||
   die "CE egress preflight plan identity or action scope failed"

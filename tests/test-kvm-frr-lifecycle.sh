@@ -191,3 +191,7 @@ python3 "$repo_root/tests/test_xc_kvm_bgp_observer.py"
 python3 "$repo_root/tests/test_kvm_lan_plan_scope.py"
 
 printf 'PASS: KVM CE identity and FRR lifecycle are Terraform-owned\n'
+
+require 'owning securemesh_site_v2' "$onprem"
+require 'preserves the complete primary SLO' "$onprem"
+reject 'resource "xcsh_network_interface" "kvm_lan_sli"' "$onprem"

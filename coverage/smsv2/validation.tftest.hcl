@@ -20,7 +20,7 @@ run "accept_valid_bounds" {
 
   variables {
     probe_name      = "cov-probe-s1-ok"
-    mtu             = 1500                # AtMost(16384)
+    mtu             = 1500                # API v9: 0 or 512-8000
     priority        = 0                   # Between(0, 255)   lower bound
     vlan_id         = 4095                # Between(1, 4095)  upper bound
     proxy_port      = 0                   # Between(0, 65535) lower bound
@@ -526,5 +526,19 @@ run "plan_admin_user_credentials" {
   assert {
     condition     = startswith(xcsh_securemesh_site_v2.probe.admin_user_credentials.admin_password.clear_secret_info.url, "string:///")
     error_message = "admin_password.clear_secret_info.url must be a string:/// dummy-secret URL (dependency-free backend)."
+  }
+}
+
+run "accept_mtu_api_v9_maximum" {
+  command = plan
+  variables {
+    mtu = 8000
+  }
+}
+
+run "accept_mtu_api_v9_zero" {
+  command = plan
+  variables {
+    mtu = 0
   }
 }

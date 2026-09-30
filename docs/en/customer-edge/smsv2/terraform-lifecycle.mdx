@@ -116,9 +116,10 @@ realize an added NIC through its domain Update path:
    live registration, and Terraform-owned MACs. Do not guess `ethX` or reuse a
    prior registration suffix.
 5. Set `kvm_lan_configuration_phase = "configured"` and review a second full-root
-   plan. It may adopt and update only the exact owned runtime SLI child, and create
-   the owned KVM LAN virtual site, origin pool, and HTTP load balancer. The primary
-   SLO remains platform-owned and read-only.
+   plan. The provider may adopt only the exact owned runtime SLI and change it
+   through one versioned owning-site request, followed by exact child readback.
+   The request preserves the primary SLO and unrelated site settings. It also
+   creates the owned KVM LAN virtual site, origin pool, and HTTP load balancer.
 6. Apply the reviewed plan, then prove the CE is online, the original single BGP
    peer remains established, exactly one SLO and one SLI exist, and an independent
    LAN client reaches the real origin through the inside custom VIP on port 80.

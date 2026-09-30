@@ -4,13 +4,13 @@
 # mock_provider => no credentials; validator fires from the real provider schema at plan.
 mock_provider "xcsh" {}
 
-run "reject_mtu_over_max" {
+run "reject_mtu_new_max" {
   command = plan
 
   # The released provider validates the complete union, including its lower bound.
   variables {
     probe_name = "cov-probe-s1-mtu"
-    mtu        = 20000
+    mtu        = 8001
     priority   = 10
     vlan_id    = 100
     proxy_port = 8080

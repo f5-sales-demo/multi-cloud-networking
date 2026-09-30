@@ -14,7 +14,7 @@ import subprocess
 import sys
 from typing import Any
 
-PROVIDER_SHA256 = "5dab6b26cbc2656bd7df2a8259564f238b1947d5cfdf9e9370243300c954d85d"
+PROVIDER_SHA256 = "e6687d3727afecc225531746d35d21053c0661c4e6a6595f83812e4fb327dcf3"
 AZURE_PREFIXES = (
     "module.azure_hub[",
     "module.azure_hub_ca[",
@@ -87,6 +87,7 @@ FULL_FLAGS = (
 
 PRODUCTION_KEY = "mcn-ce-ha-smsv2/showcase.tfstate"
 LEGACY_KVM_BGP = "xcsh_bgp.onprem_ebgp[0]"
+LEGACY_TENANT = "f5-sales-demo"
 
 
 def legacy_kvm_bgp_owned(
@@ -110,7 +111,7 @@ def legacy_kvm_bgp_owned(
             labels.get("mcn-deployment-generation")
             == legacy.get("generation")
             == "smsv2-current",
-            labels.get("mcn-xc-tenant") == legacy.get("tenant") == "f5-sales-demo",
+            labels.get("mcn-xc-tenant") == legacy.get("tenant") == LEGACY_TENANT,
             labels.get("mcn-topology") == site_name,
             isinstance(refs, list)
             and len(refs) == 1
@@ -184,8 +185,8 @@ def validate(
     xcsh = providers.get("xcsh", {})
     if xcsh.get("full_name") != "registry.terraform.io/f5-sales-demo/xcsh" or xcsh.get(
         "version_constraint"
-    ) not in ("11.3.0", "= 11.3.0"):
-        raise ValueError("saved plan does not pin xcsh 11.3.0")
+    ) not in ("12.0.0", "= 12.0.0"):
+        raise ValueError("saved plan does not pin xcsh 12.0.0")
 
     changes = []
     if document.get("action_invocations"):

@@ -25,7 +25,7 @@ resource "xcsh_securemesh_site_v2" "onprem_kvm" {
   disable_management_network = {}
 
   # Match the non-AppStack SMSv2 Console defaults during first-boot software
-  # installation. Provider v11.3.0 does not expose software_settings.waf_signatures;
+  # installation. Provider v12.0.0 does not expose software_settings.waf_signatures;
   # every supported default from the Console-created KVM object is explicit here.
   dns_ntp_config {
     f5_dns_default = {}
@@ -182,11 +182,10 @@ locals {
   kvm_lan_sli_interfaces = local.kvm_lan_configured ? toset(["sli"]) : toset([])
 }
 
-# XC creates node interfaces as children of the registered site. The site API
-# rejects any post-registration node_list update that restates the immutable
-# primary SLO. The KVM-specific provider resource adopts only the exact owned
-# secondary child, reconciles ambiguous PUT outcomes, and restores DHCP on
-# destroy without deleting the platform-owned child.
+# XC creates node interfaces as children of the registered site. xcsh changes
+# only the exact owned secondary SLI through its owning securemesh_site_v2,
+# preserves the complete primary SLO, and confirms the SLI by exact readback.
+# Destroy restores SLI DHCP without deleting the platform-owned child.
 resource "xcsh_smsv2_kvm_runtime_interface" "kvm_lan_sli" {
   for_each = local.kvm_lan_sli_interfaces
 
