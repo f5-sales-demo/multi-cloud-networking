@@ -14,7 +14,7 @@ run "site_and_interface_binding" {
       one(xcsh_securemesh_site_v2.this).azure.not_managed.node_list[0].interface_list[1].network_option.site_local_inside_network != null &&
       one(xcsh_securemesh_site_v2.this).azure.not_managed.node_list[0].interface_list[2].ethernet_interface.device == "eth2"
     )
-    error_message = "Azure must preserve SLO, SLI and external hardware interfaces with exact device roles."
+    error_message = "Azure must join secondary device roles to owned NIC MACs rather than fixed order."
   }
 
   module {

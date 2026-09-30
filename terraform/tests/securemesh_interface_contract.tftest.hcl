@@ -24,11 +24,10 @@ run "bootstrap_preserves_three_devices_without_assuming_macs" {
     error_message = "Bootstrap must preserve every physical Azure interface."
   }
 }
-run "configured_interfaces_bind_observed_macs" {
+run "secondary_roles_require_registered_mac_join" {
   command = plan
-  variables { azure_site_configuration_phase = "configured" }
   assert {
-    condition     = local.azure_interface_contract.devices == { slo = "eth0", sli = "eth1", external = "eth2" }
-    error_message = "Azure role/device identities must match live registered hardware."
+    condition     = local.azure_interface_contract.devices == { slo = "eth0", secondary = "registered-mac" }
+    error_message = "Secondary Azure roles must resolve by registered MAC identity."
   }
 }
