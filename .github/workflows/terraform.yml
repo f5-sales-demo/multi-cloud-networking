@@ -263,9 +263,7 @@ jobs:
 
       - name: Origin ACL boot ordering
         working-directory: .
-        run: |
-          terraform -chdir=terraform/modules/client-vm init -backend=false -input=false
-          bash tests/test-origin-acl-boot-order.sh
+        run: bash tests/test-origin-acl-boot-order.sh
 
       - name: Format check
         run: terraform fmt -check -recursive
