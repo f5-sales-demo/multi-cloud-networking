@@ -81,6 +81,7 @@ terraform/modules/azure-ilb-app/variables.tf -> terraform/modules/azure-ilb-app/
 terraform/modules/azure-ilb-app/versions.tf -> terraform/modules/azure-ilb-app/versions.tf
 terraform/modules/azure-registration-mapping/main.tf -> terraform/modules/azure-registration-mapping/main.tf
 terraform/modules/azure-registration-mapping/variables.tf -> terraform/modules/azure-registration-mapping/variables.tf
+terraform/modules/azure-registration-mapping/versions.tf -> terraform/modules/azure-registration-mapping/versions.tf
 terraform/modules/ce-node/main.tf -> terraform/modules/ce-node/main.tf
 terraform/modules/ce-node/outputs.tf -> terraform/modules/ce-node/outputs.tf
 terraform/modules/ce-node/variables.tf -> terraform/modules/ce-node/variables.tf
