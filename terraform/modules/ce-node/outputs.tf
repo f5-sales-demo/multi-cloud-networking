@@ -18,10 +18,6 @@ output "sli_private_ip" {
   value       = azurerm_network_interface.internal.private_ip_address
 }
 
-
-
-
-
 output "identity_id" {
   description = "User-assigned managed identity resource ID."
   value       = azurerm_user_assigned_identity.this.id
