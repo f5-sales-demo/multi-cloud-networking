@@ -16,8 +16,4 @@ locals {
     version = "2.0.0"
     devices = { slo = "eth0", sli = "eth1", external = "eth2" }
   }
-  azure_observed_macs = concat(
-    [for _, node in module.ce_node : [node.mgmt_nic_mac, node.inside_nic_mac, node.external_nic_mac]],
-    [for _, node in module.ce_node_ca : [node.mgmt_nic_mac, node.inside_nic_mac, node.external_nic_mac]]
-  )
 }
