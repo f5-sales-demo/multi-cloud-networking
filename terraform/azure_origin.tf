@@ -55,14 +55,16 @@ module "showcase_origin" {
   resource_group_name = module.azure_hub[0].resource_group_name
   location            = module.azure_hub[0].location
   subnet_id           = module.azure_hub[0].management_subnet_id
-  admin_username      = var.admin_username
-  ssh_public_key      = local.ssh_public_key
-  serve_http          = true
-  allow_ssh           = false
-  restrict_ingress    = true
-  http_source_cidrs   = sort(distinct(concat(local.origin_f5_cidrs, local.origin_demo_cidrs, var.origin_developer_cidrs)))
-  tags                = local.tags
-  depends_on          = [terraform_data.origin_f5_acl_gate]
+  # CE hosts use 4-6 and FRR uses 20-21 in this subnet.
+  private_ip        = cidrhost(var.mgmt_subnet_prefix, 30)
+  admin_username    = var.admin_username
+  ssh_public_key    = local.ssh_public_key
+  serve_http        = true
+  allow_ssh         = false
+  restrict_ingress  = true
+  http_source_cidrs = sort(distinct(concat(local.origin_f5_cidrs, local.origin_demo_cidrs, var.origin_developer_cidrs)))
+  tags              = local.tags
+  depends_on        = [terraform_data.origin_f5_acl_gate]
   custom_data = base64encode(<<-EOF
     #cloud-config
     write_files:

@@ -6,4 +6,5 @@ grep -Eq 'ip[[:space:]]*=[[:space:]]*local.selected_origin_ip' "$repo/terraform/
 grep -Eq 'value[[:space:]]*=[[:space:]]*local.selected_origin_ip' "$repo/terraform/outputs.tf"
 grep -q 'var.serve_http' "$repo/terraform/modules/client-vm/main.tf"
 grep -q 'mcn-showcase-origin' "$repo/terraform/azure_origin.tf"
+grep -Eq 'private_ip[[:space:]]*=[[:space:]]*cidrhost\(var.mgmt_subnet_prefix, 30\)' "$repo/terraform/azure_origin.tf"
 echo 'PASS: optional origin is owned and selected for pools and controls'

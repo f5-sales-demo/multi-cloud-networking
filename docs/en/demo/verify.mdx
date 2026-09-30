@@ -14,7 +14,8 @@ healthy showcase.
 The disposable origin VM waits for its NIC security-group association before
 boot. Its HTTP allowlist uses all published F5 Regional Edge and CDN networks,
 exact owned demo sources, and private workstation IPv4 /32 exceptions.
-An explicit deny rule blocks other ingress, including SSH.
+An explicit deny rule blocks other ingress, including SSH. The origin reserves
+management subnet host offset 30 so it cannot take a CE or FRR address.
 
 ## Azure US and Canada
 
