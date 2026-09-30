@@ -40,6 +40,12 @@ run "fixed_customer_edge_marketplace_agreement" {
     ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l plan-test-only"
   }
 
+
+  override_data {
+    target = data.azapi_resource_action.f5xc_customer_edge_marketplace_agreement[0]
+    values = { output = { properties = { accepted = true, retrieveDatetime = "rotating-time", signature = "rotating-signature", publisher = "f5-networks", product = "f5xc_customer_edge", plan = "f5xc-ce-crt-20260201" } } }
+  }
+
   assert {
     condition = (
       data.azapi_resource_action.f5xc_customer_edge_marketplace_agreement[0].type == "Microsoft.MarketplaceOrdering/offerTypes/publishers/offers/plans/agreements@2021-01-01" &&
@@ -60,3 +66,4 @@ run "fixed_customer_edge_marketplace_agreement" {
     error_message = "Terraform must PUT accepted=true for the exact fixed Customer Edge agreement."
   }
 }
+
