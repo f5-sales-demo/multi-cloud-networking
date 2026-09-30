@@ -72,3 +72,13 @@ variable "http_source_cidrs" {
     error_message = "HTTP origin sources must be valid CIDRs and cannot allow the whole Internet."
   }
 }
+
+variable "private_ip" {
+  description = "Optional reserved private IPv4 address; empty keeps ordinary test clients dynamic."
+  type        = string
+  default     = ""
+  validation {
+    condition     = var.private_ip == "" || can(cidrhost("${var.private_ip}/32", 0)) && !strcontains(var.private_ip, ":")
+    error_message = "Reserved client addresses must be IPv4 literals."
+  }
+}
