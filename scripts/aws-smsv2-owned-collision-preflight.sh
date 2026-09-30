@@ -664,7 +664,10 @@ while IFS= read -r item; do
       expected_tags=$(jq -ec '.tags // {}' <<<"$after") || die "planned tags are invalid for $address"
       mapfile -t instance_tag_filters < <(jq -r 'to_entries[] | "Name=tag:\(.key),Values=\(.value)"' <<<"$expected_tags")
       ((${#instance_tag_filters[@]} > 0)) || die "planned tags are incomplete for $address"
-      lookup=(ec2 describe-instances --filters "${instance_tag_filters[@]}")
+      # EC2 retains terminated instances after a successful demo teardown.
+      # Only states that can still occupy the deployment count as collisions.
+      lookup=(ec2 describe-instances --filters "${instance_tag_filters[@]}"
+        'Name=instance-state-name,Values=pending,running,stopping,stopped')
       ;;
     aws_internet_gateway)
       name=$address

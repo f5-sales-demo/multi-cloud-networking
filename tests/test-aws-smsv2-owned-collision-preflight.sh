@@ -130,6 +130,16 @@ case "$*" in
   *"sts get-caller-identity"*)
     printf '{"Account":"%s","Arn":"arn:aws:sts::123456789012:assumed-role/test/session","UserId":"TESTUSER:session"}\n' "${FAKE_ACCOUNT_ID:-123456789012}"
     ;;
+  *"describe-instances"*)
+    state=${FAKE_INSTANCE_STATE:-running}
+    if [[ $* == *"Name=instance-state-name,Values=pending,running,stopping,stopped"* &&
+      ( $state == terminated || $state == shutting-down ) ]]; then
+      printf '%s\n' '{"Reservations":[]}'
+    else
+      jq -nc --arg state "$state" --argjson count "${FAKE_INSTANCE_COUNT:-1}" \
+        '{Reservations:[{Instances:[range($count) | {InstanceId:("i-0123456789abcde" + tostring),LaunchTime:"2026-09-30T12:00:00Z",State:{Name:$state},Tags:[{Key:"component",Value:"mcn-ce-ha"},{Key:"deployment_generation",Value:"gen-01"},{Key:"deployer",Value:"tester"},{Key:"managed_by",Value:"terraform"}]}]}]}'
+    fi
+    ;;
   *"describe-key-pairs"*"mcn-ce-ha-gen-01-key"*)
     if [[ ${FAKE_ABSENT:-false} == true ]]; then
       printf '%s\n' 'InvalidKeyPair.NotFound' >&2
@@ -403,3 +413,37 @@ for required in \
 done
 
 printf 'PASS: owned AWS and F5 name collisions are rejected before Terraform apply with a verified manifest\n'
+
+# EC2 keeps terminal instances visible after teardown. They must not prevent
+# immediate recycling, while every live state retains collision protection.
+instance_plan="$scratch/instance-rebuild-plan.json"
+jq -n '{resource_changes:[{address:"aws_instance.ce[0]",type:"aws_instance",change:{actions:["create"],after:{tags:{component:"mcn-ce-ha",deployment_generation:"gen-01",deployer:"tester",managed_by:"terraform"}}}}]}' >"$instance_plan"
+for instance_state in terminated shutting-down pending running stopping stopped; do
+  instance_manifest="$scratch/instance-$instance_state.json"
+  set +e
+  FAKE_INSTANCE_STATE="$instance_state" PATH="$fake_bin:$PATH" CURL_BIN="$fake_bin/curl" \
+    XCSH_API_URL=https://f5-sales-demo.console.ves.volterra.io XCSH_API_TOKEN=test-token \
+    "$script" --plan-json "$instance_plan" --aws-region ap-northeast-1 --xc-tenant f5-sales-demo \
+    --aws-account-id 123456789012 --deployment-generation gen-01 --component mcn-ce-ha \
+    --creator-id tester@example.test --manifest "$instance_manifest" >"$scratch/instance-output.log" 2>&1
+  instance_result=$?
+  set -e
+  case "$instance_state" in
+  terminated | shutting-down)
+    [ "$instance_result" -eq 0 ] || fail "terminal instance $instance_state must permit rebuild"
+    jq -e '.status == "ready" and .collisions == []' "$instance_manifest" >/dev/null || fail 'terminal instance collision remains'
+    ;;
+  *)
+    [ "$instance_result" -eq 3 ] || fail "live instance $instance_state must block rebuild"
+    jq -e '.status == "blocked" and (.collisions | length == 1)' "$instance_manifest" >/dev/null || fail 'live instance collision was lost'
+    ;;
+  esac
+done
+if FAKE_INSTANCE_COUNT=2 PATH="$fake_bin:$PATH" CURL_BIN="$fake_bin/curl" \
+  XCSH_API_URL=https://f5-sales-demo.console.ves.volterra.io XCSH_API_TOKEN=test-token \
+  "$script" --plan-json "$instance_plan" --aws-region ap-northeast-1 --xc-tenant f5-sales-demo \
+  --aws-account-id 123456789012 --deployment-generation gen-01 --component mcn-ce-ha \
+  --creator-id tester@example.test --manifest "$scratch/instance-ambiguous.json" >/dev/null 2>&1; then
+  fail 'ambiguous live instances must still reject'
+fi
+printf 'PASS: terminal EC2 instances permit recycling; live and ambiguous collisions remain blocked\n'
