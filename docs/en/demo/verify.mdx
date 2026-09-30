@@ -11,6 +11,11 @@ last receipt must be a **refresh-enabled zero-change plan** from the second
 build. A successful apply or a static Terraform test does not establish a
 healthy showcase.
 
+The disposable origin VM waits for its NIC security-group association before
+boot. Its HTTP allowlist uses all published F5 Regional Edge and CDN networks,
+exact owned demo sources, and private workstation IPv4 /32 exceptions.
+An explicit deny rule blocks other ingress, including SSH.
+
 ## Azure US and Canada
 
 Run the regional verifier with the configured subscription, which may differ

@@ -261,6 +261,12 @@ jobs:
       - name: Init (no backend; CI has no cloud credentials)
         run: terraform init -input=false -backend=false
 
+      - name: Origin ACL boot ordering
+        working-directory: .
+        run: |
+          terraform -chdir=terraform/modules/client-vm init -backend=false -input=false
+          bash tests/test-origin-acl-boot-order.sh
+
       - name: Format check
         run: terraform fmt -check -recursive
 

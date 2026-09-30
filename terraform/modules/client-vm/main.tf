@@ -112,6 +112,9 @@ resource "azurerm_linux_virtual_machine" "this" {
 
   network_interface_ids = [azurerm_network_interface.this.id]
 
+  # Install the declared ingress ACL before cloud-init can start an origin.
+  depends_on = [azurerm_network_interface_security_group_association.this]
+
   os_disk {
     caching              = "ReadWrite"
     storage_account_type = "Premium_LRS"
