@@ -63,3 +63,6 @@ check 'replace_triggered_by = \[terraform_data.generation\]' terraform/modules/c
 check 'ce_generation_id[[:space:]]*=[[:space:]]*module.ce_node\[each.key\].generation_id' terraform/main.tf
 check 'depends_on[[:space:]]*= \[module.xc_site\]' terraform/main.tf
 reject 'ce_vm_instance_id[[:space:]]*=[[:space:]]*module.ce_node' terraform/main.tf
+
+check 'labels[[:space:]]*=[[:space:]]*local.azure_token_labels' terraform/main.tf
+check 'azure_token_labels' terraform/locals.tf

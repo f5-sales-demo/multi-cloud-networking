@@ -43,6 +43,14 @@ variables {
 run "generated_token_is_used" {
   command = plan
 
+  assert {
+    condition = (
+      xcsh_token.ce[0].type == 0 &&
+      !contains(keys(xcsh_token.ce[0].labels), "mcn-source-commit")
+    )
+    error_message = "The NORMAL boot token must be explicit and stable across source metadata updates."
+  }
+
   variables {
     ce_count       = 1
     deployer       = "tester"

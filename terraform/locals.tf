@@ -147,6 +147,10 @@ locals {
   kvm_xc_labels = merge(local.xc_labels, {
     "mcn-topology" = "${local.site_prefix}-kvm"
   })
+  azure_token_labels = {
+    for key, value in local.azure_xc_labels : key => value
+    if key != "mcn-source-commit"
+  }
   kvm_token_labels = {
     for key, value in local.kvm_xc_labels : key => value
     if key != "mcn-source-commit"
