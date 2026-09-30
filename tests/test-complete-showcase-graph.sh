@@ -50,3 +50,9 @@ check 'transit_gateway_default_route_table_association[[:space:]]*=[[:space:]]*t
 reject 'resource "aws_ec2_transit_gateway_route_table_association"' terraform/modules/aws-tgw-connect/main.tf
 reject 'resource "aws_ec2_transit_gateway_route_table_association"' terraform/aws_vpc.tf
 echo 'PASS: complete showcase graph contract'
+
+check 'mcn-topology in' terraform/kvm_lan.tf
+check 'mcn-topology in' terraform/modules/azure-ilb-app/main.tf
+reject 'ves.io/siteName' terraform/kvm_lan.tf
+reject 'ves.io/siteName' terraform/modules/azure-ilb-app/main.tf
+reject 'ves.io/siteName' terraform/main.tf

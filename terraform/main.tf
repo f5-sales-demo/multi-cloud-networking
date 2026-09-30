@@ -575,7 +575,7 @@ resource "xcsh_virtual_site" "canada_ce" {
 
   site_type = "CUSTOMER_EDGE"
   site_selector {
-    expressions = ["ves.io/siteName in (${join(", ", [for k, v in try(module.ce_topology_ca[0].ce_nodes, {}) : v.site_name])})"]
+    expressions = ["mcn-topology in (${local.ca_xc_labels["mcn-topology"]})"]
   }
 }
 

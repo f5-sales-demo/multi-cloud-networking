@@ -46,7 +46,7 @@ resource "xcsh_virtual_site" "kvm_lan" {
   site_type = "CUSTOMER_EDGE"
 
   site_selector {
-    expressions = ["ves.io/siteName in (${xcsh_securemesh_site_v2.onprem_kvm[0].name})"]
+    expressions = ["mcn-topology in (${local.kvm_xc_labels["mcn-topology"]})"]
   }
 }
 
