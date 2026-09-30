@@ -172,3 +172,10 @@ reject 'maurice_config_cardinality_exactly_one' "$lifecycle"
 
 printf 'PASS: unified AWS, KVM, and Azure lifecycle contract is enforced\n'
 python3 -m unittest tests/test_showcase_registration_gate.py
+
+verification_line=$(grep -n '^python3 .*verify-showcase-provider.py' "$lifecycle" | cut -d: -f1)
+init_line=$(grep -n '^tf init ' "$lifecycle" | cut -d: -f1)
+[ -n "$verification_line" ] && [ "$verification_line" -lt "$init_line" ] ||
+  fail 'published provider verification must precede lifecycle initialization'
+require 'TF_CLI_CONFIG_FILE="$PRIVATE_ROOT/published-providers.tfrc"' "$lifecycle"
+require 'init -backend=false -input=false -lockfile=readonly' "$lifecycle"

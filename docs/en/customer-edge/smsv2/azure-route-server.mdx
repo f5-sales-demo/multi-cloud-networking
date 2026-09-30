@@ -7,8 +7,8 @@ sidebar:
 
 ## Regional routing design
 
-The unified root pins `f5-sales-demo/xcsh` v11.3.0, built from
-`api-specs-enriched` v8.0.2. Each Azure region has three Customer Edges (CEs),
+The unified root pins `f5-sales-demo/xcsh` v12.0.0, built from
+`api-specs-enriched` v9.0.0. Each Azure region has three Customer Edges (CEs),
 two Terraform-managed FRR routers, and one Azure Route Server. A CE peers directly
 with both FRRs on the management subnet. Each FRR peers with both Route Server
 endpoints using eBGP multihop. Route Server peers with the FRRs at management

@@ -5,6 +5,9 @@ import copy
 from pathlib import Path
 from typing import Any
 import unittest
+from unittest.mock import patch
+
+PROVIDER_SOURCE = "registry.terraform.io/f5-sales-demo/xcsh"
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/showcase-plan-scope.py"
 spec = importlib.util.spec_from_file_location("showcase_plan_scope", SCRIPT)
@@ -34,8 +37,8 @@ def plan(changes):
         "configuration": {
             "provider_config": {
                 "xcsh": {
-                    "full_name": "registry.terraform.io/f5-sales-demo/xcsh",
-                    "version_constraint": "11.3.0",
+                    "full_name": PROVIDER_SOURCE,
+                    "version_constraint": "12.0.0",
                 }
             }
         },
@@ -265,7 +268,7 @@ class ShowcasePlanScopeTest(unittest.TestCase):
             "deployer": "operator",
             "environment": "lab",
             "generation": "smsv2-current",
-            "tenant": "f5-sales-demo",
+            "tenant": "example-corp",
         }
         self.assertEqual(
             module.validate(
@@ -316,6 +319,7 @@ class ShowcasePlanScopeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "prior state"):
             module.validate(document, "full-destroy", "a" * 40)
 
+    @patch.object(module, "LEGACY_TENANT", "example-corp")
     def test_destroy_accepts_only_exact_legacy_kvm_poc_bgp(self):
         address = "xcsh_bgp.onprem_ebgp[0]"
         document = prior(plan([(address, ["delete"])]), [address])
@@ -327,7 +331,7 @@ class ShowcasePlanScopeTest(unittest.TestCase):
                 "mcn-owner-id": "kvm-poc",
                 "mcn-environment": "production",
                 "mcn-deployment-generation": "smsv2-current",
-                "mcn-xc-tenant": "f5-sales-demo",
+                "mcn-xc-tenant": "example-corp",
                 "mcn-topology": "mcn-ce-ha-smsv2-current-kvm",
             },
             "where": {
@@ -346,7 +350,7 @@ class ShowcasePlanScopeTest(unittest.TestCase):
             "deployer": "operator",
             "environment": "lab",
             "generation": "smsv2-current",
-            "tenant": "f5-sales-demo",
+            "tenant": "example-corp",
         }
         args = (
             document,

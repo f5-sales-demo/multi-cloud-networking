@@ -528,3 +528,17 @@ run "plan_admin_user_credentials" {
     error_message = "admin_password.clear_secret_info.url must be a string:/// dummy-secret URL (dependency-free backend)."
   }
 }
+
+run "accept_mtu_api_v9_maximum" {
+  command = plan
+  variables {
+    mtu = 8000
+  }
+}
+
+run "accept_mtu_api_v9_zero" {
+  command = plan
+  variables {
+    mtu = 0
+  }
+}

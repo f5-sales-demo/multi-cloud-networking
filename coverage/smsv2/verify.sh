@@ -56,7 +56,9 @@ reject_norm="$(printf '%s' "${reject_out}" | sed $'s/\x1b\\[[0-9;]*m//g' | tr '\
 # internal/validators (MAC/CIDR/IP) and the framework's stringvalidator.OneOf (node type).
 declare -a expected=(
   # S1 numeric
-  "Value 20000 must be in one of these inclusive ranges: 0, 512-16384."
+  "Value 20000 must be in one of these inclusive ranges: 0, 512-8000."
+  "Value 8001 must be in one of these inclusive ranges: 0, 512-8000."
+  "Value 511 must be in one of these inclusive ranges: 0, 512-8000."
   "must be between 0 and 255, got: 256"
   "must be between 1 and 4095, got: 4096"
   "must be between 0 and 65535, got: 70000"
