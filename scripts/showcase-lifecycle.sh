@@ -289,7 +289,7 @@ TF_CLI_CONFIG_FILE="$PRIVATE_ROOT/published-providers.tfrc"
 printf 'provider_installation { direct {} }\n' >"$TF_CLI_CONFIG_FILE"
 export TF_CLI_CONFIG_FILE
 python3 "$REPO_ROOT/scripts/verify-showcase-provider.py" --private-root "$PRIVATE_ROOT"
-PROVIDER_ZIP="$PRIVATE_ROOT/terraform-provider-xcsh_12.0.0_linux_amd64.zip"
+PROVIDER_ZIP="$PRIVATE_ROOT/terraform-provider-xcsh_12.0.3_linux_amd64.zip"
 
 tf init -reconfigure -input=false -lockfile=readonly -backend-config="$BACKEND_CONFIG"
 # The old production state contains xcsh data attributes the current provider
@@ -336,7 +336,7 @@ jq -e --arg commit "$SOURCE_COMMIT_SHA" --arg key "$SHOWCASE_BACKEND_KEY" '
   .planned_values.outputs.reviewed_identity.value.source_commit_sha == $commit and
   .planned_values.outputs.reviewed_identity.value.backend_key == $key and
   .configuration.provider_config.xcsh.full_name == "registry.terraform.io/f5-sales-demo/xcsh" and
-  (.configuration.provider_config.xcsh.version_constraint | . == "12.0.0" or . == "= 12.0.0") and
+  (.configuration.provider_config.xcsh.version_constraint | . == "12.0.3" or . == "= 12.0.3") and
   ([.resource_changes[]? | select(.change.actions != ["no-op"] and .change.actions != ["read"])] | length == 0) and
   ((.action_invocations // []) | length == 0)' "$PREFLIGHT_JSON" >/dev/null ||
   die "CE egress preflight plan identity or action scope failed"

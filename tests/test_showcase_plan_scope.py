@@ -38,7 +38,7 @@ def plan(changes):
             "provider_config": {
                 "xcsh": {
                     "full_name": PROVIDER_SOURCE,
-                    "version_constraint": "12.0.0",
+                    "version_constraint": "12.0.3",
                 }
             }
         },
