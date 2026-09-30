@@ -45,3 +45,5 @@ output "network" {
 
 output "inside_nic_mac" { value = azurerm_network_interface.internal.mac_address }
 output "external_nic_mac" { value = azurerm_network_interface.external.mac_address }
+
+output "mgmt_public_ip" { value = azurerm_public_ip.mgmt.ip_address }

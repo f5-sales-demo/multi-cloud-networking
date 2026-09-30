@@ -61,7 +61,12 @@ cp terraform.tfvars.example terraform.tfvars
 For repeatable disposable demos, set `enable_showcase_origin = true`. Terraform
 creates an HTTP origin in the US hub, supplies its public IP to both regional
 pools and the direct control probes, and reclaims it with the stack. Its response
-is `mcn-showcase-origin`. The default keeps your explicit external origin.
+is `mcn-showcase-origin`. Its HTTP ACL consumes every Regional Edge region and
+CDN CIDR from the pinned provider, plus exact owned CE and test-client addresses.
+Unlisted ingress is denied, and origin SSH is disabled. For development, put the
+Ubuntu workstation and VPN-connected Mac's current public `/32` addresses in
+`origin_developer_cidrs` in private tfvars. Measure each host independently; their
+Internet egress addresses can differ. The default keeps your explicit external origin.
 
 Both `origin_ip` and domains are format-validated so a typo fails the plan rather than runtime routing.
 

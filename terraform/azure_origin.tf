@@ -1,7 +1,52 @@
+variable "origin_developer_cidrs" {
+  description = "Explicit workstation public IPv4 /32 addresses allowed to reach the demo origin for development. Keep allocations in private tfvars."
+  type        = list(string)
+  default     = []
+  validation {
+    condition     = alltrue([for cidr in var.origin_developer_cidrs : can(cidrhost(cidr, 0)) && endswith(cidr, "/32") && !strcontains(cidr, ":")])
+    error_message = "Developer origin access requires exact public IPv4 /32 addresses."
+  }
+}
 variable "enable_showcase_origin" {
   description = "Deploy a disposable HTTP origin for repeatable full-showcase traffic verification."
   type        = bool
   default     = false
+}
+# Omit regions to include every published Regional Edge network.
+data "xcsh_network_regional_edges" "origin" {
+  count = var.enable_azure && var.enable_showcase_origin ? 1 : 0
+}
+data "xcsh_network_cdn" "origin" {
+  count = var.enable_azure && var.enable_showcase_origin ? 1 : 0
+}
+locals {
+  origin_f5_cidrs = var.enable_azure && var.enable_showcase_origin ? sort(distinct(concat(
+    data.xcsh_network_regional_edges.origin[0].cidr_blocks,
+    data.xcsh_network_cdn.origin[0].cidr_blocks,
+  ))) : []
+  # CE-local load balancing and direct-origin controls use these exact owned
+  # sources. They do not grant access to an arbitrary VNet or Internet client.
+  origin_demo_cidrs = var.enable_azure && var.enable_showcase_origin ? [
+    for ip in concat(
+      [for node in module.ce_node : node.mgmt_private_ip],
+      [for node in module.ce_node : node.mgmt_public_ip],
+      [for node in module.ce_node_ca : node.mgmt_public_ip],
+      [module.client_vm[0].private_ip, module.client_vm[0].public_ip],
+      var.enable_canada ? [module.client_vm_ca[0].public_ip] : [],
+    ) : "${ip}/32"
+  ] : []
+}
+resource "terraform_data" "origin_f5_acl_gate" {
+  count = var.enable_azure && var.enable_showcase_origin ? 1 : 0
+  input = local.origin_f5_cidrs
+  lifecycle {
+    precondition {
+      condition = (length(local.origin_f5_cidrs) > 0 &&
+        data.xcsh_network_regional_edges.origin[0].api_release_tag == "v9.0.0" &&
+      data.xcsh_network_cdn.origin[0].api_release_tag == "v9.0.0")
+      error_message = "Origin ingress requires nonempty F5 provider CIDRs from the pinned API release."
+    }
+  }
 }
 module "showcase_origin" {
   count               = var.enable_azure && var.enable_showcase_origin ? 1 : 0
@@ -13,7 +58,11 @@ module "showcase_origin" {
   admin_username      = var.admin_username
   ssh_public_key      = local.ssh_public_key
   serve_http          = true
+  allow_ssh           = false
+  restrict_ingress    = true
+  http_source_cidrs   = sort(distinct(concat(local.origin_f5_cidrs, local.origin_demo_cidrs, var.origin_developer_cidrs)))
   tags                = local.tags
+  depends_on          = [terraform_data.origin_f5_acl_gate]
   custom_data = base64encode(<<-EOF
     #cloud-config
     write_files:
@@ -40,4 +89,14 @@ module "showcase_origin" {
 }
 locals {
   selected_origin_ip = var.enable_azure && var.enable_showcase_origin ? module.showcase_origin[0].public_ip : var.origin_ip
+}
+
+output "origin_ingress_acl" {
+  value = {
+    f5_cidrs           = local.origin_f5_cidrs
+    developer_cidrs    = var.origin_developer_cidrs
+    owned_demo_cidrs   = local.origin_demo_cidrs
+    provider_version   = "12.0.3"
+    all_regional_edges = true
+  }
 }

@@ -18,16 +18,19 @@ resource "azurerm_network_security_group" "this" {
   resource_group_name = var.resource_group_name
   location            = var.location
 
-  security_rule {
-    name                       = "SSH"
-    priority                   = 1001
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "22"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
+  dynamic "security_rule" {
+    for_each = var.allow_ssh ? [1] : []
+    content {
+      name                       = "SSH"
+      priority                   = 1001
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      source_port_range          = "*"
+      destination_port_range     = "22"
+      source_address_prefix      = "*"
+      destination_address_prefix = "*"
+    }
   }
 
   dynamic "security_rule" {
@@ -40,8 +43,29 @@ resource "azurerm_network_security_group" "this" {
       protocol                   = "Tcp"
       source_port_range          = "*"
       destination_port_range     = "80"
+      source_address_prefixes    = var.http_source_cidrs
+      destination_address_prefix = "*"
+    }
+  }
+
+  dynamic "security_rule" {
+    for_each = var.restrict_ingress ? [1] : []
+    content {
+      name                       = "deny-other-origin-ingress"
+      priority                   = 4096
+      direction                  = "Inbound"
+      access                     = "Deny"
+      protocol                   = "*"
+      source_port_range          = "*"
+      destination_port_range     = "*"
       source_address_prefix      = "*"
       destination_address_prefix = "*"
+    }
+  }
+  lifecycle {
+    precondition {
+      condition     = !var.serve_http || length(var.http_source_cidrs) > 0
+      error_message = "HTTP origins require a nonempty explicit source ACL."
     }
   }
 
