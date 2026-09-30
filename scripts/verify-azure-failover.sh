@@ -91,10 +91,10 @@ client_next_hops() {
 }
 
 traffic() {
-  local rg=$1 client=$2 domain=$3 vip=$4 inside_domain=$5 ilb=$6 console_ip=$7 result
+  local rg=$1 client=$2 domain=$3 vip=$4 inside_domain=$5 ilb=$6 console_ip=$7 origin=$8 result
   result=$(az vm run-command invoke --resource-group "$rg" --name "$client" --command-id RunShellScript \
     --query 'value[0].message' --output tsv --scripts \
-    "set -eu; ok=0; for i in \$(seq 1 20); do a=\$(curl -fsS -m 10 --resolve '${domain}:80:${vip}' 'http://${domain}/'); b=\$(curl -fsS -m 10 --resolve '${inside_domain}:80:${ilb}' 'http://${inside_domain}/'); [ -n \"\$a\" ] && [ -n \"\$b\" ]; ok=\$((ok+1)); done; timeout 10 bash -c '</dev/tcp/${console_ip}/65500'; echo MCN_FAILOVER_TRAFFIC ok=\$ok") || return 1
+    "set -eu; ok=0; for i in \$(seq 1 20); do control=\$(curl -fsS -m 10 'http://${origin}/'); [ -n \"\$control\" ] || exit 1; a=\$(curl -fsS -m 10 --resolve '${domain}:80:${vip}' 'http://${domain}/'); b=\$(curl -fsS -m 10 --resolve '${inside_domain}:80:${ilb}' 'http://${inside_domain}/'); [ \"\$a\" = \"\$control\" ] && [ \"\$b\" = \"\$control\" ] || exit 1; ok=\$((ok+1)); done; timeout 10 bash -c '</dev/tcp/${console_ip}/65500'; echo MCN_FAILOVER_TRAFFIC ok=\$ok") || return 1
   grep -qF 'MCN_FAILOVER_TRAFFIC ok=20' <<<"$result"
 }
 
@@ -125,26 +125,29 @@ run_region() {
   recover_vm=$ce_vm
   az vm stop --resource-group "$rg" --name "$ce_vm" --only-show-errors >/dev/null
   wait_state "$rg" "$nic" "$vip" "$survivor_vm" "$ce_ips" "$rs_ips" 2 "$frr_ips" || die "$region CE failure did not withdraw one direct session"
-  traffic "$rg" "$client" "$domain" "$vip" "$inside_domain" "$ilb" "$console_ip" || die "$region traffic failed during CE stop"
+  traffic "$rg" "$client" "$domain" "$vip" "$inside_domain" "$ilb" "$console_ip" "$ORIGIN" || die "$region traffic failed during CE stop"
   az vm start --resource-group "$rg" --name "$ce_vm" --only-show-errors >/dev/null
   wait_state "$rg" "$nic" "$vip" "$survivor_vm" "$ce_ips" "$rs_ips" 3 "$frr_ips" || die "$region CE recovery failed"
   recover_vm=""
   jq -n --arg region "$region" --arg commit "$SOURCE_COMMIT" \
-    '{region:$region,source_commit:$commit,stage:"ce",sessions_during_failure:2,traffic_samples:20,recovered:true}' \
+    '{region:$region,source_commit:$commit,stage:"ce",sessions_during_failure:2,traffic_samples:20,exact_origin:true,recovered:true}' \
     >"$EVIDENCE_DIR/${region}-ce.json"
 
   recover_rg=$rg
   recover_vm=$frr_vm
   az vm stop --resource-group "$rg" --name "$frr_vm" --only-show-errors >/dev/null
   wait_state "$rg" "$nic" "$vip" "$survivor_vm" "$ce_ips" "$rs_ips" 3 "[\"$survivor_ip\"]" || die "$region FRR failure did not withdraw its VIP next hop"
-  traffic "$rg" "$client" "$domain" "$vip" "$inside_domain" "$ilb" "$console_ip" || die "$region traffic failed during FRR stop"
+  traffic "$rg" "$client" "$domain" "$vip" "$inside_domain" "$ilb" "$console_ip" "$ORIGIN" || die "$region traffic failed during FRR stop"
   az vm start --resource-group "$rg" --name "$frr_vm" --only-show-errors >/dev/null
   wait_state "$rg" "$nic" "$vip" "$frr_vm" "$ce_ips" "$rs_ips" 3 "$frr_ips" || die "$region FRR recovery failed"
   recover_vm=""
   jq -n --arg region "$region" --arg commit "$SOURCE_COMMIT" \
-    '{region:$region,source_commit:$commit,stage:"frr",next_hops_during_failure:1,traffic_samples:20,recovered:true}' \
+    '{region:$region,source_commit:$commit,stage:"frr",next_hops_during_failure:1,traffic_samples:20,exact_origin:true,recovered:true}' \
     >"$EVIDENCE_DIR/${region}-frr.json"
 }
+
+ORIGIN=$(tf_raw origin_ip)
+[[ "$ORIGIN" =~ ^[0-9.]+$ ]] || die "origin_ip is not an IPv4 literal"
 
 run_region us "$(tf_raw resource_group_name)" "$(tf_raw client_vm_name)" "$(tf_raw client_nic_name)" \
   "$(tf_raw vip)" "$(tf_raw lb_domain)" "$(tf_raw azure_ilb_application_domain)" \
