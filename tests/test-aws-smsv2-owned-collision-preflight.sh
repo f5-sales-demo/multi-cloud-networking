@@ -434,7 +434,7 @@ for instance_state in terminated shutting-down pending running stopping stopped;
     jq -e '.status == "ready" and .collisions == []' "$instance_manifest" >/dev/null || fail 'terminal instance collision remains'
     ;;
   *)
-    [ "$instance_result" -eq 1 ] || fail "live instance $instance_state must block rebuild"
+    [ "$instance_result" -eq 3 ] || fail "live instance $instance_state must block rebuild"
     jq -e '.status == "blocked" and (.collisions | length == 1)' "$instance_manifest" >/dev/null || fail 'live instance collision was lost'
     ;;
   esac
