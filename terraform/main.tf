@@ -107,7 +107,8 @@ resource "xcsh_token" "ce" {
   name        = "${local.site_prefix}-registration"
   namespace   = "system"
   description = "MCN CE-HA registration token (tenant-scoped, reusable across CE sites)"
-  labels      = local.azure_xc_labels
+  labels      = local.azure_token_labels
+  type        = 0
 }
 
 # Pure expansion of ce_count into the per-CE node map (hostname, site_name,
