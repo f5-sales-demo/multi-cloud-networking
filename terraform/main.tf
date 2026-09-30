@@ -320,7 +320,7 @@ resource "xcsh_origin_pool" "this" {
   origin_servers {
     labels = {}
     public_ip {
-      ip = var.origin_ip
+      ip = local.selected_origin_ip
     }
   }
 
@@ -595,7 +595,7 @@ resource "xcsh_origin_pool" "canada" {
   origin_servers {
     labels = {}
     public_ip {
-      ip = var.origin_ip
+      ip = local.selected_origin_ip
     }
   }
 

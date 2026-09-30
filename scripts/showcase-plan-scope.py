@@ -26,6 +26,7 @@ AZURE_PREFIXES = (
     "module.xc_site_ca[",
     "module.azure_frr_us[",
     "module.azure_frr_ca[",
+    "module.showcase_origin[",
     "module.client_vm[",
     "module.client_vm_ca[",
     "module.azure_ilb_application[",

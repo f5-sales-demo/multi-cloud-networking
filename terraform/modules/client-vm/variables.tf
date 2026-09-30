@@ -46,3 +46,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "serve_http" {
+  description = "Allow public HTTP only for the opt-in disposable origin."
+  type        = bool
+  default     = false
+}

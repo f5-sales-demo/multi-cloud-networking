@@ -89,7 +89,7 @@ output "lb_domain" {
 
 output "origin_ip" {
   description = "Origin the pool targets. Useful as a control: a batch straight to the origin, bypassing the VIP, separates an origin fault from a VIP/ECMP/CE fault."
-  value       = var.origin_ip
+  value       = local.selected_origin_ip
 }
 
 output "route_server_peer_ips" {

@@ -58,6 +58,11 @@ cp terraform.tfvars.example terraform.tfvars
 | `ca_vip` | `10.250.1.10` | HA VIP advertised by Canadian CEs via eBGP (must be outside VNet CIDRs). |
 | `ca_re_cities` | `["toronto", "montreal"]` | List of Regional Edge cities for Canadian RE Virtual Site selector expression. |
 
+For repeatable disposable demos, set `enable_showcase_origin = true`. Terraform
+creates an HTTP origin in the US hub, supplies its public IP to both regional
+pools and the direct control probes, and reclaims it with the stack. Its response
+is `mcn-showcase-origin`. The default keeps your explicit external origin.
+
 Both `origin_ip` and domains are format-validated so a typo fails the plan rather than runtime routing.
 
 `terraform.tfvars` is gitignored to protect sensitive environment variables, subscription IDs, and custom credentials.
