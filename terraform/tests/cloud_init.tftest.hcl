@@ -152,6 +152,7 @@ run "every_ce_node_gets_the_operator_key" {
 
 run "azure_probe_bootstrap_is_exact" {
   command = plan
+  variables { ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l plan-test-only" }
   assert {
     condition     = trimspace(one([for item in yamldecode(local.ce_cloud_init["eastus01"]).write_files : item.content if item.path == "/etc/mcn/azure-probe-routing.sh"])) == trimspace(file("${path.module}/cloud-init/azure-probe-routing.sh"))
     error_message = "Cloud-init must preserve the exact probe routing script."
