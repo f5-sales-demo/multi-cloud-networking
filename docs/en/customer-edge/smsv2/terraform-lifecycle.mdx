@@ -180,3 +180,12 @@ prove packet forwarding. Use the platform-specific acceptance procedure as the f
 Review a saved destroy plan for the isolated deployment before applying it. Preserve any
 shared app namespace and unrelated resources. Retire private plan and bootstrap artifacts
 according to the backend's retention policy; do not publish them as documentation evidence.
+
+### Azure interface phases
+
+The Azure CE graph creates network resources and the Secure Mesh configuration
+before guest boot. Bootstrap declares all three observed devices: management
+SLO on `eth0`, inside SLI on `eth1`, and external SLO on `eth2`. Azure assigns
+NIC MAC addresses after VM attachment, so a fresh configured-phase plan binds
+those MACs before registration approval. The lifecycle scopes that plan to
+site updates and rejects VM, host, AWS, or replacement actions.

@@ -2,7 +2,11 @@
 # are contacted. Asserts CE NIC hardening invariants (IP forwarding on,
 # accelerated networking off) and the required marketplace plan block.
 
-mock_provider "azurerm" {}
+mock_provider "azurerm" {
+  mock_resource "azurerm_network_interface" {
+    defaults = { mac_address = "52:54:00:10:00:11" }
+  }
+}
 
 run "ce_vm_and_nics" {
   command = plan

@@ -43,3 +43,7 @@ output "peer_count" {
   description = "Number of external BGP peers configured (one per regional FRR relay; 0 when enable_bgp is false)."
   value       = var.enable_bgp ? var.peer_count : 0
 }
+
+output "interface_count" {
+  value = nonsensitive(length(one(xcsh_securemesh_site_v2.this).azure.not_managed.node_list[0].interface_list))
+}

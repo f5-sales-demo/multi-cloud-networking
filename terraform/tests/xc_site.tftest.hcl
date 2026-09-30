@@ -6,6 +6,17 @@ mock_provider "xcsh" {}
 run "site_and_interface_binding" {
   command = plan
 
+  assert {
+    condition = (
+      length(one(xcsh_securemesh_site_v2.this).azure.not_managed.node_list[0].interface_list) == 3 &&
+      one(xcsh_securemesh_site_v2.this).azure.not_managed.node_list[0].interface_list[0].ethernet_interface.device == "eth0" &&
+      one(xcsh_securemesh_site_v2.this).azure.not_managed.node_list[0].interface_list[1].ethernet_interface.device == "eth1" &&
+      one(xcsh_securemesh_site_v2.this).azure.not_managed.node_list[0].interface_list[1].network_option.site_local_inside_network != null &&
+      one(xcsh_securemesh_site_v2.this).azure.not_managed.node_list[0].interface_list[2].ethernet_interface.device == "eth2"
+    )
+    error_message = "Azure must preserve SLO, SLI and external hardware interfaces with exact device roles."
+  }
+
   module {
     source = "./modules/xc-site"
   }
@@ -15,6 +26,8 @@ run "site_and_interface_binding" {
     hostname         = "f5-xc-ce-vm-01"
     interface_name   = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
     mgmt_nic_mac     = "7c:1e:52:18:c1:77"
+    inside_nic_mac   = "52:54:00:20:00:11"
+    external_nic_mac = "52:54:00:30:00:11"
     ce_generation_id = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
     peer_ips         = ["10.0.1.20", "10.0.1.21"]
     ce_asn           = 64512

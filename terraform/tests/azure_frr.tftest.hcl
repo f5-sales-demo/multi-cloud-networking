@@ -1,4 +1,8 @@
-mock_provider "azurerm" {}
+mock_provider "azurerm" {
+  mock_resource "azurerm_network_interface" {
+    defaults = { mac_address = "52:54:00:10:00:11" }
+  }
+}
 
 run "two_regional_relays_and_vip_only_export" {
   command = plan

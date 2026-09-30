@@ -14,8 +14,9 @@ variable "interface_name" {
 }
 
 variable "mgmt_nic_mac" {
-  description = "MAC address of the CE eth0/SLO NIC. Pins the SMSv2 interface to the NIC."
+  description = "Observed MAC of the CE eth0/SLO NIC; null before VM attachment."
   type        = string
+  default     = null
 }
 
 variable "ce_generation_id" {
@@ -90,4 +91,15 @@ variable "sw_version" {
   description = "CE F5 Distributed Cloud software version. Empty deliberately selects the server-advertised latest build; set a value only to reproduce an older build."
   type        = string
   default     = ""
+}
+
+variable "inside_nic_mac" {
+  description = "Observed MAC of eth1/SLI; null before VM attachment."
+  type        = string
+  default     = null
+}
+variable "external_nic_mac" {
+  description = "Observed MAC of eth2/external SLO; null before VM attachment."
+  type        = string
+  default     = null
 }

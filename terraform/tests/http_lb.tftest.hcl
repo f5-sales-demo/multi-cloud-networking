@@ -2,7 +2,11 @@
 # advertised per CE site (advertise_custom) and the LB serves the configured
 # domain and default route pool. Mocks all providers (no credentials).
 
-mock_provider "azurerm" {}
+mock_provider "azurerm" {
+  mock_resource "azurerm_network_interface" {
+    defaults = { mac_address = "52:54:00:10:00:11" }
+  }
+}
 mock_provider "azuread" {}
 mock_provider "xcsh" {}
 mock_provider "azapi" {}

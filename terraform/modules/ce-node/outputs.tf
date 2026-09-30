@@ -42,3 +42,6 @@ output "network" {
     generation_id   = random_uuid.generation.result
   }
 }
+
+output "inside_nic_mac" { value = azurerm_network_interface.internal.mac_address }
+output "external_nic_mac" { value = azurerm_network_interface.external.mac_address }

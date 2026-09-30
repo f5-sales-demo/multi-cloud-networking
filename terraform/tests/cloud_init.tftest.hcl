@@ -9,7 +9,11 @@
 # until apply even under mock_provider, and every assertion below would fail with
 # "Unknown condition value" instead of on its own merits.
 
-mock_provider "azurerm" {}
+mock_provider "azurerm" {
+  mock_resource "azurerm_network_interface" {
+    defaults = { mac_address = "52:54:00:10:00:11" }
+  }
+}
 mock_provider "azuread" {}
 mock_provider "xcsh" {}
 mock_provider "azapi" {}

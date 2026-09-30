@@ -1,89 +1,34 @@
-# Azure contract-v1 must keep its Secure Mesh topology logical and SLO-only. These are
-# root-module plan tests with mocks, so they prove the preflight fails before
-# a live Azure or XC operation can be attempted.
-
-mock_provider "azurerm" {}
+mock_provider "azurerm" {
+  mock_resource "azurerm_network_interface" { defaults = { mac_address = "52:54:00:10:00:11" } }
+}
 mock_provider "azuread" {}
 mock_provider "xcsh" {}
 mock_provider "azapi" {}
 mock_provider "aws" {}
 mock_provider "libvirt" {}
-
 variables {
+  deployer               = "tester"
   enable_azure           = true
   enable_kvm             = false
-  site_prefix            = null
-  lb_name                = null
-  origin_pool_name       = null
-  route_server_name      = null
-  bastion_name           = null
-  client_vm_name         = null
-  region_short           = null
-  resource_group_name    = null
-  lb_domain              = "mcn-ce-ha.f5-sales-demo.com"
-  origin_ip              = "203.0.113.10"
   enable_aws             = false
   enable_aws_tgw_connect = false
+  lb_domain              = "app.example.com"
+  origin_ip              = "192.0.2.100"
+  ssh_public_key         = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l plan-test-only"
 }
-
-run "slo_only_is_the_default_logical_shape" {
+run "bootstrap_preserves_three_devices_without_assuming_macs" {
   command = plan
-
-  variables {
-    ce_count       = 3
-    deployer       = "tester"
-    enable_bastion = false
-    ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l interface-contract-test-only"
-  }
-
+  variables { azure_site_configuration_phase = "bootstrap" }
   assert {
-    condition = (
-      var.enable_expanded_ce_interfaces == false &&
-      local.securemesh_interface_contract_v1.bindable_roles == toset(["slo"])
-    )
-    error_message = "Interface contract v1 must expose only the SLO role by default."
+    condition     = alltrue([for _, site in module.xc_site : site.interface_count == 3])
+    error_message = "Bootstrap must preserve every physical Azure interface."
   }
-
+}
+run "configured_interfaces_bind_observed_macs" {
+  command = plan
+  variables { azure_site_configuration_phase = "configured" }
   assert {
-    condition = (
-      toset(keys(local.expected_slo_bindings)) == toset([
-        "f5-xc-ce-vm-01",
-        "f5-xc-ce-vm-02",
-        "f5-xc-ce-vm-03",
-      ]) &&
-      alltrue([for hostname in keys(local.expected_slo_bindings) :
-        local.expected_slo_bindings[hostname].cloud_nic_position == 1
-      ])
-    )
-    error_message = "Every CE node must have exactly one first-NIC logical SLO binding."
+    condition     = local.azure_interface_contract.devices == { slo = "eth0", sli = "eth1", external = "eth2" }
+    error_message = "Azure role/device identities must match live registered hardware."
   }
-}
-
-run "expanded_interfaces_fail_before_any_mapping_is_inferred" {
-  command = plan
-
-  variables {
-    ce_count                                               = 1
-    deployer                                               = "tester"
-    enable_bastion                                         = false
-    enable_expanded_ce_interfaces                          = true
-    expanded_ce_interfaces_maintenance_window_acknowledged = true
-    ssh_public_key                                         = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l interface-contract-test-only"
-  }
-
-  expect_failures = [check.securemesh_expanded_interfaces_are_evidence_bound]
-}
-
-run "evidence_freshness_window_is_bounded" {
-  command = plan
-
-  variables {
-    ce_count                            = 1
-    deployer                            = "tester"
-    enable_bastion                      = false
-    ce_interface_evidence_max_age_hours = 0
-    ssh_public_key                      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l interface-contract-test-only"
-  }
-
-  expect_failures = [var.ce_interface_evidence_max_age_hours]
 }

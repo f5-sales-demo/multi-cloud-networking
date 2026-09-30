@@ -167,6 +167,34 @@ def _value(document: dict[str, Any], name: str) -> Any:
     return value
 
 
+def validate_azure_site_bindings(item: dict[str, Any]) -> None:
+    """Require complete, distinct hardware MACs in the exact configured plan."""
+    after = item.get("change", {}).get("after") or {}
+    nodes = after.get("azure", {}).get("not_managed", {}).get("node_list")
+    if not isinstance(nodes, list) or len(nodes) != 1:
+        raise ValueError("Azure MAC binding requires exactly one configured node")
+    interfaces = nodes[0].get("interface_list")
+    if not isinstance(interfaces, list) or len(interfaces) != 3:
+        raise ValueError("Azure MAC binding requires all three registered interfaces")
+    macs = []
+    for index, interface in enumerate(interfaces):
+        ethernet = interface.get("ethernet_interface") or {}
+        mac = str(ethernet.get("mac", "")).lower().replace("-", ":")
+        if ethernet.get("device") != f"eth{index}" or not re.fullmatch(
+            r"[0-9a-f]{2}(:[0-9a-f]{2}){5}", mac
+        ):
+            raise ValueError(
+                "Azure MAC binding has a missing or incorrect hardware identity"
+            )
+        role = interface.get("network_option") or {}
+        expected = "site_local_inside_network" if index == 1 else "site_local_network"
+        if role.get(expected) is None:
+            raise ValueError("Azure MAC binding changes the registered interface role")
+        macs.append(mac)
+    if len(set(macs)) != 3:
+        raise ValueError("Azure MAC binding contains duplicate hardware identities")
+
+
 def validate(
     document: dict[str, Any],
     scope: str,
@@ -236,6 +264,23 @@ def validate(
                 raise ValueError(
                     f"Azure approval plan contains an action outside its scope: {address}"
                 )
+    elif scope == "azure-bindings":
+        if _value(document, "azure_site_configuration_phase") != "configured":
+            raise ValueError("Azure MAC binding requires configured phase")
+        if not changes:
+            raise ValueError("Azure MAC binding plan has no actions")
+        for address, actions in changes:
+            if not (
+                address.startswith(("module.xc_site[", "module.xc_site_ca["))
+                and ".xcsh_securemesh_site_v2.this[" in address
+                and actions == ["update"]
+            ):
+                raise ValueError(
+                    f"Azure MAC binding contains an action outside its scope: {address}"
+                )
+        for item in document.get("resource_changes") or []:
+            if item.get("change", {}).get("actions") == ["update"]:
+                validate_azure_site_bindings(item)
     elif scope == "azure-converge":
         if not changes:
             raise ValueError("Azure convergence plan has no actions")
@@ -515,6 +560,7 @@ def main() -> int:
             "azure-build",
             "azure-approvals",
             "azure-converge",
+            "azure-bindings",
             "refresh-only",
             "full-destroy",
             "zero-change",
