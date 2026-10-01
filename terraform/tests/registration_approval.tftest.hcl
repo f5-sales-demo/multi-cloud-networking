@@ -265,3 +265,475 @@ run "pending_registration_uses_the_resolved_registration_name" {
 
 # Gate 3 — an operator owns approval. Even with the registration resolved,
 # approve_registration = false plans nothing.
+
+run "apply_new_registration_receipt" {
+  command = apply
+
+  module {
+    source = "./modules/xc-site"
+  }
+
+  variables {
+    site_name            = "mcn-ce-ha-eastus01"
+    hostname             = "f5-xc-ce-vm-01"
+    interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
+    mgmt_nic_mac         = "7c:1e:52:18:c1:77"
+    ce_generation_id     = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
+    peer_ips             = ["10.0.1.20", "10.0.1.21"]
+    ce_asn               = 64512
+    peer_asn             = 65515
+    enable_bgp           = false
+    approve_registration = true
+  }
+
+  override_data {
+    target = data.xcsh_site_registration.this
+    values = {
+      found = true
+      name  = "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+      state = "NEW"
+    }
+  }
+
+  assert {
+    condition     = length(xcsh_registration_approval.this) == 1
+    error_message = "Exactly one approval must be planned once the registration is found."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].name == "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+    error_message = "The approval must target the resolved r-<uuid> registration name, not the site name."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].namespace == "system"
+    error_message = "Registrations are approved in the system namespace."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].state == "APPROVED"
+    error_message = "The approval must request state APPROVED."
+  }
+
+  assert {
+    condition     = output.registration_name == "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+    error_message = "registration_name must expose the resolved r-<uuid> name."
+  }
+
+  assert {
+    condition     = output.registration_state == "NEW"
+    error_message = "registration_state must expose the NEW state reported by XC."
+  }
+}
+
+run "online_registration_retains_applied_receipt" {
+  command = plan
+
+  module {
+    source = "./modules/xc-site"
+  }
+
+  variables {
+    site_name            = "mcn-ce-ha-eastus01"
+    hostname             = "f5-xc-ce-vm-01"
+    interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
+    mgmt_nic_mac         = "7c:1e:52:18:c1:77"
+    ce_generation_id     = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
+    peer_ips             = ["10.0.1.20", "10.0.1.21"]
+    ce_asn               = 64512
+    peer_asn             = 65515
+    enable_bgp           = false
+    approve_registration = true
+  }
+
+  override_data {
+    target = data.xcsh_site_registration.this
+    values = {
+      found = true
+      name  = "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+      state = "ONLINE"
+    }
+  }
+
+  assert {
+    condition     = output.registration_approval_name == run.apply_new_registration_receipt.registration_approval_name
+    error_message = "The ONLINE node must retain the exact applied approval receipt."
+  }
+
+  assert {
+    condition     = length(xcsh_registration_approval.this) == 1
+    error_message = "Exactly one approval must be planned once the registration is found."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].name == "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+    error_message = "The approval must target the resolved r-<uuid> registration name, not the site name."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].namespace == "system"
+    error_message = "Registrations are approved in the system namespace."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].state == "APPROVED"
+    error_message = "The receipt keeps its immutable APPROVED target."
+  }
+
+  assert {
+    condition     = output.registration_name == "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+    error_message = "registration_name must expose the resolved r-<uuid> name."
+  }
+
+  assert {
+    condition     = output.registration_state == "ONLINE"
+    error_message = "registration_state must expose the NEW state reported by XC."
+  }
+}
+
+run "retains_receipt_approved" {
+  command = plan
+
+  module {
+    source = "./modules/xc-site"
+  }
+
+  variables {
+    site_name            = "mcn-ce-ha-eastus01"
+    hostname             = "f5-xc-ce-vm-01"
+    interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
+    mgmt_nic_mac         = "7c:1e:52:18:c1:77"
+    ce_generation_id     = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
+    peer_ips             = ["10.0.1.20", "10.0.1.21"]
+    ce_asn               = 64512
+    peer_asn             = 65515
+    enable_bgp           = false
+    approve_registration = true
+  }
+
+  override_data {
+    target = data.xcsh_site_registration.this
+    values = {
+      found = true
+      name  = "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+      state = "APPROVED"
+    }
+  }
+
+  assert {
+    condition     = length(xcsh_registration_approval.this) == 1
+    error_message = "Exactly one approval must be planned once the registration is found."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].name == "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+    error_message = "The approval must target the resolved r-<uuid> registration name, not the site name."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].namespace == "system"
+    error_message = "Registrations are approved in the system namespace."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].state == "APPROVED"
+    error_message = "The approval must request state APPROVED."
+  }
+
+  assert {
+    condition     = output.registration_name == "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+    error_message = "registration_name must expose the resolved r-<uuid> name."
+  }
+
+  assert {
+    condition     = output.registration_state == "APPROVED"
+    error_message = "registration_state must expose the NEW state reported by XC."
+  }
+}
+
+run "retains_receipt_admitted" {
+  command = plan
+
+  module {
+    source = "./modules/xc-site"
+  }
+
+  variables {
+    site_name            = "mcn-ce-ha-eastus01"
+    hostname             = "f5-xc-ce-vm-01"
+    interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
+    mgmt_nic_mac         = "7c:1e:52:18:c1:77"
+    ce_generation_id     = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
+    peer_ips             = ["10.0.1.20", "10.0.1.21"]
+    ce_asn               = 64512
+    peer_asn             = 65515
+    enable_bgp           = false
+    approve_registration = true
+  }
+
+  override_data {
+    target = data.xcsh_site_registration.this
+    values = {
+      found = true
+      name  = "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+      state = "ADMITTED"
+    }
+  }
+
+  assert {
+    condition     = length(xcsh_registration_approval.this) == 1
+    error_message = "Exactly one approval must be planned once the registration is found."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].name == "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+    error_message = "The approval must target the resolved r-<uuid> registration name, not the site name."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].namespace == "system"
+    error_message = "Registrations are approved in the system namespace."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].state == "APPROVED"
+    error_message = "The approval must request state APPROVED."
+  }
+
+  assert {
+    condition     = output.registration_name == "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+    error_message = "registration_name must expose the resolved r-<uuid> name."
+  }
+
+  assert {
+    condition     = output.registration_state == "ADMITTED"
+    error_message = "registration_state must expose the NEW state reported by XC."
+  }
+}
+
+run "retains_receipt_upgrading" {
+  command = plan
+
+  module {
+    source = "./modules/xc-site"
+  }
+
+  variables {
+    site_name            = "mcn-ce-ha-eastus01"
+    hostname             = "f5-xc-ce-vm-01"
+    interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
+    mgmt_nic_mac         = "7c:1e:52:18:c1:77"
+    ce_generation_id     = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
+    peer_ips             = ["10.0.1.20", "10.0.1.21"]
+    ce_asn               = 64512
+    peer_asn             = 65515
+    enable_bgp           = false
+    approve_registration = true
+  }
+
+  override_data {
+    target = data.xcsh_site_registration.this
+    values = {
+      found = true
+      name  = "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+      state = "UPGRADING"
+    }
+  }
+
+  assert {
+    condition     = length(xcsh_registration_approval.this) == 1
+    error_message = "Exactly one approval must be planned once the registration is found."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].name == "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+    error_message = "The approval must target the resolved r-<uuid> registration name, not the site name."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].namespace == "system"
+    error_message = "Registrations are approved in the system namespace."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].state == "APPROVED"
+    error_message = "The approval must request state APPROVED."
+  }
+
+  assert {
+    condition     = output.registration_name == "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+    error_message = "registration_name must expose the resolved r-<uuid> name."
+  }
+
+  assert {
+    condition     = output.registration_state == "UPGRADING"
+    error_message = "registration_state must expose the NEW state reported by XC."
+  }
+}
+
+run "retains_receipt_maintenance" {
+  command = plan
+
+  module {
+    source = "./modules/xc-site"
+  }
+
+  variables {
+    site_name            = "mcn-ce-ha-eastus01"
+    hostname             = "f5-xc-ce-vm-01"
+    interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
+    mgmt_nic_mac         = "7c:1e:52:18:c1:77"
+    ce_generation_id     = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
+    peer_ips             = ["10.0.1.20", "10.0.1.21"]
+    ce_asn               = 64512
+    peer_asn             = 65515
+    enable_bgp           = false
+    approve_registration = true
+  }
+
+  override_data {
+    target = data.xcsh_site_registration.this
+    values = {
+      found = true
+      name  = "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+      state = "MAINTENANCE"
+    }
+  }
+
+  assert {
+    condition     = length(xcsh_registration_approval.this) == 1
+    error_message = "Exactly one approval must be planned once the registration is found."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].name == "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+    error_message = "The approval must target the resolved r-<uuid> registration name, not the site name."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].namespace == "system"
+    error_message = "Registrations are approved in the system namespace."
+  }
+
+  assert {
+    condition     = xcsh_registration_approval.this[0].state == "APPROVED"
+    error_message = "The approval must request state APPROVED."
+  }
+
+  assert {
+    condition     = output.registration_name == "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+    error_message = "registration_name must expose the resolved r-<uuid> name."
+  }
+
+  assert {
+    condition     = output.registration_state == "MAINTENANCE"
+    error_message = "registration_state must expose the NEW state reported by XC."
+  }
+}
+
+run "terminal_failed_plans_no_approval" {
+  command = plan
+
+  module {
+    source = "./modules/xc-site"
+  }
+
+  variables {
+    site_name            = "mcn-ce-ha-eastus01"
+    hostname             = "f5-xc-ce-vm-01"
+    interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
+    mgmt_nic_mac         = "7c:1e:52:18:c1:77"
+    ce_generation_id     = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
+    peer_ips             = ["10.0.1.20", "10.0.1.21"]
+    ce_asn               = 64512
+    peer_asn             = 65515
+    enable_bgp           = false
+    approve_registration = true
+  }
+
+  override_data {
+    target = data.xcsh_site_registration.this
+    values = {
+      found = true
+      name  = "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+      state = "FAILED"
+    }
+  }
+
+  assert {
+    condition     = length(xcsh_registration_approval.this) == 0
+    error_message = "A RETIRED registration must never plan an APPROVED transition."
+  }
+}
+
+
+run "terminal_failed_inactive_plans_no_approval" {
+  command = plan
+
+  module {
+    source = "./modules/xc-site"
+  }
+
+  variables {
+    site_name            = "mcn-ce-ha-eastus01"
+    hostname             = "f5-xc-ce-vm-01"
+    interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
+    mgmt_nic_mac         = "7c:1e:52:18:c1:77"
+    ce_generation_id     = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
+    peer_ips             = ["10.0.1.20", "10.0.1.21"]
+    ce_asn               = 64512
+    peer_asn             = 65515
+    enable_bgp           = false
+    approve_registration = true
+  }
+
+  override_data {
+    target = data.xcsh_site_registration.this
+    values = {
+      found = true
+      name  = "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+      state = "FAILED_INACTIVE"
+    }
+  }
+
+  assert {
+    condition     = length(xcsh_registration_approval.this) == 0
+    error_message = "A RETIRED registration must never plan an APPROVED transition."
+  }
+}
+
+
+run "terminal_done_plans_no_approval" {
+  command = plan
+
+  module {
+    source = "./modules/xc-site"
+  }
+
+  variables {
+    site_name            = "mcn-ce-ha-eastus01"
+    hostname             = "f5-xc-ce-vm-01"
+    interface_name       = "ves-io-securemesh-site-v2-mcn-ce-ha-eastus01-network-f5-xc-ce-vm-01-eth0-0"
+    mgmt_nic_mac         = "7c:1e:52:18:c1:77"
+    ce_generation_id     = "89e6c538-6bc2-4c2c-a37e-d6149c1708ce"
+    peer_ips             = ["10.0.1.20", "10.0.1.21"]
+    ce_asn               = 64512
+    peer_asn             = 65515
+    enable_bgp           = false
+    approve_registration = true
+  }
+
+  override_data {
+    target = data.xcsh_site_registration.this
+    values = {
+      found = true
+      name  = "r-dcec2400-52d5-4154-9fd0-4b042d3fe18d"
+      state = "DONE"
+    }
+  }
+
+  assert {
+    condition     = length(xcsh_registration_approval.this) == 0
+    error_message = "A RETIRED registration must never plan an APPROVED transition."
+  }
+}
