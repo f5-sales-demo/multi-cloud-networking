@@ -37,6 +37,8 @@ two Route Server sessions, and the CE-learned application VIP `/32`.
 The regional client must have both FRR next hops for that VIP.
 Terraform creates the Route Server BGP peers sequentially through Network API
 2022-01-01, with a separate 30-minute deadline for each peer.
+The lifecycle applies Azure MAC bindings, registration approvals, and status
+convergence sequentially to keep XC site updates from overlapping.
 
 It sends time-separated HTTP batches from each region's own client through the
 external BGP VIP, the inside ILB application frontend, and the origin control.
