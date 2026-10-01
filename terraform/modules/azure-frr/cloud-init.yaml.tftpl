@@ -1,13 +1,28 @@
 #cloud-config
-package_update: true
-packages:
-  - frr
 write_files:
   - path: /etc/sysctl.d/90-mcn-frr.conf
     permissions: '0644'
     content: |
       net.ipv4.ip_forward=1
       net.ipv4.conf.all.rp_filter=2
+  - path: /usr/local/lib/mcn/bootstrap.sh
+    permissions: '0700'
+    content: |
+      ${indent(6, bootstrap_script)}
+  - path: /etc/systemd/system/mcn-frr-bootstrap.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Install and configure regional FRR with bounded retries
+      After=network-online.target
+      Wants=network-online.target
+      [Service]
+      Type=oneshot
+      TimeoutStartSec=30min
+      ExecStart=/bin/bash /usr/local/lib/mcn/bootstrap.sh
+      RemainAfterExit=yes
+      [Install]
+      WantedBy=multi-user.target
   - path: /usr/local/lib/mcn/vip_translation.py
     permissions: '0700'
     content: |
@@ -31,9 +46,8 @@ write_files:
       OnUnitActiveSec=3s
       [Install]
       WantedBy=timers.target
-  - path: /etc/frr/frr.conf
-    defer: true
-    owner: frr:frr
+  - path: /var/lib/mcn/frr.conf
+    owner: root:root
     permissions: '0640'
     content: |
       frr defaults traditional
@@ -72,9 +86,5 @@ write_files:
 %{ endfor ~}
        exit-address-family
 runcmd:
-  - [sysctl, --system]
-  - [sed, -i, 's/^bgpd=no/bgpd=yes/', /etc/frr/daemons]
-  - [systemctl, enable, --now, frr]
-  - [systemctl, restart, frr]
   - [systemctl, daemon-reload]
-  - [systemctl, enable, --now, mcn-vip-translation.timer]
+  - [systemctl, enable, --now, --no-block, mcn-frr-bootstrap.service]

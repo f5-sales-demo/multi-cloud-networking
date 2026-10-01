@@ -298,6 +298,12 @@ verify_region_routing() {
   local remote_script
   remote_script=$(
     cat <<PY
+set -eu
+for attempt in \$(seq 1 120); do
+  if command -v vtysh >/dev/null && systemctl is-active --quiet frr; then break; fi
+  sleep 5
+done
+command -v vtysh >/dev/null || { echo MCN_FRR_BOOTSTRAP_UNAVAILABLE >&2; exit 1; }
 python3 - <<'MCN_PY'
 import json, subprocess
 ce_ips = set(json.loads('${ce_ips_json}'))
@@ -322,8 +328,8 @@ PY
   while IFS= read -r frr_name; do
     message=$(az_vm_run_command --resource-group "$resource_group" --name "$frr_name" \
       --command-id RunShellScript --query 'value[0].message' --output tsv --scripts "$remote_script")
-    result=$(grep -Eo 'MCN_FRR ce_established=[0-9]+ rs_established=[0-9]+ vip_learned=[01]' <<<"$message" | tail -n 1)
-    [ -n "$result" ] || die "${region} FRR did not return BGP evidence"
+    result=$(grep -Eo 'MCN_FRR ce_established=[0-9]+ rs_established=[0-9]+ vip_learned=[01]' <<<"$message" | tail -n 1 || true)
+    [ -n "$result" ] || die "${region} FRR ${frr_name} did not return BGP evidence; check bootstrap package installation"
     read -r ce_count rs_count vip_count < <(sed -E 's/.*ce_established=([0-9]+) rs_established=([0-9]+) vip_learned=([01]).*/\1 \2 \3/' <<<"$result")
     [ "$ce_count" -eq 3 ] && [ "$rs_count" -eq 2 ] && [ "$vip_count" -eq 1 ] ||
       die "${region} FRR sessions or CE-learned VIP are unhealthy"

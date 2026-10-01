@@ -117,6 +117,7 @@ resource "azurerm_linux_virtual_machine" "frr" {
     ce_ips                 = var.ce_ips
     rs_peer_ips            = var.rs_peer_ips
     ce_asn                 = var.ce_asn
+    bootstrap_script       = file("${path.module}/bootstrap.sh")
     vip_translation_script = file("${path.module}/vip_translation.py")
     frr_asn                = var.frr_asn
     rs_asn                 = var.rs_asn
