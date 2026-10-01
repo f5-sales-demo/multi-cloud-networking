@@ -162,6 +162,8 @@ SH
 chmod 755 "${BIN}/aws" "${BIN}/curl" "${BIN}/terraform"
 
 export PATH="${BIN}:$PATH"
+printf '[profile sso]\nregion = ap-northeast-1\n' >"${TMP_ROOT}/aws-config"
+export AWS_CONFIG_FILE="${TMP_ROOT}/aws-config"
 FAKE_TF_DIR="$(cd "$TF_DIR" && pwd)"
 export FAKE_TF_DIR
 export FAKE_TF_CALLS="$TF_CALLS"

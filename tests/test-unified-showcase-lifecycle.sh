@@ -211,3 +211,5 @@ for apply_scope in azure-bindings azure-approvals azure-converge azure-build kvm
     ;;
   esac
 done
+
+require 'AWS_SSO_SOURCE_PROFILE="$AWS_PROFILE" "$REPO_ROOT/scripts/aws-smsv2-uat-preflight.sh"' "$lifecycle"

@@ -10,6 +10,7 @@ TFVARS=""
 MAPPING_FILE=""
 EXPECTED_AWS_ACCOUNT=""
 EXPECTED_AWS_REGION=""
+AWS_SSO_SOURCE_PROFILE=${AWS_SSO_SOURCE_PROFILE:-${AWS_PROFILE:-sso}}
 EXPECTED_XC_TENANT=""
 CREATOR_ID=""
 DEPLOYMENT_GENERATION=""
@@ -661,7 +662,8 @@ verify_mutation_identities() {
 
 tf() {
   TF_CLI_CONFIG_FILE="$SELECTED_CLI_CONFIG" XCSH_API_URL="$API_URL" XCSH_API_TOKEN="$API_TOKEN" \
-    terraform -chdir="$TERRAFORM_DIR" "$@"
+    "$REPO_ROOT/scripts/terraform-with-aws-sso.sh" --profile "$AWS_SSO_SOURCE_PROFILE" --region "$EXPECTED_AWS_REGION" -- \
+    -chdir="$TERRAFORM_DIR" "$@"
 }
 
 tf_plan() {
