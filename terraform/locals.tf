@@ -175,6 +175,7 @@ locals {
   ce_cloud_init = {
     for key, node in module.ce_topology.ce_nodes : key => templatefile("${path.module}/cloud-init/ce-node.yaml", {
       probe_routing_script = file("${path.module}/cloud-init/azure-probe-routing.sh")
+      inside_subnet        = var.internal_subnet_prefix
       cluster_name         = node.site_name
       token                = local.ce_registration_token
       # chomp: a key read from a .pub file ends in a newline, which would render a
@@ -187,6 +188,7 @@ locals {
   ca_ce_cloud_init = {
     for key, node in try(module.ce_topology_ca[0].ce_nodes, {}) : key => templatefile("${path.module}/cloud-init/ce-node.yaml", {
       probe_routing_script = file("${path.module}/cloud-init/azure-probe-routing.sh")
+      inside_subnet        = var.ca_internal_subnet_prefix
       cluster_name         = node.site_name
       token                = local.ce_registration_token
       ssh_public_key       = chomp(local.ssh_public_key)
