@@ -19,7 +19,8 @@ check 'module "azure_frr_ca"' terraform/main.tf
 reject 'module "azure_route_server_bgp"' terraform/main.tf
 reject 'module "azure_route_server_bgp_ca"' terraform/main.tf
 reject 'azure_route_server_ebgp_multihop' terraform/main.tf
-check 'azurerm_route_server_bgp_connection' terraform/modules/azure-frr/main.tf
+check 'Microsoft.Network/virtualHubs/bgpConnections@2022-01-01' terraform/modules/azure-frr/main.tf
+check 'depends_on = \[azapi_resource.route_server_primary\]' terraform/modules/azure-frr/main.tf
 check 'ip_forwarding_enabled[[:space:]]*=[[:space:]]*true' terraform/modules/azure-frr/main.tf
 check 'ip prefix-list VIP seq 10 permit' terraform/modules/azure-frr/cloud-init.yaml.tftpl
 check 'route-map RS-OUT permit' terraform/modules/azure-frr/cloud-init.yaml.tftpl

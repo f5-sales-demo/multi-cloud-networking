@@ -1,3 +1,4 @@
+mock_provider "azapi" {}
 mock_provider "azurerm" {
   mock_resource "azurerm_network_interface" {
     defaults = { mac_address = "52:54:00:10:00:11" }
@@ -32,8 +33,13 @@ run "two_regional_relays_and_vip_only_export" {
   }
 
   assert {
-    condition     = length(azurerm_route_server_bgp_connection.frr) == 2 && alltrue([for _, v in azurerm_route_server_bgp_connection.frr : v.peer_asn == 65020])
+    condition     = alltrue([for v in [azapi_resource.route_server_primary, azapi_resource.route_server_secondary] : v.type == "Microsoft.Network/virtualHubs/bgpConnections@2022-01-01" && v.body.properties.peerAsn == 65020 && v.parent_id == var.route_server_id && v.timeouts.create == "30m" && v.timeouts.delete == "30m"])
     error_message = "Both FRRs must peer with Route Server under the relay ASN."
+  }
+
+  assert {
+    condition     = azapi_resource.route_server_primary.body.properties.peerIp == "10.0.1.20" && azapi_resource.route_server_secondary.body.properties.peerIp == "10.0.1.21"
+    error_message = "Both Route Server requests must use the exact reserved FRR addresses."
   }
 
   assert {
