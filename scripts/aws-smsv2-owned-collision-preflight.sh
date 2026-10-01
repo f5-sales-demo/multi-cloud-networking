@@ -459,6 +459,8 @@ while IFS= read -r item; do
     ' "$PLAN_JSON" >/dev/null || die "planned listener is not bound to collision-checked NLB and target group: $address"
     continue
   fi
+  # EC2 keeps deleted TGW records visible after teardown. Only explicit
+  # deletion releases the name; unknown and nonterminal states still collide.
   if [[ $type == aws_ec2_transit_gateway || $type == aws_ec2_transit_gateway_route_table || $type == aws_ec2_transit_gateway_connect ]]; then
     expected_tags=$(jq -ec '.tags // {}' <<<"$after") || die "planned tags are invalid for $address"
     name=$(jq -er '.Name' <<<"$expected_tags") || die "planned TGW Name tag is unavailable for $address"
@@ -481,7 +483,8 @@ while IFS= read -r item; do
       ;;
     esac
     matches=$(jq -ec --arg collection "$collection" --arg id_field "$id_field" --argjson expected "$expected_tags" '
-      [.[$collection][]? | (.Tags // [] | map({key:.Key,value:.Value}) | from_entries) as $tags |
+      [.[$collection][]? | select(.State != "deleted") |
+       (.Tags // [] | map({key:.Key,value:.Value}) | from_entries) as $tags |
        select($tags == $expected) | {id:.[ $id_field ],tags:$tags}]
     ' "$response") || die "cannot normalize AWS TGW tagged candidates for $address"
     match_count=$(jq -er 'length' <<<"$matches") || die "cannot count AWS TGW tagged candidates for $address"
@@ -574,7 +577,7 @@ while IFS= read -r item; do
     aws ec2 describe-transit-gateway-attachments --region "$AWS_REGION" --output json >"$response" 2>/dev/null ||
       die "cannot inspect AWS TGW attachment candidates for $address"
     matches=$(jq -ec --argjson expected "$expected_tags" '
-      [.TransitGatewayAttachments[]? |
+      [.TransitGatewayAttachments[]? | select(.State != "deleted") |
        (.Tags // [] | map({key:.Key,value:.Value}) | from_entries) as $tags |
        select($tags == $expected) |
        {id:.TransitGatewayAttachmentId,tags:$tags}]
@@ -596,7 +599,7 @@ while IFS= read -r item; do
     aws ec2 describe-transit-gateway-connect-peers --region "$AWS_REGION" --output json >"$response" 2>/dev/null ||
       die "cannot inspect AWS Connect-peer candidates for $address"
     matches=$(jq -ec --argjson expected "$expected_tags" '
-      [.TransitGatewayConnectPeers[]? |
+      [.TransitGatewayConnectPeers[]? | select(.State != "deleted") |
        (.Tags // [] | map({key:.Key,value:.Value}) | from_entries) as $tags |
        select($tags == $expected) |
        {

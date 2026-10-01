@@ -157,7 +157,26 @@ case "$*" in
     generation=${FAKE_EIP_GENERATION:-gen-01}
     printf '{"Addresses":[{"AllocationId":"eipalloc-0123456789abcdef0","Tags":[{"Key":"component","Value":"mcn-ce-ha"},{"Key":"deployment_generation","Value":"%s"},{"Key":"deployer","Value":"tester"},{"Key":"managed_by","Value":"terraform"}]}]}\n' "$generation"
     ;;
-  *"describe-transit-gateway-connect-peers"*)
+  *"describe-transit-gateway"* | *"describe-transit-gateways"*)
+    if [[ -n ${FAKE_TGW_COLLECTION:-} ]]; then
+      jq -nc --arg collection "$FAKE_TGW_COLLECTION" --arg state "${FAKE_TGW_STATE-available}" --argjson count "${FAKE_TGW_COUNT:-1}" '
+        {($collection):[range($count) | {
+          TransitGatewayId:("tgw-test-" + tostring),
+          TransitGatewayRouteTableId:("tgw-rtb-test-" + tostring),
+          TransitGatewayAttachmentId:("tgw-attach-test-" + tostring),
+          TransitGatewayConnectPeerId:("tgw-connect-peer-test-" + tostring),
+          State:$state,
+          Tags:[{Key:"Name",Value:"mcn-ce-ha-gen-01-tgw"},
+                {Key:"component",Value:"mcn-ce-ha"},
+                {Key:"deployment_generation",Value:"gen-01"},
+                {Key:"deployer",Value:"tester"},
+                {Key:"managed_by",Value:"terraform"}]
+        }]}'
+      exit 0
+    fi
+    if [[ $* != *"describe-transit-gateway-connect-peers"* ]]; then
+      exit 64
+    fi
     if [[ ${FAKE_ABSENT:-false} == true ]]; then
       printf '{"TransitGatewayConnectPeers":[]}\n'
       exit 0
@@ -447,3 +466,58 @@ if FAKE_INSTANCE_COUNT=2 PATH="$fake_bin:$PATH" CURL_BIN="$fake_bin/curl" \
   fail 'ambiguous live instances must still reject'
 fi
 printf 'PASS: terminal EC2 instances permit recycling; live and ambiguous collisions remain blocked\n'
+
+# EC2 retains deleted TGW inventory after teardown. Only explicit terminal
+# deletion permits reuse; all nonterminal and unknown states remain collisions.
+for tgw_kind in gateway table connect vpc peer; do
+  case "$tgw_kind" in
+  gateway)
+    tgw_type=aws_ec2_transit_gateway
+    tgw_collection=TransitGateways
+    ;;
+  table)
+    tgw_type=aws_ec2_transit_gateway_route_table
+    tgw_collection=TransitGatewayRouteTables
+    ;;
+  connect)
+    tgw_type=aws_ec2_transit_gateway_connect
+    tgw_collection=TransitGatewayAttachments
+    ;;
+  vpc)
+    tgw_type=aws_ec2_transit_gateway_vpc_attachment
+    tgw_collection=TransitGatewayAttachments
+    ;;
+  peer)
+    tgw_type=aws_ec2_transit_gateway_connect_peer
+    tgw_collection=TransitGatewayConnectPeers
+    ;;
+  esac
+  tgw_plan="$scratch/tgw-$tgw_kind-plan.json"
+  jq -n --arg type "$tgw_type" '{resource_changes:[{address:($type+".test[0]"),type:$type,change:{actions:["create"],after:{tags:{Name:"mcn-ce-ha-gen-01-tgw",component:"mcn-ce-ha",deployment_generation:"gen-01",deployer:"tester",managed_by:"terraform"}}}}]}' >"$tgw_plan"
+  for tgw_state in deleted deleting pending available failed unknown ""; do
+    tgw_manifest="$scratch/tgw-$tgw_kind-${tgw_state:-missing}.json"
+    set +e
+    FAKE_TGW_COLLECTION="$tgw_collection" FAKE_TGW_STATE="$tgw_state" PATH="$fake_bin:$PATH" CURL_BIN="$fake_bin/curl" \
+      XCSH_API_URL=https://f5-sales-demo.console.ves.volterra.io XCSH_API_TOKEN=test-token \
+      "$script" --plan-json "$tgw_plan" --aws-region ap-northeast-1 --xc-tenant f5-sales-demo \
+      --aws-account-id 123456789012 --deployment-generation gen-01 --component mcn-ce-ha \
+      --creator-id tester@example.test --manifest "$tgw_manifest" >"$scratch/tgw-output.log" 2>&1
+    tgw_result=$?
+    set -e
+    if [[ $tgw_state == deleted ]]; then
+      [[ $tgw_result -eq 0 ]] || fail "deleted $tgw_kind must permit rebuild"
+      jq -e '.status == "ready" and .collisions == []' "$tgw_manifest" >/dev/null || fail "deleted TGW collision remains"
+    else
+      [[ $tgw_result -eq 3 ]] || fail "nonterminal $tgw_kind $tgw_state must block rebuild"
+      jq -e '.status == "blocked" and (.collisions | length == 1)' "$tgw_manifest" >/dev/null || fail "nonterminal TGW collision lost"
+    fi
+  done
+  if FAKE_TGW_COLLECTION="$tgw_collection" FAKE_TGW_STATE=available FAKE_TGW_COUNT=2 PATH="$fake_bin:$PATH" CURL_BIN="$fake_bin/curl" \
+    XCSH_API_URL=https://f5-sales-demo.console.ves.volterra.io XCSH_API_TOKEN=test-token \
+    "$script" --plan-json "$tgw_plan" --aws-region ap-northeast-1 --xc-tenant f5-sales-demo \
+    --aws-account-id 123456789012 --deployment-generation gen-01 --component mcn-ce-ha \
+    --creator-id tester@example.test --manifest "$scratch/tgw-$tgw_kind-ambiguous.json" >/dev/null 2>&1; then
+    fail "multiple nonterminal $tgw_kind records must reject"
+  fi
+done
+printf 'PASS: deleted TGW records permit recycling; nonterminal and ambiguous records remain blocked\n'
