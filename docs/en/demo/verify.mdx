@@ -32,6 +32,8 @@ scripts/verify-deployment.sh \
 
 The verifier checks three registered `ONLINE` CEs in each region, Azure VM and
 password-extension readiness, and all three CE Site Console TCP/65500 backends.
+Approval receipts remain tracked when the same registration becomes ONLINE;
+the provider verifies already-approved nodes without another approval action.
 For each of the two FRR relays per region, it requires three direct CE sessions,
 two Route Server sessions, and the CE-learned application VIP `/32`.
 The regional client must have both FRR next hops for that VIP.

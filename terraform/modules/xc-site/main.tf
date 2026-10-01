@@ -214,7 +214,8 @@ data "xcsh_site_registration" "this" {
 # once the CE has registered (see the deploy ordering in main.tf).
 #
 # The API approves NEW and PENDING registrations. Retired and
-# already-admitted registrations are observations, never approval targets.
+# already-admitted registrations keep the same immutable action receipt.
+# The published provider verifies their cluster size and performs no new action.
 # Keeping the guard in the module rather than relying on provider selection also
 # protects installed provider versions that predate terminal-state filtering.
 #
@@ -222,7 +223,7 @@ data "xcsh_site_registration" "this" {
 # explicit site creation. The data source deliberately has no dependency: its
 # result determines this resource's plan-known count.
 resource "xcsh_registration_approval" "this" {
-  count = var.approve_registration && data.xcsh_site_registration.this.found && contains(["NEW", "PENDING"], data.xcsh_site_registration.this.state) ? 1 : 0
+  count = var.approve_registration && data.xcsh_site_registration.this.found && contains(["NEW", "PENDING", "APPROVED", "ADMITTED", "ONLINE", "UPGRADING", "MAINTENANCE"], data.xcsh_site_registration.this.state) ? 1 : 0
 
   namespace    = "system"
   name         = data.xcsh_site_registration.this.name
