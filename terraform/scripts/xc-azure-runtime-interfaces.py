@@ -11,6 +11,8 @@ import os
 import pathlib
 import re
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -63,6 +65,49 @@ def resolve_interfaces(
     return sorted(result, key=lambda row: row["device"])
 
 
+def fetch_health(api_url: str, site: str, token: str) -> dict:
+    """Read one exact runtime endpoint without disclosing response details."""
+    quoted = urllib.parse.quote(site, safe="")
+    request = urllib.request.Request(  # noqa: S310 -- validated HTTPS origin.
+        api_url
+        + f"/api/operate/namespaces/system/sites/{quoted}/vpm/debug/global/health",
+        headers={"Accept": "application/json", "Authorization": "APIToken " + token},
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+        return json.load(response)
+
+
+def wait_interfaces(
+    api_url: str,
+    site: str,
+    token: str,
+    hostname: str,
+    macs: dict,
+    timeout: int = 900,
+) -> list[dict[str, str]]:
+    """Wait only for transient runtime readiness; reject wrong hardware."""
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            health = fetch_health(api_url, site, token)
+        except urllib.error.HTTPError as error:
+            if error.code not in (404, 408, 429, 500, 502, 503, 504):
+                raise
+        except (urllib.error.URLError, TimeoutError):
+            pass
+        else:
+            if not isinstance(health, dict) or health.get("hostname") != hostname:
+                raise ValueError("Runtime response does not identify the owned node")
+            if health.get("state") == "PROVISIONED":
+                return resolve_interfaces(health, hostname, macs)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError(
+                "Runtime health did not become available before deadline"
+            )
+        time.sleep(min(10, remaining))
+
+
 def main() -> int:
     """Emit string-valued, credential-free Terraform external data."""
     try:
@@ -89,19 +134,12 @@ def main() -> int:
         token = os.environ.get("XCSH_API_TOKEN", "")
         if len(token) < MIN_TOKEN_LENGTH:
             raise ValueError("Runtime API credential is unavailable")
-        site = urllib.parse.quote(query["site_name"], safe="")
-        request = urllib.request.Request(  # noqa: S310 -- validated HTTPS origin.
-            url
-            + f"/api/operate/namespaces/system/sites/{site}/vpm/debug/global/health",
-            headers={
-                "Accept": "application/json",
-                "Authorization": "APIToken " + token,
-            },
-        )
-        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
-            health = json.load(response)
-        result = resolve_interfaces(
-            health, query["hostname"], json.loads(query["role_macs"])
+        result = wait_interfaces(
+            url,
+            query["site_name"],
+            token,
+            query["hostname"],
+            json.loads(query["role_macs"]),
         )
         json.dump({"network": json.dumps(result)}, sys.stdout)
         sys.stdout.write("\n")
