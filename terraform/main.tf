@@ -308,6 +308,17 @@ data "xcsh_namespace" "mcn" {
   namespace = ""
 }
 
+resource "xcsh_virtual_site" "regional_ce" {
+  count     = var.enable_azure ? 1 : 0
+  name      = "${local.site_prefix}-ce-vsite"
+  namespace = data.xcsh_namespace.mcn.name
+  labels    = local.azure_xc_labels
+  site_type = "CUSTOMER_EDGE"
+  site_selector {
+    expressions = ["mcn-topology in (${local.azure_xc_labels["mcn-topology"]})"]
+  }
+}
+
 resource "xcsh_origin_pool" "this" {
   count       = var.enable_azure ? 1 : 0
   name        = local.origin_pool_name
@@ -319,8 +330,15 @@ resource "xcsh_origin_pool" "this" {
 
   origin_servers {
     labels = {}
-    public_ip {
-      ip = local.selected_origin_ip
+    private_ip {
+      ip              = local.selected_origin_ip
+      outside_network = {}
+      site_locator {
+        virtual_site {
+          name      = xcsh_virtual_site.regional_ce[0].name
+          namespace = data.xcsh_namespace.mcn.name
+        }
+      }
     }
   }
 
@@ -610,8 +628,15 @@ resource "xcsh_origin_pool" "canada" {
 
   origin_servers {
     labels = {}
-    public_ip {
-      ip = local.selected_origin_ip
+    private_ip {
+      ip              = local.selected_origin_ip
+      outside_network = {}
+      site_locator {
+        virtual_site {
+          name      = xcsh_virtual_site.canada_ce[0].name
+          namespace = data.xcsh_namespace.mcn.name
+        }
+      }
     }
   }
 
