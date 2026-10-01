@@ -264,6 +264,9 @@ TF_RUNNER=("$REPO_ROOT/scripts/terraform-with-aws-sso.sh" --profile "$AWS_PROFIL
 tf() {
   "${TF_RUNNER[@]}" -chdir="$TERRAFORM_DIR" "$@"
 }
+tf_exec() {
+  "$REPO_ROOT/scripts/terraform-with-aws-sso.sh" --profile "$AWS_PROFILE" --region "$AWS_REGION" --exec -- "$@"
+}
 IDENTITY_TF_ARGS=(
   -var="source_repository=$SOURCE_REPOSITORY"
   -var="source_ref=$SOURCE_REF"
@@ -422,7 +425,7 @@ phase_paths() {
 scope_plan() {
   local scope=$1 receipt=$EVIDENCE_DIR/showcase-plan-receipt.json
   if [ "$scope" = full-destroy ] && [ "${DESTROY_FALLBACK:-false}" = true ]; then
-    python3 "$REPO_ROOT/scripts/showcase-legacy-destroy-scope.py" \
+    tf_exec python3 "$REPO_ROOT/scripts/showcase-legacy-destroy-scope.py" \
       --terraform-dir "$TERRAFORM_DIR" --state "$EVIDENCE_DIR/prior-state.json" \
       --events "$EVIDENCE_DIR/destroy-events.jsonl" --plan "$PLAN_FILE" \
       --provider-zip "$PROVIDER_ZIP" --backend-config "$BACKEND_CONFIG" \
@@ -432,7 +435,7 @@ scope_plan() {
       --legacy-generation "$LEGACY_GENERATION" --legacy-tenant "$XC_TENANT" \
       >"$receipt" || die "legacy destroy plan failed exact ownership/action scope"
   else
-    python3 "$REPO_ROOT/scripts/showcase-plan-scope.py" \
+    tf_exec python3 "$REPO_ROOT/scripts/showcase-plan-scope.py" \
       --terraform-dir "$TERRAFORM_DIR" --plan-file "$PLAN_FILE" \
       --provider-zip "$PROVIDER_ZIP" --backend-config "$BACKEND_CONFIG" \
       --scope "$scope" --source-commit "$SOURCE_COMMIT_SHA" \
@@ -654,7 +657,7 @@ build_cycle() {
     -var='aws_site_configuration_phase=configured' \
     -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE"
   apply_scoped_plan kvm-configured
-  python3 "$REPO_ROOT/scripts/verify-kvm-lan-client.py" \
+  tf_exec python3 "$REPO_ROOT/scripts/verify-kvm-lan-client.py" \
     --terraform-dir "$TERRAFORM_DIR" --evidence-dir "$CYCLE_DIR/kvm-client" \
     --source-commit "$SOURCE_COMMIT_SHA"
   phase_paths "$cycle" azure_build both-regions
@@ -766,10 +769,10 @@ settle_azure() {
 verify_final() {
   local cycle=$1
   phase_paths "$cycle" final refresh-zero-change
-  bash "$REPO_ROOT/scripts/verify-deployment.sh" --terraform-dir "$TERRAFORM_DIR" \
+  tf_exec bash "$REPO_ROOT/scripts/verify-deployment.sh" --terraform-dir "$TERRAFORM_DIR" \
     --evidence-dir "$PHASE_DIR/azure-uat" --subscription "$AZURE_SUBSCRIPTION" --skip-console
   if [ "$cycle" != verify ]; then
-    "$REPO_ROOT/scripts/verify-azure-failover.sh" --terraform-dir "$TERRAFORM_DIR" \
+    tf_exec "$REPO_ROOT/scripts/verify-azure-failover.sh" --terraform-dir "$TERRAFORM_DIR" \
       --evidence-dir "$PHASE_DIR/azure-failover" --subscription "$AZURE_SUBSCRIPTION" \
       --source-commit "$SOURCE_COMMIT_SHA"
   fi

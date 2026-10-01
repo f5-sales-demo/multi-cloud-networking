@@ -62,7 +62,8 @@ selectors; a selector alone is not live path evidence.
 ## AWS
 
 The live UAT uses the same isolated AWS SSO credential-process route as the
-lifecycle for every root Terraform refresh.
+lifecycle for every root Terraform refresh. Child KVM and Azure verifiers and
+saved-plan readers share that route, including nested wrapper calls.
 
 The AWS UAT receipt requires three independent sites, six Connect peers,
 twelve established sessions, workload and VIP HTTP responses, and zero VIP

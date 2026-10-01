@@ -215,3 +215,8 @@ done
 require 'AWS_SSO_SOURCE_PROFILE="$AWS_PROFILE" "$REPO_ROOT/scripts/aws-smsv2-uat-preflight.sh"' "$lifecycle"
 
 require 'apply_scoped_plan kvm-status-output-refresh' "$lifecycle"
+
+require 'tf_exec python3 "$REPO_ROOT/scripts/verify-kvm-lan-client.py"' "$lifecycle"
+require 'tf_exec bash "$REPO_ROOT/scripts/verify-deployment.sh"' "$lifecycle"
+require 'tf_exec "$REPO_ROOT/scripts/verify-azure-failover.sh"' "$lifecycle"
+require 'tf_exec python3 "$REPO_ROOT/scripts/showcase-plan-scope.py"' "$lifecycle"
