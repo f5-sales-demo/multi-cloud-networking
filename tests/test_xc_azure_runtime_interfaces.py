@@ -1,9 +1,10 @@
 """Azure runtime NIC observations must supersede stale registration facts."""
 
-# ruff: noqa: INP001, PT009, PT027
+# ruff: noqa: INP001, PT009, PT027, SIM117
 import importlib.util
 import pathlib
 import unittest
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
@@ -95,6 +96,62 @@ class RuntimeInterfacesTests(unittest.TestCase):
             MODULE.resolve_interfaces(value, "node-example", MACS)[0]["mac"],
             MACS["slo"],
         )
+
+
+class RuntimeWaitTests(unittest.TestCase):
+    def test_transient_then_provisioned(self):
+        with (
+            patch.object(
+                MODULE,
+                "fetch_health",
+                side_effect=[
+                    MODULE.urllib.error.HTTPError(
+                        "https://example.invalid", 503, "pending", {}, None
+                    ),
+                    health(),
+                ],
+            ),
+            patch.object(MODULE.time, "sleep"),
+        ):
+            result = MODULE.wait_interfaces(
+                "https://example.invalid",
+                "site-example",
+                "token",
+                "node-example",
+                MACS,
+                30,
+            )
+        self.assertEqual(result[2]["device"], "eth2")
+
+    def test_malformed_never_retried(self):
+        with patch.object(
+            MODULE, "fetch_health", return_value={**health(), "hostname": "foreign"}
+        ) as fetch:
+            with self.assertRaises(ValueError):
+                MODULE.wait_interfaces(
+                    "https://example.invalid",
+                    "site-example",
+                    "token",
+                    "node-example",
+                    MACS,
+                    30,
+                )
+        self.assertEqual(fetch.call_count, 1)
+
+    def test_bounded_runtime_expiry(self):
+        with (
+            patch.object(MODULE, "fetch_health", side_effect=TimeoutError),
+            patch.object(MODULE.time, "monotonic", side_effect=[0, 31]),
+        ):
+            with self.assertRaises(TimeoutError):
+                MODULE.wait_interfaces(
+                    "https://example.invalid",
+                    "site-example",
+                    "token",
+                    "node-example",
+                    MACS,
+                    30,
+                )
 
 
 if __name__ == "__main__":
