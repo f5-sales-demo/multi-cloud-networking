@@ -372,6 +372,22 @@ resource "xcsh_http_loadbalancer" "this" {
         use_default_port = {}
       }
     }
+
+    # FRR translates the advertised VIP to a currently learned CE primary IP.
+    dynamic "advertise_where" {
+      for_each = module.ce_topology.ce_nodes
+      content {
+        site {
+          network = "SITE_NETWORK_OUTSIDE"
+          site {
+            namespace = "system"
+            name      = advertise_where.value.site_name
+          }
+          ip = advertise_where.value.slo_ip
+        }
+        use_default_port = {}
+      }
+    }
   }
 
   default_route_pools {
@@ -630,6 +646,21 @@ resource "xcsh_http_loadbalancer" "canada" {
             name      = advertise_where.value.site_name
           }
           ip = var.ca_vip
+        }
+        use_default_port = {}
+      }
+    }
+
+    dynamic "advertise_where" {
+      for_each = try(module.ce_topology_ca[0].ce_nodes, {})
+      content {
+        site {
+          network = "SITE_NETWORK_OUTSIDE"
+          site {
+            namespace = "system"
+            name      = advertise_where.value.site_name
+          }
+          ip = advertise_where.value.slo_ip
         }
         use_default_port = {}
       }

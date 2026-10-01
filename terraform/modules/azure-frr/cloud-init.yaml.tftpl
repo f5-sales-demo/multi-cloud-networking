@@ -7,6 +7,30 @@ write_files:
     permissions: '0644'
     content: |
       net.ipv4.ip_forward=1
+      net.ipv4.conf.all.rp_filter=2
+  - path: /usr/local/lib/mcn/vip_translation.py
+    permissions: '0700'
+    content: |
+      ${indent(6, vip_translation_script)}
+  - path: /etc/systemd/system/mcn-vip-translation.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Converge Azure VIP translation from CE-learned BGP paths
+      After=frr.service
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/bin/python3 /usr/local/lib/mcn/vip_translation.py --vip ${vip} --router-ip ${router_ip} --ce-ips ${join(" ", ce_ips)}
+  - path: /etc/systemd/system/mcn-vip-translation.timer
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Follow regional CE BGP failure and recovery
+      [Timer]
+      OnBootSec=15s
+      OnUnitActiveSec=3s
+      [Install]
+      WantedBy=timers.target
   - path: /etc/frr/frr.conf
     defer: true
     owner: frr:frr
@@ -52,3 +76,5 @@ runcmd:
   - [sed, -i, 's/^bgpd=no/bgpd=yes/', /etc/frr/daemons]
   - [systemctl, enable, --now, frr]
   - [systemctl, restart, frr]
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, --now, mcn-vip-translation.timer]

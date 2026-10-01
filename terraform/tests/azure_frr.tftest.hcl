@@ -54,4 +54,14 @@ run "two_regional_relays_and_vip_only_export" {
     ])
     error_message = "Each FRR must import only the CE VIP and export only that learned route."
   }
+
+  assert {
+    condition = alltrue([for _, vm in azurerm_linux_virtual_machine.frr :
+      strcontains(base64decode(vm.custom_data), "--vip 10.250.0.10 --router-ip") &&
+      strcontains(base64decode(vm.custom_data), "--ce-ips 10.0.1.4 10.0.1.5 10.0.1.6") &&
+      strcontains(base64decode(vm.custom_data), "OnUnitActiveSec=3s") &&
+      strcontains(base64decode(vm.custom_data), "mcn-vip-translation.timer")
+    ])
+    error_message = "Each relay must follow only its regional CE-learned VIP paths."
+  }
 }
