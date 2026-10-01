@@ -68,7 +68,7 @@ reject 'ce_vm_instance_id[[:space:]]*=[[:space:]]*module.ce_node' terraform/main
 check 'labels[[:space:]]*=[[:space:]]*local.azure_token_labels' terraform/main.tf
 check 'azure_token_labels' terraform/locals.tf
 
-check 'defer: true' terraform/modules/azure-frr/cloud-init.yaml.tftpl
+check 'mcn-frr-bootstrap.service' terraform/modules/azure-frr/cloud-init.yaml.tftpl
 
 check 'azure_site_configuration_phase=bootstrap' scripts/showcase-lifecycle.sh
 check 'bind_azure_interfaces' scripts/showcase-lifecycle.sh
