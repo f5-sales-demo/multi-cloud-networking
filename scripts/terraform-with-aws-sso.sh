@@ -33,9 +33,14 @@ if [ "${1:-}" = "__export_credentials" ]; then
 fi
 
 source_profile=${AWS_SSO_SOURCE_PROFILE:-default}
+execute_command=false
 region=${AWS_REGION:-${AWS_DEFAULT_REGION:-}}
 while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do
   case "$1" in
+  --exec)
+    execute_command=true
+    shift
+    ;;
   --profile)
     [ "$#" -ge 2 ] || fail "--profile requires a value"
     source_profile=$2
@@ -46,17 +51,17 @@ while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do
     region=$2
     shift 2
     ;;
-  *) fail "usage: $0 [--profile NAME] [--region REGION] -- TERRAFORM_ARGUMENTS..." ;;
+  *) fail "usage: $0 [--profile NAME] [--region REGION] [--exec] -- ARGUMENTS..." ;;
   esac
 done
-[ "${1:-}" = "--" ] || fail "usage: $0 [--profile NAME] [--region REGION] -- TERRAFORM_ARGUMENTS..."
+[ "${1:-}" = "--" ] || fail "usage: $0 [--profile NAME] [--region REGION] [--exec] -- ARGUMENTS..."
 shift
 [ "$#" -gt 0 ] || fail "at least one Terraform argument is required"
 validate_profile "$source_profile"
 
 aws_bin=$(command -v aws) || fail "AWS CLI is unavailable"
 terraform_bin=$(command -v terraform) || fail "Terraform is unavailable"
-source_config=${AWS_CONFIG_FILE:-${HOME:?}/.aws/config}
+source_config=${MCN_AWS_SSO_SOURCE_CONFIG:-${AWS_CONFIG_FILE:-${HOME:?}/.aws/config}}
 [ -r "$source_config" ] || fail "AWS source config is not readable: $source_config"
 source_config=$(cd "$(dirname "$source_config")" && printf '%s/%s\n' "$PWD" "$(basename "$source_config")")
 script_path=$(cd "$(dirname "${BASH_SOURCE[0]}")" && printf '%s/%s\n' "$PWD" "$(basename "${BASH_SOURCE[0]}")")
@@ -85,15 +90,23 @@ printf '%s\n' \
   "region = ${region}" \
   >"$config_file"
 
+if [ "$execute_command" = true ]; then
+  command_argv=("$@")
+else
+  command_argv=("$terraform_bin" "$@")
+fi
+
 set +e
 unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
-AWS_CONFIG_FILE="$config_file" \
+MCN_AWS_SSO_SOURCE_CONFIG="$source_config" \
+  AWS_SSO_SOURCE_PROFILE="$source_profile" \
+  AWS_CONFIG_FILE="$config_file" \
   AWS_SHARED_CREDENTIALS_FILE=/dev/null \
   AWS_SDK_LOAD_CONFIG=1 \
   AWS_PROFILE=mcn-terraform \
   AWS_REGION="$region" \
   AWS_DEFAULT_REGION="$region" \
-  "$terraform_bin" "$@"
+  "${command_argv[@]}"
 status=$?
 set -e
 exit "$status"

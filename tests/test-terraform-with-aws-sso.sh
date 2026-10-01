@@ -99,3 +99,22 @@ grep -Fq '../scripts/terraform-with-aws-sso.sh -- init' "$deploy_guide" ||
   fail "showcase guidance does not use the credential-isolation wrapper"
 
 printf 'PASS: Terraform uses isolated AWS CLI SSO process credentials\n'
+
+# Arbitrary verifier children and nested Terraform wrappers keep the source route.
+child=$work/child.sh
+cat >"$child" <<'CHILD'
+#!/usr/bin/env bash
+set -euo pipefail
+[ "$MCN_AWS_SSO_SOURCE_CONFIG" = "$EXPECTED_SOURCE_CONFIG" ]
+[ "$AWS_SSO_SOURCE_PROFILE" = default ]
+[ "$AWS_PROFILE" = mcn-terraform ]
+terraform output -json kvm_runtime_status
+"$WRAPPER_UNDER_TEST" --profile default --region us-iso-east-1 -- output -json kvm_runtime_status
+CHILD
+chmod +x "$child"
+WRAPPER_TEST_ARGS="$work/child-args" \
+  WRAPPER_UNDER_TEST="$wrapper" EXPECTED_SOURCE_CONFIG="$work/source-config" \
+  PATH="$work/bin:$PATH" AWS_CONFIG_FILE="$work/source-config" \
+  "$wrapper" --profile default --region us-iso-east-1 --exec -- "$child"
+[ "$(cat "$work/child-args")" = "output -json kvm_runtime_status" ] ||
+  fail "nested verifier Terraform arguments changed"
