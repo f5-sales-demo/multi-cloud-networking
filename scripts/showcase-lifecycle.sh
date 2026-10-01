@@ -600,7 +600,7 @@ verify_configured() {
   if [ "$execute_uat" = true ]; then
     local uat_evidence="$PHASE_DIR/uat-evidence"
     mkdir "$uat_evidence"
-    "$REPO_ROOT/scripts/aws-smsv2-uat-preflight.sh" \
+    AWS_SSO_SOURCE_PROFILE="$AWS_PROFILE" "$REPO_ROOT/scripts/aws-smsv2-uat-preflight.sh" \
       --evidence-dir "$uat_evidence" --terraform-dir "$TERRAFORM_DIR" --plan-file "$PLAN_FILE" \
       --tfvars "$TFVARS" --mapping-file "$MAPPING_FILE" --plan-mode apply --lifecycle-phase configured \
       --expected-aws-account "$AWS_ACCOUNT" --expected-aws-region "$AWS_REGION" \
