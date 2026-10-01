@@ -796,6 +796,7 @@ destroy_all() {
   tf state pull >"$EVIDENCE_DIR/prior-state.json"
   tf_plan -destroy -json -input=false -no-color -var-file="$TFVARS" \
     -var='aws_site_configuration_phase=bootstrap' -var='enable_aws_tgw_connect=false' \
+    -var='azure_site_configuration_phase=bootstrap' \
     -var='enable_kvm=false' -var='enable_kvm_lan=false' \
     -var='kvm_lan_configuration_phase=disabled' -var='kvm_lan=null' \
     -out="$PLAN_FILE" >"$EVIDENCE_DIR/destroy-events.jsonl"
