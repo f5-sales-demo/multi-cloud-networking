@@ -55,7 +55,7 @@ write_files:
       Description=Converge Azure CE secondary reverse-path validation
       [Service]
       Type=oneshot
-      ExecStart=/bin/bash /etc/mcn/azure-probe-routing.sh
+      ExecStart=/bin/bash /etc/mcn/azure-probe-routing.sh ${inside_subnet}
   - path: /etc/systemd/system/mcn-azure-probes.timer
     permissions: "0644"
     owner: root
