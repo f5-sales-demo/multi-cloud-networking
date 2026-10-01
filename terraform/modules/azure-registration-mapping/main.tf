@@ -5,7 +5,7 @@ locals {
     !contains(["RETIRED", "FAILED", "FAILED_INACTIVE", "DONE"], record.state) &&
     alltrue([for mac in values(local.macs) : contains([for nic in record.network : lower(replace(nic.mac, "-", ":"))], mac)])
   ]
-  network = try(one(local.nodes).network, [])
+  network = var.runtime_required ? coalesce(var.runtime_network, []) : try(one(local.nodes).network, [])
   matches = { for role, mac in local.macs : role => [for nic in local.network : nic.device if lower(replace(nic.mac, "-", ":")) == mac] }
   valid = (length(local.nodes) == 1 && length(distinct(values(local.macs))) == 3 &&
     alltrue([for matches in values(local.matches) : length(matches) == 1]) &&

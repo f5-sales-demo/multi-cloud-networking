@@ -140,3 +140,45 @@ run "duplicate_mac" {
     error_message = "Invalid registration must not authorize interface binding."
   }
 }
+
+run "runtime_supersedes_stale_registration" {
+  command = plan
+  module { source = "./modules/azure-registration-mapping" }
+  variables {
+    runtime_required = true
+    runtime_network = [
+      { device = "eth0", mac = "52:54:00:10:00:11" },
+      { device = "eth1", mac = "52:54:00:20:00:11" },
+      { device = "eth2", mac = "52:54:00:30:00:11" },
+    ]
+  }
+  assert {
+    condition     = output.valid && output.devices == { slo = "eth0", sli = "eth1", external = "eth2" }
+    error_message = "Admitted nodes must use current runtime MAC/device facts."
+  }
+}
+run "runtime_missing_never_falls_back" {
+  command = plan
+  module { source = "./modules/azure-registration-mapping" }
+  variables { runtime_required = true }
+  assert {
+    condition     = !output.valid
+    error_message = "Admitted nodes cannot fall back to stale registration devices."
+  }
+}
+run "runtime_foreign_mac_rejected" {
+  command = plan
+  module { source = "./modules/azure-registration-mapping" }
+  variables {
+    runtime_required = true
+    runtime_network = [
+      { device = "eth0", mac = "52:54:00:10:00:11" },
+      { device = "eth1", mac = "52:54:00:20:00:11" },
+      { device = "eth2", mac = "52:54:00:40:00:11" },
+    ]
+  }
+  assert {
+    condition     = !output.valid
+    error_message = "Runtime hardware must cover exactly the three owned NICs."
+  }
+}
