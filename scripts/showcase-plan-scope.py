@@ -396,18 +396,22 @@ def validate(
             change.get("actions") != ["update"]
             or not isinstance(before, dict)
             or not isinstance(after, dict)
-            or set(before) != set(healthy)
-            or set(after) != set(healthy)
-            or any(
-                type(after[key]) is not type(value) or after[key] != value
-                for key, value in healthy.items()
-            )
-            or before == after
         ):
+            raise ValueError("KVM status refresh has a malformed output action")
+        if set(before) != set(healthy) or set(after) != set(healthy) or before == after:
             raise ValueError("KVM status refresh is not an exact healthy transition")
+        if any(
+            type(after[key]) is not type(value) or after[key] != value
+            for key, value in healthy.items()
+        ):
+            raise ValueError("KVM status refresh does not end healthy")
         for key, value in before.items():
             if key in ("online_count", "registration_count"):
-                if type(value) is not int or value not in (0, 1):
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, int)
+                    or value not in (0, 1)
+                ):
                     raise ValueError("KVM status refresh has an invalid prior count")
             elif type(value) is not type(healthy[key]) or value != healthy[key]:
                 raise ValueError("KVM status refresh changes a routing or mapping fact")
