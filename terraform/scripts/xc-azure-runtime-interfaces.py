@@ -1,5 +1,6 @@
 """Read current physical Azure CE NIC identities for Terraform."""
 
+# pylint: disable=invalid-name,no-else-return
 # ruff: noqa: EM101, INP001, TRY003, TRY004, TRY301
 from __future__ import annotations
 
@@ -74,11 +75,15 @@ def main() -> int:
         if (
             parsed.scheme != "https"
             or not parsed.hostname
-            or parsed.path
-            or parsed.query
-            or parsed.fragment
-            or parsed.username
-            or parsed.password
+            or any(
+                (
+                    parsed.path,
+                    parsed.query,
+                    parsed.fragment,
+                    parsed.username,
+                    parsed.password,
+                )
+            )
         ):
             raise ValueError("Runtime API URL must be an HTTPS origin")
         token = os.environ.get("XCSH_API_TOKEN", "")
