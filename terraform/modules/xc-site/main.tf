@@ -24,6 +24,8 @@ locals {
       }]
     }
   ] : []
+  runtime_required = (var.bind_registered_interfaces && data.xcsh_site_registration.this.found &&
+  contains(["APPROVED", "ADMITTED", "ONLINE", "UPGRADING", "MAINTENANCE"], coalesce(data.xcsh_site_registration.this.state, "UNKNOWN")))
   binding_valid = !var.bind_registered_interfaces || module.registration_mapping.valid
   devices       = var.bind_registered_interfaces ? module.registration_mapping.devices : { slo = "eth0", sli = "eth1", external = "eth2" }
   interfaces = [for device in ["eth0", "eth1", "eth2"] : {
@@ -34,11 +36,27 @@ locals {
 }
 
 module "registration_mapping" {
-  source   = "../azure-registration-mapping"
-  site     = var.site_name
-  hostname = var.hostname
-  macs     = local.role_macs
-  records  = local.registration_records
+  source           = "../azure-registration-mapping"
+  site             = var.site_name
+  hostname         = var.hostname
+  macs             = local.role_macs
+  records          = local.registration_records
+  runtime_required = local.runtime_required
+  runtime_network  = local.runtime_required ? try(jsondecode(data.external.runtime_interfaces[0].result.network), []) : null
+}
+
+# Registration retains pre-upgrade device names. Admitted nodes must use the
+# running OS hardware facts; credential values never enter the external query.
+data "external" "runtime_interfaces" {
+  count   = local.runtime_required ? 1 : 0
+  program = ["python3", "${path.module}/../../scripts/xc-azure-runtime-interfaces.py"]
+  query = {
+    api_url         = "https://${var.labels["mcn-xc-tenant"]}.console.ves.volterra.io"
+    site_name       = var.site_name
+    hostname        = var.hostname
+    role_macs       = jsonencode(local.role_macs)
+    observer_sha256 = filesha256("${path.module}/../../scripts/xc-azure-runtime-interfaces.py")
+  }
 }
 
 # The pre-boot node generation couples site and VM replacement without waiting
