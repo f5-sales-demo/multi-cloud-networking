@@ -220,3 +220,5 @@ require 'tf_exec python3 "$REPO_ROOT/scripts/verify-kvm-lan-client.py"' "$lifecy
 require 'tf_exec bash "$REPO_ROOT/scripts/verify-deployment.sh"' "$lifecycle"
 require 'tf_exec "$REPO_ROOT/scripts/verify-azure-failover.sh"' "$lifecycle"
 require 'tf_exec python3 "$REPO_ROOT/scripts/showcase-plan-scope.py"' "$lifecycle"
+
+sed -n '/^destroy_all()/,/^verify_absence()/p' "$lifecycle" | grep -q -- "-var='azure_site_configuration_phase=bootstrap'"
