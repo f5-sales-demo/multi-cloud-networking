@@ -74,7 +74,7 @@ reject 'tf output -json aws_smsv2_bootstrap_registration_projection' "$lifecycle
 require '.registration_count == 1 and .online_count == 1' "$lifecycle"
 require 'systemctl enable --now' "$lifecycle"
 require 'terraform plan' "$lifecycle"
-require 'tf apply -input=false -no-color "$PLAN_FILE"' "$lifecycle"
+require 'tf apply -input=false -no-color "${parallel_args[@]}" "$PLAN_FILE"' "$lifecycle"
 require 'plan -destroy' "$lifecycle"
 require "-var='enable_kvm=false'" "$lifecycle"
 require 'plan -refresh-only' "$lifecycle"
@@ -179,3 +179,35 @@ init_line=$(grep -n '^tf init ' "$lifecycle" | cut -d: -f1)
   fail 'published provider verification must precede lifecycle initialization'
 require 'TF_CLI_CONFIG_FILE="$PRIVATE_ROOT/published-providers.tfrc"' "$lifecycle"
 require 'init -backend=false -input=false -lockfile=readonly' "$lifecycle"
+
+# Execute the scoped apply helper so serialization cannot drift from scope.
+apply_source=$(mktemp)
+apply_calls=$(mktemp)
+apply_plan=$(mktemp)
+apply_receipt_dir=$(mktemp -d)
+trap 'rm -f "$eni_lookup_source" "$refresh_scope_source" "$refresh_scope_calls" "$autostart_source" "$apply_source" "$apply_calls" "$apply_plan"; rm -rf "$apply_receipt_dir"' EXIT
+sed -n '/^apply_scoped_plan() {/,/^}/p' "$lifecycle" >"$apply_source"
+# shellcheck source=/dev/null
+source "$apply_source"
+for apply_scope in azure-bindings azure-approvals azure-converge azure-build kvm-configured; do
+  (
+    PLAN_FILE=$apply_plan
+    EVIDENCE_DIR=$apply_receipt_dir
+    printf 'synthetic saved plan\n' >"$PLAN_FILE"
+    # shellcheck disable=SC2329
+    scope_plan() {
+      jq -nc --arg digest "sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')" '{plan_sha256:$digest}' >"$EVIDENCE_DIR/showcase-plan-receipt.json"
+    }
+    # shellcheck disable=SC2329
+    tf() { printf '%s\n' "$@" >"$apply_calls"; }
+    apply_scoped_plan "$apply_scope"
+  )
+  case "$apply_scope" in
+  azure-bindings | azure-approvals | azure-converge)
+    grep -Fxq -- '-parallelism=1' "$apply_calls" || fail "Azure scope $apply_scope must serialize XC updates"
+    ;;
+  *)
+    ! grep -Fxq -- '-parallelism=1' "$apply_calls" || fail "scope $apply_scope unexpectedly serializes ordinary build work"
+    ;;
+  esac
+done

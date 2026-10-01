@@ -449,11 +449,15 @@ scope_plan() {
 
 apply_scoped_plan() {
   local scope=$1
+  local -a parallel_args=()
+  case "$scope" in
+  azure-bindings | azure-approvals | azure-converge) parallel_args=(-parallelism=1) ;;
+  esac
   scope_plan "$scope"
   local digest
   digest=$(jq -er .plan_sha256 "$EVIDENCE_DIR/showcase-plan-receipt.json")
   [ "$digest" = "sha256:$(sha256sum "$PLAN_FILE" | awk '{print $1}')" ] || die "saved plan digest changed before apply"
-  tf apply -input=false -no-color "$PLAN_FILE"
+  tf apply -input=false -no-color "${parallel_args[@]}" "$PLAN_FILE"
   jq -n --arg scope "$scope" --arg digest "$digest" --arg completed_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '{scope:$scope,plan_sha256:$digest,completed_at:$completed_at,status:"applied"}' >"$EVIDENCE_DIR/apply-receipt.json"
   rm -f -- "$PLAN_FILE"
