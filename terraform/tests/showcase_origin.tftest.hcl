@@ -60,7 +60,7 @@ run "owned_origin_selected_for_both_regions" {
     outputs = { public_ip = "198.51.100.42" }
   }
   assert {
-    condition     = output.origin_ip == "198.51.100.42" && xcsh_origin_pool.this[0].origin_servers[0].public_ip.ip == "198.51.100.42" && xcsh_origin_pool.canada[0].origin_servers[0].public_ip.ip == "198.51.100.42"
+    condition     = output.origin_ip == "198.51.100.42" && xcsh_origin_pool.this[0].origin_servers[0].private_ip.ip == "198.51.100.42" && xcsh_origin_pool.canada[0].origin_servers[0].private_ip.ip == "198.51.100.42"
     error_message = "Both regions and control probes must select the owned origin."
   }
 }

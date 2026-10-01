@@ -118,6 +118,14 @@ run "canada_regional_virtual_sites_and_lb" {
     error_message = "Regional origin connections must stay on the serving CE."
   }
 
+  assert {
+    condition = (
+      xcsh_origin_pool.canada[0].origin_servers[0].private_ip.outside_network != null &&
+      xcsh_origin_pool.canada[0].origin_servers[0].private_ip.site_locator.virtual_site.name == xcsh_virtual_site.canada_ce[0].name
+    )
+    error_message = "Local endpoints must resolve through only the regional CE outside network."
+  }
+
 }
 
 run "canada_disabled_plans_no_canada_resources" {

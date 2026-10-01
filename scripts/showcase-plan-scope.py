@@ -45,6 +45,7 @@ AZURE_PREFIXES = (
     "xcsh_http_loadbalancer.canada[",
     "xcsh_virtual_site.canada_re[",
     "xcsh_virtual_site.canada_ce[",
+    "xcsh_virtual_site.regional_ce[",
     "xcsh_token.ce[",
     "azapi_resource_action.f5xc_customer_edge_marketplace_agreement[",
 )

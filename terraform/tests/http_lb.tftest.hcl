@@ -101,6 +101,14 @@ run "loadbalancer_advertise_and_pool" {
     error_message = "Regional origin connections must stay on the serving CE."
   }
 
+  assert {
+    condition = (
+      xcsh_origin_pool.this[0].origin_servers[0].private_ip.outside_network != null &&
+      xcsh_origin_pool.this[0].origin_servers[0].private_ip.site_locator.virtual_site.name == xcsh_virtual_site.regional_ce[0].name
+    )
+    error_message = "Local endpoints must resolve through only the regional CE outside network."
+  }
+
 }
 
 # The app namespace is read, never owned (#634, #637): a managed xcsh_namespace
