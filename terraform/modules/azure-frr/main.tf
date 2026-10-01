@@ -126,13 +126,46 @@ resource "azurerm_linux_virtual_machine" "frr" {
   depends_on = [azurerm_network_interface_security_group_association.frr]
 }
 
-resource "azurerm_route_server_bgp_connection" "frr" {
-  for_each        = local.routers
-  name            = "${var.name}-frr-${each.key}-bgp"
-  route_server_id = var.route_server_id
-  peer_asn        = var.frr_asn
-  peer_ip         = each.value.ip
-  depends_on      = [azurerm_linux_virtual_machine.frr]
+# The Route Server CLI and live qualification use Network API 2022-01-01.
+# Separate resources order the peers and give each operation its own deadline.
+resource "azapi_resource" "route_server_primary" {
+  type      = "Microsoft.Network/virtualHubs/bgpConnections@2022-01-01"
+  name      = "${var.name}-frr-20-bgp"
+  parent_id = var.route_server_id
+  body = {
+    properties = {
+      peerAsn = var.frr_asn
+      peerIp  = local.routers["20"].ip
+    }
+  }
+  response_export_values = ["properties.provisioningState"]
+  locks                  = [var.route_server_id]
+  timeouts {
+    create = "30m"
+    update = "30m"
+    delete = "30m"
+  }
+  depends_on = [azurerm_linux_virtual_machine.frr]
+}
+
+resource "azapi_resource" "route_server_secondary" {
+  type      = "Microsoft.Network/virtualHubs/bgpConnections@2022-01-01"
+  name      = "${var.name}-frr-21-bgp"
+  parent_id = var.route_server_id
+  body = {
+    properties = {
+      peerAsn = var.frr_asn
+      peerIp  = local.routers["21"].ip
+    }
+  }
+  response_export_values = ["properties.provisioningState"]
+  locks                  = [var.route_server_id]
+  timeouts {
+    create = "30m"
+    update = "30m"
+    delete = "30m"
+  }
+  depends_on = [azapi_resource.route_server_primary]
 }
 
 output "peer_ips" {

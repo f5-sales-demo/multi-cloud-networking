@@ -33,8 +33,10 @@ scripts/verify-deployment.sh \
 The verifier checks three registered `ONLINE` CEs in each region, Azure VM and
 password-extension readiness, and all three CE Site Console TCP/65500 backends.
 For each of the two FRR relays per region, it requires three direct CE sessions,
-two Route Server sessions, and the CE-learned application VIP `/32`. The
-regional client must have both FRR next hops for that VIP.
+two Route Server sessions, and the CE-learned application VIP `/32`.
+The regional client must have both FRR next hops for that VIP.
+Terraform creates the Route Server BGP peers sequentially through Network API
+2022-01-01, with a separate 30-minute deadline for each peer.
 
 It sends time-separated HTTP batches from each region's own client through the
 external BGP VIP, the inside ILB application frontend, and the origin control.
