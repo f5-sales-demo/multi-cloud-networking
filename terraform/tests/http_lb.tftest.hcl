@@ -86,6 +86,16 @@ run "loadbalancer_advertise_and_pool" {
     condition     = xcsh_http_loadbalancer.this[0].http.dns_volterra_managed == null
     error_message = "The US showcase HTTP LB must remain a non-delegated Sales Demo domain."
   }
+  assert {
+    condition = (
+      length(xcsh_http_loadbalancer.this[0].advertise_custom.advertise_where) == 6 &&
+      alltrue([for ip in ["10.0.1.4", "10.0.1.5", "10.0.1.6"] : contains([
+        for ad in xcsh_http_loadbalancer.this[0].advertise_custom.advertise_where : ad.site.ip
+      ], ip)])
+    )
+    error_message = "Regional primary-IP listeners must accompany the three BGP VIP advertisements."
+  }
+
 }
 
 # The app namespace is read, never owned (#634, #637): a managed xcsh_namespace

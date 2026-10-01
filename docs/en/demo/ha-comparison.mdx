@@ -35,3 +35,14 @@ Azure Route Server or the Azure ILB design.
 
 See [Azure Route Server](../../customer-edge/smsv2/azure-route-server/) for the
 relay topology and [deployment verification](../verify/) for live acceptance.
+
+Azure clients send the regional BGP VIP to either FRR relay. The relay translates
+TCP port 80 to an assigned primary address of a CE that still advertises that
+exact VIP. This avoids Azure dropping packets addressed to an unassigned VIP
+between FRR and CE. The relay preserves the VIP seen by the client and follows
+valid CE BGP paths every three seconds; it removes the translation when no valid
+CE path remains. Canadian relays select only Canadian CE addresses.
+
+The inside ILB sends traffic directly to CE internal NICs. Azure health-probe
+responses use an exact source and destination policy route through that internal
+NIC, while management and metadata routing remain unchanged.

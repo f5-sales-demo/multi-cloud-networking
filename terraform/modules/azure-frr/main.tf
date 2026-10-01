@@ -113,13 +113,14 @@ resource "azurerm_linux_virtual_machine" "frr" {
   }
 
   custom_data = base64encode(templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    router_ip   = each.value.ip
-    ce_ips      = var.ce_ips
-    rs_peer_ips = var.rs_peer_ips
-    ce_asn      = var.ce_asn
-    frr_asn     = var.frr_asn
-    rs_asn      = var.rs_asn
-    vip         = var.vip
+    router_ip              = each.value.ip
+    ce_ips                 = var.ce_ips
+    rs_peer_ips            = var.rs_peer_ips
+    ce_asn                 = var.ce_asn
+    vip_translation_script = file("${path.module}/vip_translation.py")
+    frr_asn                = var.frr_asn
+    rs_asn                 = var.rs_asn
+    vip                    = var.vip
   }))
   tags = var.tags
 

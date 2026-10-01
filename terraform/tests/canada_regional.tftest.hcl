@@ -103,6 +103,16 @@ run "canada_regional_virtual_sites_and_lb" {
     condition     = xcsh_http_loadbalancer.canada[0].http.dns_volterra_managed == null
     error_message = "The Canada showcase HTTP LB must remain a non-delegated Sales Demo domain."
   }
+  assert {
+    condition = (
+      length(xcsh_http_loadbalancer.canada[0].advertise_custom.advertise_where) == 6 &&
+      alltrue([for ip in ["10.200.1.4", "10.200.1.5", "10.200.1.6"] : contains([
+        for ad in xcsh_http_loadbalancer.canada[0].advertise_custom.advertise_where : ad.site.ip
+      ], ip)])
+    )
+    error_message = "Regional primary-IP listeners must accompany the three BGP VIP advertisements."
+  }
+
 }
 
 run "canada_disabled_plans_no_canada_resources" {
