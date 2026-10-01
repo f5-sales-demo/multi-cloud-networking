@@ -592,7 +592,13 @@ verify_configured() {
       break
     fi
     [ "$attempt" -lt 3 ] || die "AWS/KVM status output did not settle after two reviewed refreshes"
-    apply_scoped_plan aws-status-output-refresh
+    if tf show -json "$PLAN_FILE" | jq -e '
+      [.output_changes | to_entries[] | select(.value.actions != ["no-op"] and .value.actions != ["read"]) | .key] == ["kvm_runtime_status"]
+    ' >/dev/null; then
+      apply_scoped_plan kvm-status-output-refresh
+    else
+      apply_scoped_plan aws-status-output-refresh
+    fi
   done
   tf show -json "$PLAN_FILE" | jq -e \
     '[.resource_changes[]? | select(.change.actions != ["no-op"] and .change.actions != ["read"])] | length == 0' >/dev/null ||

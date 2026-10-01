@@ -68,6 +68,8 @@ The AWS UAT receipt requires three independent sites, six Connect peers,
 twelve established sessions, workload and VIP HTTP responses, and zero VIP
 failures in its sampled window. It stops one CE, expects eight sessions,
 proves traffic continuity, restarts that CE, and waits for twelve sessions.
+Healthy KVM registration counts may settle through a reviewed output-only
+refresh; BGP, mapping, and the one-session invariant must remain healthy.
 The final zero-change plan confirms the recovered deployment has no Terraform
 actions. Raw transport transients are reported separately from successful
 application retries.

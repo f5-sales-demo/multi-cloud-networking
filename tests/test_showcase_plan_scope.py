@@ -62,6 +62,76 @@ def prior(document, addresses):
     return document
 
 
+class KVMStatusOutputScopeTest(unittest.TestCase):
+    def test_only_healthy_kvm_count_settlement_is_accepted(self):
+        document = plan([])
+        document["variables"]["enable_azure"]["value"] = False
+        document["variables"]["enable_canada"]["value"] = False
+        document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
+        healthy = {
+            "bgp_converged": True,
+            "bgp_session_count": 1,
+            "mapping_valid": True,
+            "online_count": 1,
+            "registration_count": 1,
+        }
+        before = dict(healthy, online_count=0, registration_count=0)
+        document["output_changes"] = {
+            "kvm_runtime_status": {
+                "actions": ["update"],
+                "before": before,
+                "after": healthy,
+            }
+        }
+        self.assertEqual(
+            module.validate(document, "kvm-status-output-refresh", "a" * 40), 0
+        )
+        for field, value in (
+            ("bgp_converged", False),
+            ("bgp_session_count", 2),
+            ("mapping_valid", False),
+            ("online_count", 0),
+            ("registration_count", 2),
+        ):
+            changed = copy.deepcopy(document)
+            changed["output_changes"]["kvm_runtime_status"]["after"][field] = value
+            with self.assertRaises(ValueError):
+                module.validate(changed, "kvm-status-output-refresh", "a" * 40)
+        for field, value in (
+            ("online_count", 2),
+            ("registration_count", -1),
+            ("bgp_converged", False),
+            ("mapping_valid", False),
+        ):
+            changed = copy.deepcopy(document)
+            changed["output_changes"]["kvm_runtime_status"]["before"][field] = value
+            with self.assertRaises(ValueError):
+                module.validate(changed, "kvm-status-output-refresh", "a" * 40)
+        for changes in (
+            {
+                "resource_changes": [
+                    {
+                        "address": "libvirt_domain.ce_node",
+                        "change": {"actions": ["update"]},
+                    }
+                ]
+            },
+            {
+                "output_changes": dict(
+                    document["output_changes"], extra={"actions": ["update"]}
+                )
+            },
+        ):
+            changed = copy.deepcopy(document)
+            changed.update(changes)
+            with self.assertRaises(ValueError):
+                module.validate(changed, "kvm-status-output-refresh", "a" * 40)
+        changed = copy.deepcopy(document)
+        changed["output_changes"]["kvm_runtime_status"]["before"] = healthy
+        with self.assertRaises(ValueError):
+            module.validate(changed, "kvm-status-output-refresh", "a" * 40)
+
+
 class AWSStatusOutputScopeTest(unittest.TestCase):
     def test_aws_status_output_refresh_accepts_only_successful_settlement(self):
         document = plan([])
