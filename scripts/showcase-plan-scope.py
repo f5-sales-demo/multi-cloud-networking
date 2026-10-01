@@ -374,6 +374,43 @@ def validate(
             raise ValueError("AWS/KVM verification must disable Azure")
         if _value(document, "kvm_lan_configuration_phase") != "hardware":
             raise ValueError("AWS/KVM verification must preserve the hardware phase")
+    elif scope == "kvm-status-output-refresh":
+        if changes or output_changes != ["kvm_runtime_status"]:
+            raise ValueError("KVM status refresh must change only its status output")
+        if (
+            _value(document, "enable_azure") is not False
+            or _value(document, "enable_canada") is not False
+            or _value(document, "kvm_lan_configuration_phase") != "hardware"
+        ):
+            raise ValueError("KVM status refresh must preserve the AWS/KVM stage")
+        change = document["output_changes"]["kvm_runtime_status"]
+        before, after = change.get("before"), change.get("after")
+        healthy = {
+            "bgp_converged": True,
+            "bgp_session_count": 1,
+            "mapping_valid": True,
+            "online_count": 1,
+            "registration_count": 1,
+        }
+        if (
+            change.get("actions") != ["update"]
+            or not isinstance(before, dict)
+            or not isinstance(after, dict)
+            or set(before) != set(healthy)
+            or set(after) != set(healthy)
+            or any(
+                type(after[key]) is not type(value) or after[key] != value
+                for key, value in healthy.items()
+            )
+            or before == after
+        ):
+            raise ValueError("KVM status refresh is not an exact healthy transition")
+        for key, value in before.items():
+            if key in ("online_count", "registration_count"):
+                if type(value) is not int or value not in (0, 1):
+                    raise ValueError("KVM status refresh has an invalid prior count")
+            elif type(value) is not type(healthy[key]) or value != healthy[key]:
+                raise ValueError("KVM status refresh changes a routing or mapping fact")
     elif scope == "aws-status-output-refresh":
         if changes or output_changes != ["aws_site_upgrade_status"]:
             raise ValueError("AWS status refresh must change only its status output")
@@ -563,6 +600,7 @@ def main() -> int:
             "aws-kvm-build",
             "aws-kvm-zero",
             "aws-status-output-refresh",
+            "kvm-status-output-refresh",
             "kvm-configured",
             "azure-build",
             "azure-approvals",
