@@ -326,7 +326,7 @@ resource "xcsh_origin_pool" "this" {
 
   no_tls                 = {}
   loadbalancer_algorithm = "ROUND_ROBIN"
-  endpoint_selection     = "DISTRIBUTED"
+  endpoint_selection     = "LOCAL_ONLY"
 }
 
 resource "xcsh_http_loadbalancer" "this" {
@@ -617,7 +617,7 @@ resource "xcsh_origin_pool" "canada" {
 
   no_tls                 = {}
   loadbalancer_algorithm = "ROUND_ROBIN"
-  endpoint_selection     = "DISTRIBUTED"
+  endpoint_selection     = "LOCAL_ONLY"
 }
 
 resource "xcsh_http_loadbalancer" "canada" {
