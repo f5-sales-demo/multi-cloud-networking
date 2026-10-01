@@ -113,6 +113,11 @@ run "canada_regional_virtual_sites_and_lb" {
     error_message = "Regional primary-IP listeners must accompany the three BGP VIP advertisements."
   }
 
+  assert {
+    condition     = xcsh_origin_pool.canada[0].endpoint_selection == "LOCAL_ONLY"
+    error_message = "Regional origin connections must stay on the serving CE."
+  }
+
 }
 
 run "canada_disabled_plans_no_canada_resources" {

@@ -96,6 +96,11 @@ run "loadbalancer_advertise_and_pool" {
     error_message = "Regional primary-IP listeners must accompany the three BGP VIP advertisements."
   }
 
+  assert {
+    condition     = xcsh_origin_pool.this[0].endpoint_selection == "LOCAL_ONLY"
+    error_message = "Regional origin connections must stay on the serving CE."
+  }
+
 }
 
 # The app namespace is read, never owned (#634, #637): a managed xcsh_namespace
