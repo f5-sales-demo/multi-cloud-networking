@@ -7,8 +7,8 @@ sidebar:
 
 ## Regional routing design
 
-The unified root pins `f5-sales-demo/xcsh` v12.0.3, built from
-`api-specs-enriched` v9.0.0. Each Azure region has three Customer Edges (CEs),
+The unified root pins `f5-sales-demo/xcsh` v12.3.0, built from
+`api-specs-enriched` v9.0.1. Each Azure region has three Customer Edges (CEs),
 two Terraform-managed FRR routers, and one Azure Route Server. A CE peers directly
 with both FRRs on the management subnet. Each FRR peers with both Route Server
 endpoints using eBGP multihop. Route Server peers with the FRRs at management
@@ -37,8 +37,14 @@ uses TCP/65500 without floating IP. The ILB backend pool attaches the CE interna
 NICs. A separate private application domain matches the inside VIP; the existing
 external application domain and VIP remain the BGP path.
 
-The Canadian HTTP load balancer advertises through the Toronto and Montreal
-Regional Edge virtual-site selector and the three Canadian CEs. The selector
+With `enable_canada_public_re=true` and a dedicated `ca_re_public_ip` allocation,
+the Canadian HTTP load balancer advertises through the Toronto and Montreal
+Regional Edge virtual-site selector and the three Canadian CEs. The public-IP
+binding scopes availability to those REs, and the LB uses
+`advertise_on_public.public_ip`; the CE-only `virtual_site` advertisement field
+cannot reference a Regional Edge selector. Use an existing unused allocated IP for the project, or request an additional IP through F5
+support. Terraform manages the regional binding and restores its original binding on teardown;
+it does not allocate or delete the IP. Keep its name, namespace and address in private tfvars. The selector
 uses their published `ves.io/region` labels: `ves-io-toronto` and
 `ves-io-montreal`. The CE VIP and
 primary-IP listeners remain available for the FRR routing path.
@@ -55,7 +61,10 @@ The US origin remains separate. Canadian traffic and failover controls use
 `ca_origin_ip`. For externally hosted origins, set `ca_origin_ip` explicitly.
 Traffic tests run from each region's own client and resolve that region's domain
 to its VIP. Regional Edge acceptance also checks the Canadian origin response
-through the public Canadian HTTP load balancer.
+through the public Canadian HTTP load balancer. `scripts/verify-canadian-public-re.py`
+reads the private `canada_public_re` output, verifies the exact allocation, RE and CE
+selectees, and checks the response marker and `x-volterra-location` header. The full
+lifecycle runs it before the final refresh-enabled zero-change plan.
 
 ## Deployment and acceptance
 

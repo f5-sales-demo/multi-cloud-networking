@@ -645,14 +645,36 @@ resource "xcsh_origin_pool" "canada" {
   endpoint_selection     = "DISTRIBUTED"
 }
 
+resource "xcsh_public_ip_binding" "canada" {
+  count = var.enable_azure && var.enable_canada && var.enable_canada_public_re && var.ca_re_public_ip != null ? 1 : 0
+
+  name                   = var.ca_re_public_ip.name
+  namespace              = var.ca_re_public_ip.namespace
+  expected_ip            = var.ca_re_public_ip.ip
+  virtual_site           = xcsh_virtual_site.canada_re[0].name
+  virtual_site_namespace = data.xcsh_namespace.mcn.name
+}
+
+resource "terraform_data" "canada_public_ip_gate" {
+  count = var.enable_azure && var.enable_canada && var.enable_canada_public_re ? 1 : 0
+  input = var.ca_re_public_ip
+  lifecycle {
+    precondition {
+      condition     = var.ca_re_public_ip != null
+      error_message = "Canadian public RE advertisement requires a dedicated ca_re_public_ip allocation."
+    }
+  }
+}
+
 resource "xcsh_http_loadbalancer" "canada" {
   count      = var.enable_azure && var.enable_canada ? 1 : 0
-  depends_on = [module.xc_site_ca, xcsh_virtual_site.canada_re, xcsh_virtual_site.canada_ce]
+  depends_on = [module.xc_site_ca, xcsh_virtual_site.canada_re, xcsh_virtual_site.canada_ce, terraform_data.canada_public_ip_gate]
 
-  name        = local.ca_lb_name
-  namespace   = data.xcsh_namespace.mcn.name
-  description = "Canada Regional HA: custom VIP ${var.ca_vip} advertised strictly via Canadian Regional Edges (Toronto and Montreal) and Canadian CEs."
-  labels      = local.ca_xc_labels
+  name         = local.ca_lb_name
+  namespace    = data.xcsh_namespace.mcn.name
+  description  = "Canada Regional HA: custom VIP ${var.ca_vip} advertised strictly via Canadian Regional Edges (Toronto and Montreal) and Canadian CEs."
+  labels       = local.ca_xc_labels
+  add_location = var.enable_canada_public_re
 
   domains = [local.ca_lb_domain]
 
@@ -661,15 +683,17 @@ resource "xcsh_http_loadbalancer" "canada" {
   }
 
   advertise_custom {
-    advertise_where {
-      virtual_site {
-        network = "SITE_NETWORK_OUTSIDE"
-        virtual_site {
-          name      = xcsh_virtual_site.canada_re[0].name
-          namespace = data.xcsh_namespace.mcn.name
+    dynamic "advertise_where" {
+      for_each = var.enable_canada_public_re ? [1] : []
+      content {
+        advertise_on_public {
+          public_ip {
+            name      = try(xcsh_public_ip_binding.canada[0].name, "")
+            namespace = try(xcsh_public_ip_binding.canada[0].namespace, "")
+          }
         }
+        use_default_port = {}
       }
-      use_default_port = {}
     }
 
     dynamic "advertise_where" {

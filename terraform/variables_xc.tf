@@ -137,3 +137,27 @@ variable "vip" {
     error_message = "vip must be a valid IPv4 address."
   }
 }
+
+variable "enable_canada_public_re" {
+  description = "Advertise the Canadian HTTP-LB publicly on Toronto/Montreal using a dedicated allocated XC public IP. Requires ca_re_public_ip."
+  type        = bool
+  default     = false
+}
+variable "ca_re_public_ip" {
+  description = "Dedicated XC public-IP allocation reserved for this Canadian demo. Use an existing unused allocation or obtain an additional one through F5 support; keep the actual allocation in private tfvars."
+  type = object({
+    name      = string
+    namespace = string
+    ip        = string
+  })
+  default  = null
+  nullable = true
+  validation {
+    condition = var.ca_re_public_ip == null || try(
+      length(var.ca_re_public_ip.name) > 0 &&
+      length(var.ca_re_public_ip.namespace) > 0 &&
+      can(cidrhost("${var.ca_re_public_ip.ip}/32", 0)) &&
+    !strcontains(var.ca_re_public_ip.ip, ":"), false)
+    error_message = "ca_re_public_ip must identify an allocated IPv4 public-IP object by name and namespace."
+  }
+}

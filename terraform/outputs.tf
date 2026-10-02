@@ -534,3 +534,20 @@ output "azure_interface_contract" {
   description = "Verified Azure device roles used by bootstrap and MAC-binding phases."
   value       = local.azure_interface_contract
 }
+
+output "canada_public_re" {
+  description = "Private Canadian public RE acceptance inputs; null when advertisement is disabled."
+  sensitive   = true
+  value = var.enable_azure && var.enable_canada && var.enable_canada_public_re ? {
+    allocation      = var.ca_re_public_ip
+    namespace       = data.xcsh_namespace.mcn.name
+    virtual_site    = xcsh_virtual_site.canada_re[0].name
+    ce_virtual_site = xcsh_virtual_site.canada_ce[0].name
+    ce_sites        = [for site in module.xc_site_ca : site.site_name]
+    loadbalancer    = xcsh_http_loadbalancer.canada[0].name
+    pool            = xcsh_origin_pool.canada[0].name
+    domain          = local.ca_lb_domain
+    origin_ip       = local.selected_ca_origin_ip
+    expected_marker = var.enable_showcase_origin ? "mcn-showcase-canada-origin" : null
+  } : null
+}

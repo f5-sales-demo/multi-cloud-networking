@@ -23,8 +23,8 @@ CRITICAL_HTTPS = (
 def requirements_from_plan(document: dict[str, Any]) -> dict[str, Any]:
     outputs = document.get("planned_values", {}).get("outputs", {})
     result = outputs.get("requirements", {}).get("value")
-    if not isinstance(result, dict) or result.get("api_release_tag") != "v9.0.0":
-        raise ValueError("CE allowlist is not the published v9.0.0 data set")
+    if not isinstance(result, dict) or result.get("api_release_tag") != "v9.0.1":
+        raise ValueError("CE allowlist is not the published v9.0.1 data set")
     expected = {
         "dns": ("egress", 53, ["udp", "tcp"]),
         "ntp": ("egress", 123, ["udp"]),
@@ -141,7 +141,7 @@ def main() -> int:
         json.dumps(
             {
                 "schema": "mcn.ce-egress-preflight/v1",
-                "api_release_tag": "v9.0.0",
+                "api_release_tag": "v9.0.1",
                 "checks": checks,
                 "status": "passed",
             },

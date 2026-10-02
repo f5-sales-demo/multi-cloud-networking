@@ -51,11 +51,11 @@ run "provider_f5_acl_and_both_developer_routes" {
   }
   override_data {
     target = data.xcsh_network_regional_edges.origin[0]
-    values = { cidr_blocks = ["192.0.2.0/25", "192.0.2.128/25"], api_release_tag = "v9.0.0" }
+    values = { cidr_blocks = ["192.0.2.0/25", "192.0.2.128/25"], api_release_tag = "v9.0.1" }
   }
   override_data {
     target = data.xcsh_network_cdn.origin[0]
-    values = { cidr_blocks = ["192.0.2.0/25"], api_release_tag = "v9.0.0" }
+    values = { cidr_blocks = ["192.0.2.0/25"], api_release_tag = "v9.0.1" }
   }
   assert {
     condition     = output.origin_ingress_acl.f5_cidrs == tolist(["192.0.2.0/25", "192.0.2.128/25"]) && output.origin_ingress_acl.developer_cidrs == tolist(["198.51.100.10/32", "203.0.113.20/32"])
