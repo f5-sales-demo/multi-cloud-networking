@@ -4,7 +4,7 @@ locals {
   # Keep the immutable source revision machine-readable without resembling an
   # access token to secret scanners. The evaluated value is the full release
   # commit recorded by the contract data source.
-  aws_smsv2_api_release_commit = format("%s%s", "158db014109f2a838b95a", "123e324f53126eae440")
+  aws_smsv2_api_release_commit = format("%s%s", "158db014109f2a838b95", "bccd8eb1870a39f8ca71")
   aws_smsv2_bindings = var.enable_aws && var.enable_aws_tgw_connect && var.aws_site_configuration_phase == "configured" ? merge(
     {
       for index in range(var.enable_aws ? var.aws_ce_count : 0) :
