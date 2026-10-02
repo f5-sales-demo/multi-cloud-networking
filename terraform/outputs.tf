@@ -542,6 +542,7 @@ output "canada_public_re" {
     allocation      = var.ca_re_public_ip
     namespace       = data.xcsh_namespace.mcn.name
     virtual_site    = xcsh_virtual_site.canada_re[0].name
+    re_namespace    = xcsh_virtual_site.canada_re[0].namespace
     ce_virtual_site = xcsh_virtual_site.canada_ce[0].name
     ce_sites        = [for site in module.xc_site_ca : site.site_name]
     loadbalancer    = xcsh_http_loadbalancer.canada[0].name
