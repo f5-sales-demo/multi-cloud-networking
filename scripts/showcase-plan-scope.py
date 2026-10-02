@@ -14,7 +14,7 @@ import subprocess
 import sys
 from typing import Any
 
-PROVIDER_SHA256 = "f2a6693b6788662178b7eb159fd02193a3fca198fcebaeada0aab172d5691a69"
+PROVIDER_SHA256 = "ecc713708c0e550019f96924b3acd7dd5435ef98b69ddea6568b66b370bf0fd4"
 AZURE_PREFIXES = (
     "module.azure_hub[",
     "module.azure_hub_ca[",
@@ -45,6 +45,8 @@ AZURE_PREFIXES = (
     "xcsh_http_loadbalancer.this[",
     "xcsh_http_loadbalancer.canada[",
     "xcsh_virtual_site.canada_re[",
+    "xcsh_public_ip_binding.canada[",
+    "terraform_data.canada_public_ip_gate[",
     "xcsh_virtual_site.canada_ce[",
     "xcsh_virtual_site.regional_ce[",
     "xcsh_token.ce[",
@@ -224,8 +226,8 @@ def validate(
     xcsh = providers.get("xcsh", {})
     if xcsh.get("full_name") != "registry.terraform.io/f5-sales-demo/xcsh" or xcsh.get(
         "version_constraint"
-    ) not in ("12.0.3", "= 12.0.3"):
-        raise ValueError("saved plan does not pin xcsh 12.0.3")
+    ) not in ("12.3.0", "= 12.3.0"):
+        raise ValueError("saved plan does not pin xcsh 12.3.0")
 
     changes = []
     if document.get("action_invocations"):

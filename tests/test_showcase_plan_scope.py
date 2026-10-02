@@ -38,7 +38,7 @@ def plan(changes):
             "provider_config": {
                 "xcsh": {
                     "full_name": PROVIDER_SOURCE,
-                    "version_constraint": "12.0.3",
+                    "version_constraint": "12.3.0",
                 }
             }
         },
@@ -183,6 +183,29 @@ class AWSStatusOutputScopeTest(unittest.TestCase):
             mutation(invalid)
             with self.assertRaises(ValueError):
                 module.validate(invalid, "aws-status-output-refresh", "a" * 40)
+
+
+class CanadianPublicIPScopeTest(unittest.TestCase):
+    def test_azure_build_owns_only_canadian_public_ip_binding(self):
+        self.assertEqual(
+            module.validate(
+                plan(
+                    [
+                        ("xcsh_public_ip_binding.canada[0]", ["create"]),
+                        ("terraform_data.canada_public_ip_gate[0]", ["create"]),
+                    ]
+                ),
+                "azure-build",
+                "a" * 40,
+            ),
+            2,
+        )
+        with self.assertRaises(ValueError):
+            module.validate(
+                plan([("xcsh_public_ip_binding.unrelated[0]", ["update"])]),
+                "azure-build",
+                "a" * 40,
+            )
 
 
 class ShowcasePlanScopeTest(unittest.TestCase):

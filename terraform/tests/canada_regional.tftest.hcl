@@ -12,33 +12,35 @@ mock_provider "aws" {}
 mock_provider "libvirt" {}
 
 variables {
-  enable_azure           = true
-  enable_kvm             = false
-  site_prefix            = null
-  ca_site_prefix         = null
-  lb_name                = null
-  ca_lb_name             = null
-  origin_pool_name       = null
-  ca_origin_pool_name    = null
-  route_server_name      = null
-  ca_route_server_name   = null
-  bastion_name           = null
-  ca_bastion_name        = null
-  client_vm_name         = null
-  ca_client_vm_name      = null
-  region_short           = null
-  ca_region_short        = null
-  resource_group_name    = null
-  ca_resource_group_name = null
-  lb_domain              = "mcn-ce-ha.f5-sales-demo.com"
-  ca_lb_domain           = "mcn-ce-ha.f5-sales-demo.ca"
-  origin_ip              = "203.0.113.10"
-  deployer               = "tester"
-  ssh_public_key         = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l plan-test-only"
-  xc_app_namespace       = "multi-cloud-networking"
-  enable_aws             = false
-  enable_aws_tgw_connect = false
-  enable_canada          = true
+  enable_azure            = true
+  enable_kvm              = false
+  site_prefix             = null
+  ca_site_prefix          = null
+  lb_name                 = null
+  ca_lb_name              = null
+  origin_pool_name        = null
+  ca_origin_pool_name     = null
+  route_server_name       = null
+  ca_route_server_name    = null
+  bastion_name            = null
+  ca_bastion_name         = null
+  client_vm_name          = null
+  ca_client_vm_name       = null
+  region_short            = null
+  ca_region_short         = null
+  resource_group_name     = null
+  ca_resource_group_name  = null
+  lb_domain               = "mcn-ce-ha.f5-sales-demo.com"
+  ca_lb_domain            = "mcn-ce-ha.f5-sales-demo.ca"
+  origin_ip               = "203.0.113.10"
+  deployer                = "tester"
+  ssh_public_key          = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l plan-test-only"
+  xc_app_namespace        = "multi-cloud-networking"
+  enable_aws              = false
+  enable_aws_tgw_connect  = false
+  enable_canada           = true
+  enable_canada_public_re = true
+  ca_re_public_ip         = { name = "example-canadian-ip", namespace = "shared", ip = "192.0.2.55" }
 }
 
 run "canada_regional_virtual_sites_and_lb" {
@@ -134,10 +136,20 @@ run "canada_regional_virtual_sites_and_lb" {
   }
 
   assert {
+    condition = (
+      xcsh_public_ip_binding.canada[0].name == "example-canadian-ip" &&
+      xcsh_public_ip_binding.canada[0].virtual_site == xcsh_virtual_site.canada_re[0].name &&
+      xcsh_public_ip_binding.canada[0].virtual_site_namespace == data.xcsh_namespace.mcn.name &&
+      xcsh_http_loadbalancer.canada[0].add_location == true
+    )
+    error_message = "The reserved allocation must be managed by the Canadian RE selector and return RE location receipts."
+  }
+
+  assert {
     condition = anytrue([
       for ad in xcsh_http_loadbalancer.canada[0].advertise_custom.advertise_where :
-      try(ad.virtual_site.virtual_site.name == xcsh_virtual_site.canada_re[0].name &&
-      ad.virtual_site.network == "SITE_NETWORK_OUTSIDE", false)
+      try(ad.advertise_on_public.public_ip.name == "example-canadian-ip" &&
+      ad.advertise_on_public.public_ip.namespace == "shared", false)
     ])
     error_message = "Canadian HTTP-LB must advertise through only the Toronto/Montreal RE selector."
   }
@@ -164,5 +176,25 @@ run "canada_disabled_plans_no_canada_resources" {
   assert {
     condition     = output.ca_re_virtual_site_name == null
     error_message = "With enable_canada = false, ca_re_virtual_site_name output must be null."
+  }
+}
+
+run "missing_dedicated_allocation_rejected" {
+  command = plan
+  variables { ca_re_public_ip = null }
+  expect_failures = [terraform_data.canada_public_ip_gate]
+}
+run "public_re_disabled_retains_only_ce_listeners" {
+  command = plan
+  variables {
+    enable_canada_public_re = false
+    ca_re_public_ip         = null
+  }
+  assert {
+    condition = (
+      length(xcsh_public_ip_binding.canada) == 0 &&
+      length(xcsh_http_loadbalancer.canada[0].advertise_custom.advertise_where) == 6
+    )
+    error_message = "Unallocated deployments retain CE listeners and must not advertise on all REs."
   }
 }
