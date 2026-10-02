@@ -73,6 +73,7 @@ case "${1:-} ${2:-} ${3:-}" in
 "output -raw ca_vip") printf '10.250.1.10\n' ;;
 "output -raw client_nic_name") printf 'client-us-nic\n' ;;
 "output -raw canada_client_nic_name") printf 'client-ca-nic\n' ;;
+"output -raw ca_origin_ip") printf '203.0.113.10\n' ;;
 "output -raw origin_ip") printf '198.51.100.10\n' ;;
 "output -raw bastion_name") printf 'bastion-example\n' ;;
 *) printf 'unexpected terraform call: %s\n' "$*" >&2; exit 2 ;;
@@ -166,6 +167,7 @@ case "$*" in
   if [[ "$*" == *"region=canada"* ]] && [ "${CURL_CANADA_LB_MODE:-ok}" = "fail" ]; then
     printf 'MCN_REGION region=canada vip_ok=0 vip_fail=50 ilb_ok=50 ilb_fail=0 origin_ok=50 origin_fail=0\n'
   elif [[ "$*" == *"region=canada"* ]]; then
+    [[ "$*" == *"http://203.0.113.10/"* ]] || { printf 'Canadian control used the wrong origin\n' >&2; exit 1; }
     printf 'MCN_REGION region=canada vip_ok=50 vip_fail=0 ilb_ok=50 ilb_fail=0 origin_ok=50 origin_fail=0\n'
   else
     printf 'MCN_REGION region=us vip_ok=50 vip_fail=0 ilb_ok=50 ilb_fail=0 origin_ok=50 origin_fail=0\n'

@@ -58,6 +58,13 @@ run "canada_regional_virtual_sites_and_lb" {
   }
 
   assert {
+    condition = (
+      one(xcsh_virtual_site.canada_re[0].site_selector.expressions) == "ves.io/region in (ves-io-toronto, ves-io-montreal)"
+    )
+    error_message = "Canadian RE selection must match live Toronto/Montreal regional labels."
+  }
+
+  assert {
     condition     = output.ca_re_virtual_site_name == "mcn-ce-ha-ca-re-vsite"
     error_message = "Canada RE Virtual Site name should be mcn-ce-ha-ca-re-vsite."
   }
@@ -105,17 +112,17 @@ run "canada_regional_virtual_sites_and_lb" {
   }
   assert {
     condition = (
-      length(xcsh_http_loadbalancer.canada[0].advertise_custom.advertise_where) == 6 &&
+      length(xcsh_http_loadbalancer.canada[0].advertise_custom.advertise_where) == 7 &&
       alltrue([for ip in ["10.200.1.4", "10.200.1.5", "10.200.1.6"] : contains([
-        for ad in xcsh_http_loadbalancer.canada[0].advertise_custom.advertise_where : ad.site.ip
+        for ad in xcsh_http_loadbalancer.canada[0].advertise_custom.advertise_where : try(ad.site.ip, null)
       ], ip)])
     )
     error_message = "Regional primary-IP listeners must accompany the three BGP VIP advertisements."
   }
 
   assert {
-    condition     = xcsh_origin_pool.canada[0].endpoint_selection == "LOCAL_ONLY"
-    error_message = "Regional origin connections must stay on the serving CE."
+    condition     = xcsh_origin_pool.canada[0].endpoint_selection == "DISTRIBUTED"
+    error_message = "Regional Edges must reach endpoints discovered exclusively by Canadian CEs."
   }
 
   assert {
@@ -124,6 +131,15 @@ run "canada_regional_virtual_sites_and_lb" {
       xcsh_origin_pool.canada[0].origin_servers[0].private_ip.site_locator.virtual_site.name == xcsh_virtual_site.canada_ce[0].name
     )
     error_message = "Local endpoints must resolve through only the regional CE outside network."
+  }
+
+  assert {
+    condition = anytrue([
+      for ad in xcsh_http_loadbalancer.canada[0].advertise_custom.advertise_where :
+      try(ad.virtual_site.virtual_site.name == xcsh_virtual_site.canada_re[0].name &&
+      ad.virtual_site.network == "SITE_NETWORK_OUTSIDE", false)
+    ])
+    error_message = "Canadian HTTP-LB must advertise through only the Toronto/Montreal RE selector."
   }
 
 }

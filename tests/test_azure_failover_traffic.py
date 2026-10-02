@@ -62,6 +62,11 @@ traffic rg client demo.example 10.250.0.10 inside.example 10.0.3.10 10.0.3.11 19
                 ["/bin/bash", "-c", script], env=env, capture_output=True, check=False
             ).returncode
 
+    def test_canadian_failover_selects_the_canadian_control(self):
+        source = (REPO / "scripts/verify-azure-failover.sh").read_text()
+        assert "CA_ORIGIN=$(tf_raw ca_origin_ip)" in source
+        assert "ORIGIN=$CA_ORIGIN\nrun_region canada" in source
+
     def test_matching_origin_passes(self):
         assert self.probe("healthy") == 0
 

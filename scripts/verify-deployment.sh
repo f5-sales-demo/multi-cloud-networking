@@ -188,6 +188,7 @@ CA_VIP=$(tf_raw ca_vip)
 DOMAIN=$(tf_raw lb_domain)
 CA_DOMAIN=$(tf_raw ca_lb_domain)
 ORIGIN=$(tf_raw origin_ip)
+CA_ORIGIN=$(tf_raw ca_origin_ip)
 CE_VM_NAMES=$(tf_json ce_vm_names)
 CA_CE_VM_NAMES=$(tf_json ca_ce_vm_names)
 [[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || die "lb_domain contains characters unsafe for the remote verifier"
@@ -195,6 +196,7 @@ CA_CE_VM_NAMES=$(tf_json ca_ce_vm_names)
 [[ "$US_ILB" =~ ^[0-9.]+$ ]] || die "azure_ilb_private_ip is not an IPv4 literal"
 [[ "$CA_ILB" =~ ^[0-9.]+$ ]] || die "canada_ilb_private_ip is not an IPv4 literal"
 [[ "$ORIGIN" =~ ^[0-9.]+$ ]] || die "origin_ip is not an IPv4 literal"
+[[ "$CA_ORIGIN" =~ ^[0-9.]+$ ]] || die "ca_origin_ip is not an IPv4 literal"
 [ "$(jq 'length' <<<"$CE_VM_NAMES")" -eq "$SITE_COUNT" ] || die "site and CE VM name maps differ in size"
 [ "$(jq 'length' <<<"$CA_CE_VM_NAMES")" -eq 3 ] || die "Canadian site and CE VM name maps differ in size"
 
@@ -365,11 +367,11 @@ batches=0
 converged=false
 
 probe_region() {
-  local region=$1 resource_group=$2 client=$3 domain=$4 vip=$5 inside_domain=$6 ilb_ip=$7
+  local region=$1 resource_group=$2 client=$3 domain=$4 vip=$5 inside_domain=$6 ilb_ip=$7 origin_ip=$8
   local remote_script message result
   remote_script="set -u; vip_ok=0; vip_fail=0; ilb_ok=0; ilb_fail=0; origin_ok=0; origin_fail=0; \
 for i in \$(seq 1 ${SAMPLES_PER_BATCH}); do \
-origin_body=\$(curl -fsS -m 10 'http://${ORIGIN}/' 2>/dev/null || true); \
+origin_body=\$(curl -fsS -m 10 'http://${origin_ip}/' 2>/dev/null || true); \
 if [ -n \"\$origin_body\" ]; then origin_ok=\$((origin_ok+1)); else origin_fail=\$((origin_fail+1)); fi; \
 body=\$(curl -fsS -m 10 --resolve '${domain}:80:${vip}' 'http://${domain}/' 2>/dev/null || true); \
 if [ -n \"\$origin_body\" ] && [ \"\$body\" = \"\$origin_body\" ]; then vip_ok=\$((vip_ok+1)); else vip_fail=\$((vip_fail+1)); fi; \
@@ -392,7 +394,7 @@ done; echo MCN_REGION region=${region} vip_ok=\$vip_ok vip_fail=\$vip_fail ilb_o
 
 while [ "$batches" -lt "$MAX_BATCHES" ]; do
   batches=$((batches + 1))
-  probe_region us "$RG" "$CLIENT" "$DOMAIN" "$US_VIP" "$US_INSIDE_DOMAIN" "$US_ILB"
+  probe_region us "$RG" "$CLIENT" "$DOMAIN" "$US_VIP" "$US_INSIDE_DOMAIN" "$US_ILB" "$ORIGIN"
   vip_ok=$((vip_ok + region_vip_ok))
   vip_fail=$((vip_fail + region_vip_fail))
   us_ilb_ok=$((us_ilb_ok + region_ilb_ok))
@@ -400,7 +402,7 @@ while [ "$batches" -lt "$MAX_BATCHES" ]; do
   origin_ok=$((origin_ok + region_origin_ok))
   origin_fail=$((origin_fail + region_origin_fail))
   batch_fail=$((region_vip_fail + region_ilb_fail + region_origin_fail))
-  probe_region canada "$CA_RG" "$CA_CLIENT" "$CA_DOMAIN" "$CA_VIP" "$CA_INSIDE_DOMAIN" "$CA_ILB"
+  probe_region canada "$CA_RG" "$CA_CLIENT" "$CA_DOMAIN" "$CA_VIP" "$CA_INSIDE_DOMAIN" "$CA_ILB" "$CA_ORIGIN"
   ca_lb_ok=$((ca_lb_ok + region_vip_ok))
   ca_lb_fail=$((ca_lb_fail + region_vip_fail))
   ca_ilb_ok=$((ca_ilb_ok + region_ilb_ok))

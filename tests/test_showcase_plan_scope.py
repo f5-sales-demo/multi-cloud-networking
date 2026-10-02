@@ -594,5 +594,20 @@ class RefreshOnlyPlanScopeTest(unittest.TestCase):
             module.validate(document, "refresh-only", "a" * 40)
 
 
+class CanadianOriginScopeTests(unittest.TestCase):
+    def test_azure_build_allows_canadian_origin_without_aws_mutation(self):
+        document = plan(
+            [
+                (
+                    "module.showcase_origin_ca[0].azurerm_linux_virtual_machine.this",
+                    ["create"],
+                ),
+                ("xcsh_origin_pool.canada[0]", ["update"]),
+                ("xcsh_http_loadbalancer.canada[0]", ["update"]),
+            ]
+        )
+        self.assertEqual(module.validate(document, "azure-build", "a" * 40), 3)
+
+
 if __name__ == "__main__":
     unittest.main()
