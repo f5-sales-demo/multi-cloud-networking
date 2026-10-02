@@ -32,6 +32,7 @@ class CanadianRETests(unittest.TestCase):
             "ce_sites": ["ca1", "ca2", "ca3"],
             "domain": "canada.example.com",
             "pool": "canada-pool",
+            "loadbalancer": "canada-lb",
             "origin_ip": "192.0.2.30",
         }
         self.objects = {
@@ -96,6 +97,20 @@ class CanadianRETests(unittest.TestCase):
                 }
             },
         }
+
+    def test_reads_regional_selectees_in_allocation_namespace(self):
+        routes = []
+
+        def get(namespace, kind, name, suffix=""):
+            routes.append((namespace, kind, name, suffix))
+            return {}
+
+        module.collect_configuration(self.config, get)
+        self.assertIn(("shared", "virtual_sites", "canada", "/selectees"), routes)
+        self.assertIn(("demo", "virtual_sites", "canada-ce", "/selectees"), routes)
+        self.assertIn(
+            ("demo", "http_loadbalancers", self.config["loadbalancer"], ""), routes
+        )
 
     def test_exact_configuration_passes(self):
         module.validate_configuration(self.config, self.objects)
