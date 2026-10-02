@@ -94,6 +94,25 @@ def validate_response(body: bytes, headers: str, expected: str) -> str:
     return locations[0]
 
 
+def collect_configuration(config: dict[str, Any], get: Any) -> dict[str, Any]:
+    """Read RE objects in allocation scope and application objects in app scope."""
+    allocation = config["allocation"]
+    namespace = config["namespace"]
+    re_namespace = config["re_namespace"]
+    return {
+        "public_ip": get(allocation["namespace"], "public_ips", allocation["name"]),
+        "virtual_site": get(re_namespace, "virtual_sites", config["virtual_site"]),
+        "selectees": get(
+            re_namespace, "virtual_sites", config["virtual_site"], "/selectees"
+        ),
+        "loadbalancer": get(namespace, "http_loadbalancers", config["loadbalancer"]),
+        "ce_selectees": get(
+            namespace, "virtual_sites", config["ce_virtual_site"], "/selectees"
+        ),
+        "pool": get(namespace, "origin_pools", config["pool"]),
+    }
+
+
 def main() -> int:
     """Collect private configuration and traffic evidence from the deployed stack."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -133,20 +152,7 @@ def main() -> int:
             return json.load(response)
 
     allocation = config["allocation"]
-    namespace = config["namespace"]
-    re_namespace = config["re_namespace"]
-    objects = {
-        "public_ip": get(allocation["namespace"], "public_ips", allocation["name"]),
-        "virtual_site": get(re_namespace, "virtual_sites", config["virtual_site"]),
-        "selectees": get(
-            namespace, "virtual_sites", config["virtual_site"], "/selectees"
-        ),
-        "loadbalancer": get(namespace, "http_loadbalancers", config["loadbalancer"]),
-        "ce_selectees": get(
-            namespace, "virtual_sites", config["ce_virtual_site"], "/selectees"
-        ),
-        "pool": get(namespace, "origin_pools", config["pool"]),
-    }
+    objects = collect_configuration(config, get)
     (args.evidence_dir / "configuration.json").write_text(json.dumps(objects))
     validate_configuration(config, objects)
     expected = config["expected_marker"]
