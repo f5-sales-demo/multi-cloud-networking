@@ -67,6 +67,20 @@ locals {
   kvm_site_cloud_init = var.enable_kvm ? (var.kvm_lan_configuration_phase == "configured" ? data.xcsh_site_cloud_init.kvm_configured[0] : data.xcsh_site_cloud_init.kvm[0]) : null
 }
 
+module "kvm_boot_image" {
+  count           = var.enable_kvm ? 1 : 0
+  source          = "./modules/kvm-boot-image"
+  site_generation = local.kvm_bootstrap_generation
+  artifact = {
+    image_download_url = local.kvm_site_image.image_download_url
+    image_md5_sum      = local.kvm_site_image.image_md5_sum
+  }
+}
+locals {
+  kvm_boot_image_md5 = var.enable_kvm ? nonsensitive(module.kvm_boot_image[0].artifact.image_md5_sum) : null
+  kvm_boot_image_url = var.enable_kvm ? module.kvm_boot_image[0].artifact.image_download_url : null
+}
+
 resource "libvirt_pool" "kvm" {
   count = var.enable_kvm ? 1 : 0
   name  = local.kvm_pool_name
@@ -76,14 +90,14 @@ resource "libvirt_pool" "kvm" {
 
 resource "terraform_data" "kvm_ce_image_cache" {
   count            = var.enable_kvm ? 1 : 0
-  triggers_replace = [local.kvm_site_image.image_md5_sum]
+  triggers_replace = [local.kvm_boot_image_md5]
   provisioner "local-exec" {
     command     = "../scripts/ensure-verified-kvm-image.sh --url \"$IMAGE_URL\" --digest \"md5:$IMAGE_MD5\" --destination \"$IMAGE_DESTINATION\""
     working_dir = path.root
     environment = {
-      IMAGE_URL         = local.kvm_site_image.image_download_url
-      IMAGE_MD5         = local.kvm_site_image.image_md5_sum
-      IMAGE_DESTINATION = "${local.kvm_image_cache_dir}/f5xc-${local.kvm_site_image.image_md5_sum}.qcow2"
+      IMAGE_URL         = local.kvm_boot_image_url
+      IMAGE_MD5         = local.kvm_boot_image_md5
+      IMAGE_DESTINATION = "${local.kvm_image_cache_dir}/f5xc-${local.kvm_boot_image_md5}.qcow2"
     }
   }
 }
@@ -130,9 +144,9 @@ resource "libvirt_network" "ce_bgp_net" {
 resource "libvirt_volume" "base_cloud" {
   count = var.enable_kvm ? 1 : 0
 
-  name       = "f5xc-kvm-ce-${local.kvm_site_image.image_md5_sum}.qcow2"
+  name       = "f5xc-kvm-ce-${local.kvm_boot_image_md5}.qcow2"
   pool       = libvirt_pool.kvm[0].name
-  source     = "${local.kvm_image_cache_dir}/f5xc-${local.kvm_site_image.image_md5_sum}.qcow2"
+  source     = "${local.kvm_image_cache_dir}/f5xc-${local.kvm_boot_image_md5}.qcow2"
   format     = "qcow2"
   depends_on = [terraform_data.kvm_ce_image_cache]
 }

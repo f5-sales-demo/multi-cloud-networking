@@ -117,7 +117,9 @@ OS image.
 The pinned `xcsh` v12.3.0 provider resolves the appliance from exactly one Site UID
 owned by the named Secure Mesh Site v2 configuration. It checks the exact UID response
 from `/api/maurice/software_os_version`, the empty error status, HTTPS image URL,
-MD5, and ownership again before use. An ambiguous owner or incomplete mapping stops
+MD5, and ownership again before use. Terraform captures that verified boot artifact for the
+site generation. A later current-image response does not replace an ONLINE CE disk;
+an explicit site replacement or destroy and rebuild selects a new artifact. An ambiguous owner or incomplete mapping stops
 planning without a repair or overwrite shortcut. Keep `enable_kvm = false`
 (the default) to omit KVM from an unrelated apply or to produce a KVM-only destroy
 plan without querying the image endpoint.
