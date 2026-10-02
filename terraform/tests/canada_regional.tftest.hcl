@@ -58,6 +58,13 @@ run "canada_regional_virtual_sites_and_lb" {
   }
 
   assert {
+    condition = (
+      one(xcsh_virtual_site.canada_re[0].site_selector.expressions) == "ves.io/region in (ves-io-toronto, ves-io-montreal)"
+    )
+    error_message = "Canadian RE selection must match live Toronto/Montreal regional labels."
+  }
+
+  assert {
     condition     = output.ca_re_virtual_site_name == "mcn-ce-ha-ca-re-vsite"
     error_message = "Canada RE Virtual Site name should be mcn-ce-ha-ca-re-vsite."
   }

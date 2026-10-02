@@ -601,7 +601,7 @@ resource "xcsh_virtual_site" "canada_re" {
 
   site_type = "REGIONAL_EDGE"
   site_selector {
-    expressions = ["ves.io/city in (${join(", ", var.ca_re_cities)})"]
+    expressions = ["ves.io/region in (${join(", ", [for city in var.ca_re_cities : "ves-io-${city}"])})"]
   }
 }
 

@@ -92,6 +92,13 @@ variable "ca_re_cities" {
   description = "List of cities for the Canadian Regional Edge Virtual Site selector. Defaults to Toronto and Montreal."
   type        = list(string)
   default     = ["toronto", "montreal"]
+  validation {
+    condition = (
+      length(var.ca_re_cities) > 0 &&
+      alltrue([for city in var.ca_re_cities : contains(["toronto", "montreal"], city)])
+    )
+    error_message = "Canadian RE advertisement must select Toronto and/or Montreal."
+  }
 }
 
 variable "ca_lb_name" {

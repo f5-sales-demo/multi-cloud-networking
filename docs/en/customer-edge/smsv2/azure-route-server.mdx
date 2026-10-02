@@ -38,7 +38,9 @@ NICs. A separate private application domain matches the inside VIP; the existing
 external application domain and VIP remain the BGP path.
 
 The Canadian HTTP load balancer advertises through the Toronto and Montreal
-Regional Edge virtual-site selector and the three Canadian CEs. The CE VIP and
+Regional Edge virtual-site selector and the three Canadian CEs. The selector
+uses their published `ves.io/region` labels: `ves-io-toronto` and
+`ves-io-montreal`. The CE VIP and
 primary-IP listeners remain available for the FRR routing path.
 
 With `enable_showcase_origin=true`, Terraform creates a separate HTTP origin in
