@@ -706,6 +706,18 @@ fi
 assert_sanitized "$evidence" "$output"
 echo "ok - the exact KVM registration mapping gate is accepted"
 
+evidence="${TMP_ROOT}/kvm-boot-receipt"
+mkdir "$evidence"
+output="${TMP_ROOT}/kvm-boot-receipt.out"
+if ! FAKE_EXTRA_CHANGE=',{"address":"module.kvm_boot_image[0].terraform_data.receipt","type":"terraform_data","name":"receipt","index":0,"change":{"actions":["create"],"after":{}}}' \
+  "$SCRIPT" --evidence-dir "$evidence" "${common[@]}" >"$output" 2>&1; then
+  cat "$output" >&2
+  fail "the owned KVM boot receipt must be accepted"
+fi
+[ "$(jq -r .status "$evidence/summary.json")" = ready ] || fail "KVM boot receipt ready status not recorded"
+assert_sanitized "$evidence" "$output"
+echo "ok - the exact KVM boot receipt is accepted"
+
 evidence="${TMP_ROOT}/kvm-token"
 mkdir "$evidence"
 output="${TMP_ROOT}/kvm-token.out"
