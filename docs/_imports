@@ -138,3 +138,5 @@ terraform/modules/ce-vm/main.tf -> terraform/modules/ce-vm/main.tf
 terraform/modules/ce-vm/outputs.tf -> terraform/modules/ce-vm/outputs.tf
 terraform/modules/ce-vm/variables.tf -> terraform/modules/ce-vm/variables.tf
 terraform/modules/ce-vm/versions.tf -> terraform/modules/ce-vm/versions.tf
+terraform/modules/kvm-boot-image/main.tf -> terraform/modules/kvm-boot-image/main.tf
+terraform/modules/kvm-boot-image/versions.tf -> terraform/modules/kvm-boot-image/versions.tf

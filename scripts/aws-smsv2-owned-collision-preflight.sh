@@ -510,7 +510,7 @@ while IFS= read -r item; do
         die "planned deployment identity guard does not match its provenance: $address"
       continue
       ;;
-    terraform_data.aws_tgw_contract_gate[[]0[]] | terraform_data.aws_tgw_runtime_gate[[]0[]] | terraform_data.aws_tgw_site_route_gate[[]*[]] | module.kvm_registration_mapping.terraform_data.gate[[]0[]] | terraform_data.kvm_ce_image_cache[[]0[]] | terraform_data.kvm_network_identity[[]0[]] | terraform_data.kvm_workload_image_cache[[]0[]])
+    terraform_data.aws_tgw_contract_gate[[]0[]] | terraform_data.aws_tgw_runtime_gate[[]0[]] | terraform_data.aws_tgw_site_route_gate[[]*[]] | module.kvm_registration_mapping.terraform_data.gate[[]0[]] | module.kvm_boot_image[[]0[]].terraform_data.receipt | terraform_data.kvm_ce_image_cache[[]0[]] | terraform_data.kvm_network_identity[[]0[]] | terraform_data.kvm_workload_image_cache[[]0[]])
       continue
       ;;
     *) die "preflight has no complete ownership adapter for internal Terraform data resource: $address" ;;

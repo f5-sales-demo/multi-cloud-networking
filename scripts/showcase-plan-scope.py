@@ -56,6 +56,7 @@ KVM_PREFIXES = (
     "libvirt_",
     "docker_",
     "module.kvm_registration_mapping.",
+    "module.kvm_boot_image[",
     "xcsh_token.kvm",
     "xcsh_securemesh_site_v2.onprem_kvm",
     "xcsh_registration_approval.kvm",

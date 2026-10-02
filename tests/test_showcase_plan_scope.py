@@ -208,6 +208,17 @@ class CanadianPublicIPScopeTest(unittest.TestCase):
             )
 
 
+class KVMBootReceiptScopeTest(unittest.TestCase):
+    def test_boot_receipt_is_part_of_owned_kvm_stage(self):
+        document = plan(
+            [("module.kvm_boot_image[0].terraform_data.receipt", ["create"])]
+        )
+        document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
+        document["variables"]["enable_azure"]["value"] = False
+        document["variables"]["enable_canada"]["value"] = False
+        self.assertEqual(module.validate(document, "aws-kvm-build", "a" * 40), 1)
+
+
 class ShowcasePlanScopeTest(unittest.TestCase):
     def test_aws_kvm_stage_accepts_exact_saved_plan_boolean_strings(self):
         document = plan([("aws_vpc.aws[0]", ["create"])])
