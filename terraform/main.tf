@@ -621,7 +621,7 @@ resource "xcsh_origin_pool" "canada" {
   count       = var.enable_azure && var.enable_canada ? 1 : 0
   name        = local.ca_origin_pool_name
   namespace   = data.xcsh_namespace.mcn.name
-  description = "Canada reference origin pool -> ${var.origin_ip}:${var.origin_port}"
+  description = "Canadian origin pool discovered exclusively through Canadian CEs"
   labels      = local.ca_xc_labels
 
   port = var.origin_port
@@ -629,7 +629,7 @@ resource "xcsh_origin_pool" "canada" {
   origin_servers {
     labels = {}
     private_ip {
-      ip              = local.selected_origin_ip
+      ip              = local.selected_ca_origin_ip
       outside_network = {}
       site_locator {
         virtual_site {
@@ -642,7 +642,7 @@ resource "xcsh_origin_pool" "canada" {
 
   no_tls                 = {}
   loadbalancer_algorithm = "ROUND_ROBIN"
-  endpoint_selection     = "LOCAL_ONLY"
+  endpoint_selection     = "DISTRIBUTED"
 }
 
 resource "xcsh_http_loadbalancer" "canada" {
@@ -661,6 +661,17 @@ resource "xcsh_http_loadbalancer" "canada" {
   }
 
   advertise_custom {
+    advertise_where {
+      virtual_site {
+        network = "SITE_NETWORK_OUTSIDE"
+        virtual_site {
+          name      = xcsh_virtual_site.canada_re[0].name
+          namespace = data.xcsh_namespace.mcn.name
+        }
+      }
+      use_default_port = {}
+    }
+
     dynamic "advertise_where" {
       for_each = try(module.ce_topology_ca[0].ce_nodes, {})
       content {

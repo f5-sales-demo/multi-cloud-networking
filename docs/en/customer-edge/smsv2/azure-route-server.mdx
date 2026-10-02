@@ -37,9 +37,23 @@ uses TCP/65500 without floating IP. The ILB backend pool attaches the CE interna
 NICs. A separate private application domain matches the inside VIP; the existing
 external application domain and VIP remain the BGP path.
 
-The Canadian external path retains the Toronto and Montreal Regional Edge
-virtual-site selector and Canadian CE selector. Traffic tests run from each
-region's own client and resolve that region's domain to its VIP.
+The Canadian HTTP load balancer advertises through the Toronto and Montreal
+Regional Edge virtual-site selector and the three Canadian CEs. The CE VIP and
+primary-IP listeners remain available for the FRR routing path.
+
+With `enable_showcase_origin=true`, Terraform creates a separate HTTP origin in
+the Canadian hub's Azure region, which must be Canada Central or Canada East.
+The Canadian pool points only to that origin, discovered through the Canadian CE
+virtual site. Its `DISTRIBUTED` endpoint selection lets Toronto/Montreal Regional
+Edges reach those Canadian endpoints. The origin ACL includes all provider
+Regional Edge/CDN source CIDRs, both private developer exceptions, and exact
+Canadian demo sources; other ingress is denied and origin SSH is disabled.
+
+The US origin remains separate. Canadian traffic and failover controls use
+`ca_origin_ip`. For externally hosted origins, set `ca_origin_ip` explicitly.
+Traffic tests run from each region's own client and resolve that region's domain
+to its VIP. Regional Edge acceptance also checks the Canadian origin response
+through the public Canadian HTTP load balancer.
 
 ## Deployment and acceptance
 

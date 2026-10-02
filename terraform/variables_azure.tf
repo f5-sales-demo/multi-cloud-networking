@@ -47,6 +47,10 @@ variable "ca_location" {
   description = "Azure region for Canadian regional resources."
   type        = string
   default     = "canadacentral"
+  validation {
+    condition     = contains(["canadacentral", "canadaeast"], var.ca_location)
+    error_message = "Canadian regional resources must use Canada Central or Canada East."
+  }
 }
 
 variable "ca_resource_group_name" {
