@@ -132,7 +132,19 @@ for relative in terraform/aws_tgw_connect.tf \
     bad "${relative} is missing the exact v9.0.1 commit"
   fi
 done
-if grep -Fq "${release_revision_left}${release_revision_right}" "${REPO_ROOT}/terraform/tests/aws_tgw_connect.tftest.hcl"; then
+fixture_revision=$(
+  python3 - "$REPO_ROOT/terraform/tests/aws_tgw_connect.tftest.hcl" <<'PY'
+import re
+import sys
+from pathlib import Path
+text = Path(sys.argv[1]).read_text()
+match = re.search(r'api_release_commit\s*=\s*join\("", \[([^]]+)\]\)', text)
+if match is None:
+    raise SystemExit("missing independent API revision fixture")
+print("".join(re.findall(r'"([0-9a-f]+)"', match.group(1))))
+PY
+)
+if [ "$fixture_revision" = "$release_revision_left$release_revision_right" ]; then
   ok "contract fixture uses the independent published API revision"
 else
   bad "contract fixture does not use the published API revision"
