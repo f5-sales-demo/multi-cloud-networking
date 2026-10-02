@@ -27,7 +27,7 @@ def validate_configuration(config: dict[str, Any], objects: dict[str, Any]) -> N
     if len(bindings) != 1 or (
         bindings[0].get("name"),
         bindings[0].get("namespace"),
-    ) != (config["virtual_site"], config["namespace"]):
+    ) != (config["virtual_site"], config["re_namespace"]):
         raise ValueError("public IP is not exclusively bound to the Canadian selector")
     site = objects["virtual_site"]["spec"]
     if (
@@ -134,9 +134,10 @@ def main() -> int:
 
     allocation = config["allocation"]
     namespace = config["namespace"]
+    re_namespace = config["re_namespace"]
     objects = {
         "public_ip": get(allocation["namespace"], "public_ips", allocation["name"]),
-        "virtual_site": get(namespace, "virtual_sites", config["virtual_site"]),
+        "virtual_site": get(re_namespace, "virtual_sites", config["virtual_site"]),
         "selectees": get(
             namespace, "virtual_sites", config["virtual_site"], "/selectees"
         ),

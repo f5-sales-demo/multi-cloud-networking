@@ -43,7 +43,8 @@ Regional Edge virtual-site selector and the three Canadian CEs. The public-IP
 binding scopes availability to those REs, and the LB uses
 `advertise_on_public.public_ip`; the CE-only `virtual_site` advertisement field
 cannot reference a Regional Edge selector. Use an existing unused allocated IP for the project, or request an additional IP through F5
-support. Terraform manages the regional binding and restores its original binding on teardown;
+support. The RE selector must live in the allocated public IP namespace, usually shared.
+Terraform manages the regional binding and restores its original binding on teardown;
 it does not allocate or delete the IP. Keep its name, namespace and address in private tfvars. The selector
 uses their published `ves.io/region` labels: `ves-io-toronto` and
 `ves-io-montreal`. The CE VIP and

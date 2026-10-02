@@ -139,7 +139,8 @@ run "canada_regional_virtual_sites_and_lb" {
     condition = (
       xcsh_public_ip_binding.canada[0].name == "example-canadian-ip" &&
       xcsh_public_ip_binding.canada[0].virtual_site == xcsh_virtual_site.canada_re[0].name &&
-      xcsh_public_ip_binding.canada[0].virtual_site_namespace == data.xcsh_namespace.mcn.name &&
+      xcsh_public_ip_binding.canada[0].virtual_site_namespace == "shared" &&
+      xcsh_virtual_site.canada_re[0].namespace == "shared" &&
       xcsh_http_loadbalancer.canada[0].add_location == true
     )
     error_message = "The reserved allocation must be managed by the Canadian RE selector and return RE location receipts."

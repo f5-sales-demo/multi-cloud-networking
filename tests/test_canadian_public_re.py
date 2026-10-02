@@ -26,6 +26,7 @@ class CanadianRETests(unittest.TestCase):
                 "ip": "192.0.2.55",
             },
             "virtual_site": "canada",
+            "re_namespace": "shared",
             "ce_virtual_site": "canada-ce",
             "namespace": "demo",
             "ce_sites": ["ca1", "ca2", "ca3"],
@@ -37,7 +38,7 @@ class CanadianRETests(unittest.TestCase):
             "public_ip": {
                 "spec": {
                     "ip": "192.0.2.55",
-                    "virtual_sites": [{"name": "canada", "namespace": "demo"}],
+                    "virtual_sites": [{"name": "canada", "namespace": "shared"}],
                 }
             },
             "virtual_site": {

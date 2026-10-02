@@ -596,7 +596,7 @@ module "client_vm_ca" {
 resource "xcsh_virtual_site" "canada_re" {
   count     = var.enable_azure && var.enable_canada ? 1 : 0
   name      = local.ca_re_vsite_name
-  namespace = data.xcsh_namespace.mcn.name
+  namespace = var.enable_canada_public_re && var.ca_re_public_ip != null ? var.ca_re_public_ip.namespace : data.xcsh_namespace.mcn.name
   labels    = local.ca_xc_labels
 
   site_type = "REGIONAL_EDGE"
@@ -652,7 +652,7 @@ resource "xcsh_public_ip_binding" "canada" {
   namespace              = var.ca_re_public_ip.namespace
   expected_ip            = var.ca_re_public_ip.ip
   virtual_site           = xcsh_virtual_site.canada_re[0].name
-  virtual_site_namespace = data.xcsh_namespace.mcn.name
+  virtual_site_namespace = xcsh_virtual_site.canada_re[0].namespace
 }
 
 resource "terraform_data" "canada_public_ip_gate" {
