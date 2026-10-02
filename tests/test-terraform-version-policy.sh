@@ -112,8 +112,8 @@ fi
 
 echo "7. provider v12.3.0 uses one immutable API release identity"
 api_tag='v9.0.1'
-release_revision_left='158db014109f2a838b95a'
-release_revision_right='123e324f53126eae440'
+release_revision_left='158db014109f2a838b95'
+release_revision_right='bccd8eb1870a39f8ca71'
 for relative in terraform/aws_tgw_connect.tf terraform/tests/aws_tgw_connect.tftest.hcl \
   scripts/aws-smsv2-uat-preflight.sh tests/test-aws-smsv2-uat-preflight.sh \
   docs/en/demo/deploy.mdx docs/en/customer-edge/smsv2/azure-route-server.mdx; do
@@ -123,7 +123,7 @@ for relative in terraform/aws_tgw_connect.tf terraform/tests/aws_tgw_connect.tft
     bad "${relative} is missing ${api_tag}"
   fi
 done
-for relative in terraform/aws_tgw_connect.tf terraform/tests/aws_tgw_connect.tftest.hcl \
+for relative in terraform/aws_tgw_connect.tf \
   scripts/aws-smsv2-uat-preflight.sh tests/test-aws-smsv2-uat-preflight.sh; do
   if grep -Fq "$release_revision_left" "${REPO_ROOT}/${relative}" &&
     grep -Fq "$release_revision_right" "${REPO_ROOT}/${relative}"; then
@@ -132,6 +132,23 @@ for relative in terraform/aws_tgw_connect.tf terraform/tests/aws_tgw_connect.tft
     bad "${relative} is missing the exact v9.0.1 commit"
   fi
 done
+fixture_revision=$(
+  python3 - "$REPO_ROOT/terraform/tests/aws_tgw_connect.tftest.hcl" <<'PY'
+import re
+import sys
+from pathlib import Path
+text = Path(sys.argv[1]).read_text()
+match = re.search(r'api_release_commit\s*=\s*join\("", \[([^]]+)\]\)', text)
+if match is None:
+    raise SystemExit("missing independent API revision fixture")
+print("".join(re.findall(r'"([0-9a-f]+)"', match.group(1))))
+PY
+)
+if [ "$fixture_revision" = "$release_revision_left$release_revision_right" ]; then
+  ok "contract fixture uses the independent published API revision"
+else
+  bad "contract fixture does not use the published API revision"
+fi
 legacy_api_tag='v7''.''0''.''9'
 if grep -R -n -F "$legacy_api_tag" \
   "${REPO_ROOT}/terraform" "${REPO_ROOT}/scripts" "${REPO_ROOT}/tests" \
