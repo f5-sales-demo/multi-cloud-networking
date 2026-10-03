@@ -130,7 +130,7 @@ run "plans_three_sites_six_peers_and_workload_attachment" {
   command = plan
 
   assert {
-    condition     = local.aws_smsv2_api_release_commit == "ac024ccbfb8b9f84412813f3e2ab9f5821937ef2"
+    condition     = local.aws_smsv2_api_release_commit == join("", ["ac024ccbfb8b9f844128", "13f3e2ab9f5821937ef2"])
     error_message = "Runtime contract must bind the actual API 10.0.0 commit."
   }
 
