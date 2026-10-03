@@ -153,10 +153,8 @@ STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 "${TF[@]}" version -json >"${EVIDENCE_DIR}/terraform-version.json"
 
 SITES=$(tf_json xc_site_names)
-CA_SITES=$(tf_json ca_xc_site_names)
 SITE_COUNT=$(jq 'length' <<<"$SITES")
 [ "$SITE_COUNT" -eq 3 ] || die "expected three XC sites, found $SITE_COUNT"
-[ "$(jq 'length' <<<"$CA_SITES")" -eq 3 ] || die "expected three Canadian XC sites, found $(jq 'length' <<<"$CA_SITES")"
 
 sites_online=0
 while IFS= read -r key; do
@@ -165,40 +163,21 @@ while IFS= read -r key; do
   [ "$state" = "ONLINE" ] || die "one or more XC sites are not ONLINE"
   sites_online=$((sites_online + 1))
 done < <(jq -r 'keys[]' <<<"$SITES")
-while IFS= read -r key; do
-  site=$(jq -r --arg key "$key" '.[$key]' <<<"$CA_SITES")
-  state=$(api_get "${API_URL}/api/config/namespaces/system/sites/${site}" | jq -r '.spec.site_state // .get_spec.site_state // empty')
-  [ "$state" = "ONLINE" ] || die "one or more Canadian XC sites are not ONLINE"
-  sites_online=$((sites_online + 1))
-done < <(jq -r 'keys[]' <<<"$CA_SITES")
-printf 'sites_online=%s/%s\n' "$sites_online" "$((SITE_COUNT * 2))"
+printf 'sites_online=%s/%s\n' "$sites_online" "$SITE_COUNT"
 
 RG=$(tf_raw resource_group_name)
 CLIENT=$(tf_raw client_vm_name)
-CA_RG=$(tf_raw ca_resource_group_name)
-CA_CLIENT=$(tf_raw ca_client_vm_name)
 US_ILB=$(tf_raw azure_ilb_private_ip)
-CA_ILB=$(tf_raw canada_ilb_private_ip)
 US_CONSOLE_ILB=$(tf_raw azure_ilb_console_ip)
-CA_CONSOLE_ILB=$(tf_raw canada_ilb_console_ip)
 US_INSIDE_DOMAIN=$(tf_raw azure_ilb_application_domain)
-CA_INSIDE_DOMAIN=$(tf_raw canada_ilb_application_domain)
 US_VIP=$(tf_raw vip)
-CA_VIP=$(tf_raw ca_vip)
 DOMAIN=$(tf_raw lb_domain)
-CA_DOMAIN=$(tf_raw ca_lb_domain)
 ORIGIN=$(tf_raw origin_ip)
-CA_ORIGIN=$(tf_raw ca_origin_ip)
 CE_VM_NAMES=$(tf_json ce_vm_names)
-CA_CE_VM_NAMES=$(tf_json ca_ce_vm_names)
 [[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || die "lb_domain contains characters unsafe for the remote verifier"
-[[ "$CA_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || die "ca_lb_domain contains characters unsafe for the remote verifier"
 [[ "$US_ILB" =~ ^[0-9.]+$ ]] || die "azure_ilb_private_ip is not an IPv4 literal"
-[[ "$CA_ILB" =~ ^[0-9.]+$ ]] || die "canada_ilb_private_ip is not an IPv4 literal"
 [[ "$ORIGIN" =~ ^[0-9.]+$ ]] || die "origin_ip is not an IPv4 literal"
-[[ "$CA_ORIGIN" =~ ^[0-9.]+$ ]] || die "ca_origin_ip is not an IPv4 literal"
 [ "$(jq 'length' <<<"$CE_VM_NAMES")" -eq "$SITE_COUNT" ] || die "site and CE VM name maps differ in size"
-[ "$(jq 'length' <<<"$CA_CE_VM_NAMES")" -eq 3 ] || die "Canadian site and CE VM name maps differ in size"
 
 # Terraform and the XC API can both become ready while Azure still reports a VM
 # or extension transition. Query Azure directly so a stuck control-plane
@@ -229,32 +208,8 @@ while IFS= read -r key; do
     die "one Site Console password extension is not complete in Azure (provisioning=${extension_state:-unknown})"
   password_extensions_succeeded=$((password_extensions_succeeded + 1))
 done < <(jq -r 'keys[]' <<<"$SITES")
-while IFS= read -r key; do
-  vm_name=$(jq -r --arg key "$key" '.[$key]' <<<"$CA_CE_VM_NAMES")
-  instance_view=$(az vm get-instance-view \
-    --resource-group "$CA_RG" \
-    --name "$vm_name" \
-    --query '{provisioningState:provisioningState,powerState:instanceView.statuses[?starts_with(code, `PowerState/`)].code | [0]}' \
-    --output json)
-  provisioning_state=$(jq -r '.provisioningState // empty' <<<"$instance_view")
-  power_state=$(jq -r '.powerState // empty' <<<"$instance_view")
-  if [ "$provisioning_state" != "Succeeded" ] || [ "$power_state" != "PowerState/running" ]; then
-    die "one Canadian CE VM is not fully running in Azure (provisioning=${provisioning_state:-unknown}, power=${power_state:-unknown})"
-  fi
-  azure_vms_running=$((azure_vms_running + 1))
-
-  extension_state=$(az vm extension show \
-    --resource-group "$CA_RG" \
-    --vm-name "$vm_name" \
-    --name site-console-admin-password \
-    --query provisioningState \
-    --output tsv)
-  [ "$extension_state" = "Succeeded" ] ||
-    die "one Canadian Site Console password extension is not complete in Azure (provisioning=${extension_state:-unknown})"
-  password_extensions_succeeded=$((password_extensions_succeeded + 1))
-done < <(jq -r 'keys[]' <<<"$CA_SITES")
-printf 'azure_vms_running=%s/%s\n' "$azure_vms_running" "$((SITE_COUNT * 2))"
-printf 'password_extensions_succeeded=%s/%s\n' "$password_extensions_succeeded" "$((SITE_COUNT * 2))"
+printf 'azure_vms_running=%s/%s\n' "$azure_vms_running" "$SITE_COUNT"
+printf 'password_extensions_succeeded=%s/%s\n' "$password_extensions_succeeded" "$SITE_COUNT"
 
 verify_ilb_endpoint() {
   local region=$1 resource_group=$2 client=$3 ilb=$4 output
@@ -270,7 +225,6 @@ verify_ilb_endpoint() {
 }
 
 verify_ilb_endpoint us "$RG" "$CLIENT" "$US_CONSOLE_ILB"
-verify_ilb_endpoint canada "$CA_RG" "$CA_CLIENT" "$CA_CONSOLE_ILB"
 
 verify_console_backends() {
   local region=$1 rg=$2 client=$3 ips_json=$4 script="set -eu; healthy=0; " ip message
@@ -288,7 +242,6 @@ verify_console_backends() {
 }
 
 verify_console_backends us "$RG" "$CLIENT" "$(tf_json ce_sli_private_ips | jq -c '[.[]]')"
-verify_console_backends canada "$CA_RG" "$CA_CLIENT" "$(tf_json canada_ce_sli_private_ips | jq -c '[.[]]')"
 
 verify_region_routing() {
   local region=$1 resource_group=$2 client_nic=$3 vip=$4 ce_ips_json=$5 rs_ips_json=$6 frr_names_json=$7 frr_ips_json=$8
@@ -348,9 +301,6 @@ PY
 verify_region_routing us "$RG" "$(tf_raw client_nic_name)" "$US_VIP" \
   "$(tf_json ce_mgmt_private_ips | jq -c '[.[]]')" "$(tf_json route_server_peer_ips)" \
   "$(tf_json azure_frr_vm_names)" "$(tf_json azure_frr_peer_ips)"
-verify_region_routing canada "$CA_RG" "$(tf_raw canada_client_nic_name)" "$CA_VIP" \
-  "$(tf_json canada_ce_mgmt_private_ips | jq -c '[.[]]')" "$(tf_json canada_route_server_peer_ips)" \
-  "$(tf_json canada_frr_vm_names)" "$(tf_json canada_frr_peer_ips)"
 
 vip_ok=0
 vip_fail=0
@@ -402,16 +352,8 @@ while [ "$batches" -lt "$MAX_BATCHES" ]; do
   origin_ok=$((origin_ok + region_origin_ok))
   origin_fail=$((origin_fail + region_origin_fail))
   batch_fail=$((region_vip_fail + region_ilb_fail + region_origin_fail))
-  probe_region canada "$CA_RG" "$CA_CLIENT" "$CA_DOMAIN" "$CA_VIP" "$CA_INSIDE_DOMAIN" "$CA_ILB" "$CA_ORIGIN"
-  ca_lb_ok=$((ca_lb_ok + region_vip_ok))
-  ca_lb_fail=$((ca_lb_fail + region_vip_fail))
-  ca_ilb_ok=$((ca_ilb_ok + region_ilb_ok))
-  ca_ilb_fail=$((ca_ilb_fail + region_ilb_fail))
-  origin_ok=$((origin_ok + region_origin_ok))
-  origin_fail=$((origin_fail + region_origin_fail))
-  batch_fail=$((batch_fail + region_vip_fail + region_ilb_fail + region_origin_fail))
   if [ "$batch_fail" -eq 0 ]; then zero_streak=$((zero_streak + 1)); else zero_streak=0; fi
-  if [ $((vip_ok + vip_fail)) -ge 100 ] && [ $((ca_lb_ok + ca_lb_fail)) -ge 100 ] &&
+  if [ $((vip_ok + vip_fail)) -ge 100 ] &&
     [ "$batches" -ge 3 ] && [ "$zero_streak" -ge 2 ]; then
     converged=true
     break
@@ -477,18 +419,12 @@ jq -n \
   --argjson azure_vms_running "$azure_vms_running" \
   --argjson password_extensions_succeeded "$password_extensions_succeeded" \
   --arg us_ilb_reachable "yes" \
-  --arg canada_ilb_reachable "yes" \
   --argjson us_console_backends 3 \
-  --argjson canada_console_backends 3 \
   --argjson batches "$batches" \
   --argjson vip_samples "$((vip_ok + vip_fail))" \
   --argjson vip_failures "$vip_fail" \
-  --argjson ca_lb_samples "$((ca_lb_ok + ca_lb_fail))" \
-  --argjson ca_lb_failures "$ca_lb_fail" \
   --argjson us_ilb_samples "$((us_ilb_ok + us_ilb_fail))" \
   --argjson us_ilb_failures "$us_ilb_fail" \
-  --argjson ca_ilb_samples "$((ca_ilb_ok + ca_ilb_fail))" \
-  --argjson ca_ilb_failures "$ca_ilb_fail" \
   --argjson origin_samples "$((origin_ok + origin_fail))" \
   --argjson origin_failures "$origin_fail" \
   --argjson console_factory_rejected "$console_factory_rejected" \
@@ -501,18 +437,12 @@ jq -n \
     azure_vms_running: $azure_vms_running,
     password_extensions_succeeded: $password_extensions_succeeded,
     us_ilb_reachable: $us_ilb_reachable,
-    canada_ilb_reachable: $canada_ilb_reachable,
     us_console_backends: $us_console_backends,
-    canada_console_backends: $canada_console_backends,
     batches: $batches,
     vip_samples: $vip_samples,
     vip_failures: $vip_failures,
-    ca_lb_samples: $ca_lb_samples,
-    ca_lb_failures: $ca_lb_failures,
     us_ilb_samples: $us_ilb_samples,
     us_ilb_failures: $us_ilb_failures,
-    ca_ilb_samples: $ca_ilb_samples,
-    ca_ilb_failures: $ca_ilb_failures,
     origin_samples: $origin_samples,
     origin_failures: $origin_failures,
     console_factory_rejected: $console_factory_rejected,
@@ -521,9 +451,7 @@ jq -n \
   }' >"${EVIDENCE_DIR}/summary.json"
 
 printf 'vip_samples=%s vip_failures=%s\n' "$((vip_ok + vip_fail))" "$vip_fail"
-printf 'ca_lb_samples=%s ca_lb_failures=%s\n' "$((ca_lb_ok + ca_lb_fail))" "$ca_lb_fail"
 printf 'us_ilb_samples=%s us_ilb_failures=%s\n' "$((us_ilb_ok + us_ilb_fail))" "$us_ilb_fail"
-printf 'ca_ilb_samples=%s ca_ilb_failures=%s\n' "$((ca_ilb_ok + ca_ilb_fail))" "$ca_ilb_fail"
 printf 'origin_samples=%s origin_failures=%s\n' "$((origin_ok + origin_fail))" "$origin_fail"
 if [ "$converged" = true ]; then
   echo 'converged=yes'

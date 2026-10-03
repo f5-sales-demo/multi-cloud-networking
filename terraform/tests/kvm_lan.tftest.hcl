@@ -34,7 +34,6 @@ variables {
   ssh_public_key         = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l kvm-lan-plan-test-only"
   xc_app_namespace       = "multi-cloud-networking"
   enable_azure           = false
-  enable_canada          = false
   enable_aws             = false
   enable_aws_tgw_connect = false
   enable_bgp             = false

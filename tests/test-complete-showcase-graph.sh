@@ -15,7 +15,7 @@ fi; }
 check 'version = "= 12\.4\.0"' terraform/versions.tf
 check 'xcsh_network_customer_edge_egress' terraform/data.tf
 check 'module "azure_frr_us"' terraform/main.tf
-check 'module "azure_frr_ca"' terraform/main.tf
+reject 'module "azure_frr_ca"' terraform/main.tf
 reject 'module "azure_route_server_bgp"' terraform/main.tf
 reject 'module "azure_route_server_bgp_ca"' terraform/main.tf
 reject 'azure_route_server_ebgp_multihop' terraform/main.tf
@@ -26,15 +26,14 @@ check 'ip prefix-list VIP seq 10 permit' terraform/modules/azure-frr/cloud-init.
 check 'route-map RS-OUT permit' terraform/modules/azure-frr/cloud-init.yaml.tftpl
 reject 'permit 0\.0\.0\.0/0 le 32' terraform/modules/azure-frr/cloud-init.yaml.tftpl
 
-for region in azure ca; do
-  ilb="terraform/${region}_ilb.tf"
-  check 'application-frontend' "$ilb"
-  check 'console-frontend' "$ilb"
-  check 'application-rule' "$ilb"
-  check 'console-rule' "$ilb"
-  check 'floating_ip_enabled[[:space:]]*=[[:space:]]*false' "$ilb"
-  check 'internal_nic_id' "$ilb"
-done
+region=azure
+ilb="terraform/${region}_ilb.tf"
+check 'application-frontend' "$ilb"
+check 'console-frontend' "$ilb"
+check 'application-rule' "$ilb"
+check 'console-rule' "$ilb"
+check 'floating_ip_enabled[[:space:]]*=[[:space:]]*false' "$ilb"
+check 'internal_nic_id' "$ilb"
 
 check 'network_interface' terraform/kvm.tf
 check 'xcsh_smsv2_kvm_runtime_interface' terraform/onprem_kvm.tf

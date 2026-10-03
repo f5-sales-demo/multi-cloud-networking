@@ -17,22 +17,7 @@ variable "ce_count" {
 # Canada CE topology / scaling
 # ---------------------------------------------------------
 
-variable "ca_ce_count" {
-  description = "Number of Canadian single-node Secure Mesh v2 CE sites (1..3)."
-  type        = number
-  default     = 3
 
-  validation {
-    condition     = var.ca_ce_count >= 1 && var.ca_ce_count <= 3
-    error_message = "ca_ce_count must be between 1 and 3."
-  }
-}
-
-variable "ca_site_prefix" {
-  description = "Prefix for Canadian XC site names (site = <ca_site_prefix>-<ca_region_short>0<n>). Leave null to derive `<component>-ca`."
-  type        = string
-  default     = null
-}
 
 variable "region_short" {
   description = "Short region token used to build the per-CE key and site name (component `mcn-ce-ha` + region `eastus` -> site `mcn-ce-ha-eastus01`). Leave null (the default) to use var.location verbatim; set it only when the Azure region name is longer than you want inside object names."

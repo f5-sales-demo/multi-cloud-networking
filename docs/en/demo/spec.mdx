@@ -26,14 +26,13 @@ the final provider-v8 acceptance did not mutate or re-prove Azure end-to-end.
 
 Observed 2026-08-05. Architectural specification:
 
-The deployment provisions an **Active/Active eBGP/ECMP F5 Distributed Cloud (XC) Customer Edge (CE) Secure Mesh v2 topology** on Microsoft Azure with an Amazon Web Services (AWS) extension, a parallel Canadian regional extension, and an On-Premise KVM extension.
+The deployment provisions an **Active/Active eBGP/ECMP F5 Distributed Cloud (XC) Customer Edge (CE) Secure Mesh v2 topology** on Microsoft Azure with an Amazon Web Services (AWS) extension, an On-Premise KVM extension.
 
 - **Routing Fabric**: CEs originate host routes (`/32`) via eBGP (ASN `64512`) to an Azure Route Server, AWS Transit Gateway Connect, or containerized ToR BGP router (ASN `65515`). The VNets, VPCs, and local libvirt networks use native ECMP for active/active traffic distribution.
-- **Four Network Paths**:
+- **Three Network Paths**:
   1. **Rest of World (ROW)**: Serves `mcn-ce-ha.f5-sales-demo.com` via 3 CEs in `eastus` (`10.0.0.0/16` VNet) with global Public Regional Edge advertisement.
-  2. **Canada Extension**: Serves `mcn-ce-ha.f5-sales-demo.ca` via 3 CEs in `canadacentral` (`10.200.0.0/16` VNet) advertised strictly through Canadian Regional Edges (Toronto and Montreal) and Canadian CEs.
-  3. **AWS Customer Edge Extension**: Serves `aws.mcn-ce-ha.f5-sales-demo.com` via 3 EC2 CEs (`m5.2xlarge`) in AWS VPC (`10.150.0.0/16` in `ap-northeast-1`) with dual NICs (public SLO / private SLI) and eBGP/ECMP routing.
-  4. **On-Premise KVM Extension**: One CE (`onprem-ce-01`, `10.100.0.11`) peers with FRR (`10.100.0.2`, ASN `65515`) on the local libvirt network (`10.100.0.0/24`). The NAT gateway is `10.100.0.1`, the workload is `10.100.0.100`, and one BGP peer imports `198.51.100.0/24`.
+  2. **AWS Customer Edge Extension**: Serves `aws.mcn-ce-ha.f5-sales-demo.com` via 3 EC2 CEs (`m5.2xlarge`) in AWS VPC (`10.150.0.0/16` in `ap-northeast-1`) with dual NICs (public SLO / private SLI) and eBGP/ECMP routing.
+  3. **On-Premise KVM Extension**: One CE (`onprem-ce-01`, `10.100.0.11`) peers with FRR (`10.100.0.2`, ASN `65515`) on the local libvirt network (`10.100.0.0/24`). The NAT gateway is `10.100.0.1`, the workload is `10.100.0.100`, and one BGP peer imports `198.51.100.0/24`.
 
 ---
 
@@ -55,7 +54,7 @@ The deployment provisions an **Active/Active eBGP/ECMP F5 Distributed Cloud (XC)
 ### Tenant Guard & CIDR Safety Checks (`data.tf`, `main.tf`, `scripts/xc-env-tenant.sh`)
 
 - **Tenant Guard**: Executable script `scripts/xc-env-tenant.sh` (`chmod +x`) outputs JSON `{"tenant":"<label>","api_url_set":"<bool>"}` from `XCSH_API_URL`. A `lifecycle { postcondition }` block on `data.external.xc_env_tenant` asserts the ambient tenant matches `var.expected_xc_tenant` (`f5-sales-demo`), failing the plan if pointed at the wrong tenant.
-- **CIDR Safety Checks**: `check "vip_outside_vnet_cidrs"` and `check "ca_vip_outside_vnet_cidrs"` assert that VIPs (`10.250.0.10` and `10.250.1.10`) sit strictly outside all hub and spoke VNet CIDRs to prevent VNet system routes from overriding BGP host routes.
+- **CIDR Safety Checks**: `check "vip_outside_vnet_cidrs"` assert that VIPs (`10.250.0.10`) sit strictly outside all hub and spoke VNet CIDRs to prevent VNet system routes from overriding BGP host routes.
 
 ---
 
@@ -135,16 +134,6 @@ Pure-computation module expanding `ce_count` (1..3) into per-CE node maps:
 - **Origin Pool**: `xcsh_origin_pool.this` targeting `var.origin_ip:var.origin_port` with `ROUND_ROBIN` and `DISTRIBUTED` selection.
 - **HTTP Load Balancer**: `xcsh_http_loadbalancer.this` (`mcn-ce-ha-f5se`) serving `var.lb_domain` with `advertise_custom` advertising VIP `10.250.0.10` on `SITE_NETWORK_OUTSIDE` per CE site, with explicit `depends_on = [module.xc_site]`.
 
-### Canada Regional Extension (`enable_canada = true`)
-
-- Parallel Hub VNet (`10.200.0.0/16` in `canadacentral`), 3 Canadian CE VMs, Canada Route Server, Canadian eBGP connections, Client VM.
-- **Canadian Virtual Sites**:
-  - `xcsh_virtual_site.canada_re`: Targets Regional Edge cities `toronto` and `montreal` (`ves.io/city in (toronto, montreal)`).
-  - `xcsh_virtual_site.canada_ce`: Targets the exact Canadian CE `mcn-topology` label.
-- **Canadian Origin Pool & Load Balancer**: `xcsh_origin_pool.canada` and `xcsh_http_loadbalancer.canada` serving `mcn-ce-ha.f5-sales-demo.ca` advertising VIP `10.250.1.10/32`.
-
----
-
 ## 6. Deployment Artifacts & Outputs (`outputs.tf`)
 
 Exports operational metrics required for verification:
@@ -152,3 +141,6 @@ Exports operational metrics required for verification:
 - Node maps, private/public IPs, Route Server IDs and peer IPs, BGP peer addresses.
 - Domain names, advertised VIPs, client NIC names.
 - Sensitive `ce_registration_token` and per-CE Site Console admin passwords (`site_console_admin_passwords`).
+
+The Canadian regional deployment is maintained independently in
+[Canada Topology](https://f5-sales-demo.github.io/canada-topology/).

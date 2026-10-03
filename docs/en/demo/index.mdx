@@ -18,7 +18,7 @@ in a single Terraform plan:
 3. **AWS Customer Edge Extension**: Serves `aws.mcn-ce-ha.f5-sales-demo.com` via 3 EC2 CEs (`m5.2xlarge`) in AWS VPC (`10.150.0.0/16`) in `ap-northeast-1` with dual NICs and eBGP/ECMP active/active routing.
 4. **On-Premise KVM Extension**: One CE (`onprem-ce-01`, `10.100.0.11`) peers with Terraform-owned FRR (`10.100.0.2`, ASN `65515`) on the local libvirt network (`10.100.0.0/24`); the NAT gateway is `10.100.0.1` and the workload is `10.100.0.100`. One BGP peer imports `198.51.100.0/24`; this is not a KVM ECMP demonstration.
 
-Azure US and Canada each use two FRR relays between the CEs and Route Server, plus
+Azure US each use two FRR relays between the CEs and Route Server, plus
 Standard Internal Load Balancers with separate application and Site Console frontends.
 The AWS path uses Transit Gateway
 Connect with six GRE peers and twelve BGP sessions; an internal NLB fronts three routed
@@ -125,3 +125,6 @@ Pin `site_prefix` to the current value when you need existing sites to stay put.
     href="./present/"
   />
 </CardGrid>
+
+The Canadian regional deployment is maintained independently in
+[Canada Topology](https://f5-sales-demo.github.io/canada-topology/).

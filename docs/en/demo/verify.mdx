@@ -17,7 +17,7 @@ exact owned demo sources, and private workstation IPv4 /32 exceptions.
 An explicit deny rule blocks other ingress, including SSH. The origin reserves
 management subnet host offset 30 so it cannot take a CE or FRR address.
 
-## Azure US and Canada
+## Azure US
 
 Run the regional verifier with the configured subscription, which may differ
 from the Azure CLI default:
@@ -96,3 +96,6 @@ VIP traffic must all pass before the KVM path is called complete.
 Observed 2026-08-08 Azure route and traffic samples and earlier AWS acceptance
 were for previous source and topology. Use the current deployment's receipts
 for presentation and failure claims.
+
+The Canadian regional deployment is maintained independently in
+[Canada Topology](https://f5-sales-demo.github.io/canada-topology/).

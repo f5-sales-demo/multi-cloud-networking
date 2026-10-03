@@ -39,7 +39,6 @@ import modulesAwsTgwConnectVariables from "../../_data/terraform/modules/aws-tgw
 import modulesAwsTgwConnectVersions from "../../_data/terraform/modules/aws-tgw-connect/versions.tf?raw";
 import variablesAws from "../../_data/terraform/variables_aws.tf?raw";
 import azureIlb from "../../_data/terraform/azure_ilb.tf?raw";
-import caIlb from "../../_data/terraform/ca_ilb.tf?raw";
 import modulesAzureHubMain from "../../_data/terraform/modules/azure-hub/main.tf?raw";
 import modulesAzureHubOutputs from "../../_data/terraform/modules/azure-hub/outputs.tf?raw";
 import modulesAzureHubVariables from "../../_data/terraform/modules/azure-hub/variables.tf?raw";
@@ -313,12 +312,6 @@ Strict provider-v8 orchestration for the immutable SMSv2 contract, MAC-bound run
 Subscription, region, CIDRs, Bastion, Canadian ILB variant option, and the Azure object names.
 
 <Code code={variablesAzure} lang="hcl" title="terraform/variables_azure.tf" />
-
-### `terraform/ca_ilb.tf`
-
-Azure Internal Load Balancer (ILB) variant configuration for the Canadian regional path (`enable_canada_ilb`).
-
-<Code code={caIlb} lang="hcl" title="terraform/ca_ilb.tf" />
 
 ### `terraform/azure_ilb.tf`
 

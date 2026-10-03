@@ -134,8 +134,8 @@ source "$refresh_scope_source"
   observe_refresh_only_drift first eni-tag-drift 'aws_network_interface.slo[0]' eni_name expected observed
 ) >/dev/null 2>&1 || :
 for stage_flag in \
-  enable_azure=false enable_canada=false \
-  enable_azure_ilb=false enable_canada_ilb=false \
+  enable_azure=false \
+  enable_azure_ilb=false \
   kvm_lan_configuration_phase=hardware; do
   grep -Fxq -- "-var=$stage_flag" "$refresh_scope_calls" ||
     fail "drift refresh plan must retain AWS/KVM stage flag $stage_flag"

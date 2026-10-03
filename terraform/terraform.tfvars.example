@@ -119,5 +119,4 @@ vip              = "10.250.0.10"
 
 # Reserve an existing unused XC public IP for Toronto/Montreal advertisements.
 # Keep the actual name, namespace and address in private tfvars.
-enable_canada_public_re = false
 # ca_re_public_ip = { name = "ip-example", namespace = "shared", ip = "192.0.2.55" }

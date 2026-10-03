@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
-for region in azure ca; do
+region=azure
+{
   sed -n "/resource \"azurerm_lb_rule\" \"${region}_application\" {/,/^}/p" "$repo/terraform/${region}_ilb.tf" | grep -Eq "probe_id[[:space:]]*=[[:space:]]*azurerm_lb_probe.${region}_site_console" || {
     echo "FAIL: floating application must probe a backend listener" >&2
     exit 1
   }
-done
+}
 grep -q 'mcn-azure-probes.timer' "$repo/terraform/cloud-init/ce-node.yaml"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT

@@ -21,7 +21,7 @@ provider "xcsh" {
 
 # Azure — deploys the hub VNet, Route Server, CE VMs and the test client.
 locals {
-  azure_provider_enabled = var.enable_azure || var.enable_canada
+  azure_provider_enabled = var.enable_azure
 }
 
 provider "azurerm" {

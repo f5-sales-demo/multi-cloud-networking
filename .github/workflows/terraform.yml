@@ -261,9 +261,6 @@ jobs:
       - name: Init (no backend; CI has no cloud credentials)
         run: terraform init -input=false -backend=false
 
-      - name: Canadian public RE isolation acceptance
-        working-directory: .
-        run: python3 -m unittest discover -s tests -p test_canadian_public_re.py
 
       - name: Origin ACL boot ordering
         working-directory: .

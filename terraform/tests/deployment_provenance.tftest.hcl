@@ -17,13 +17,11 @@ variables {
   deployment_owner_id = "showcase-team"
   deployment_actor_id = "github-actions"
   lb_domain           = "mcn-ce-ha.example.com"
-  ca_lb_domain        = "mcn-ce-ha.example.ca"
   aws_lb_domain       = "aws.mcn-ce-ha.example.com"
   origin_ip           = "203.0.113.10"
   deployer            = "tester"
   ssh_public_key      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzwDqvgRGHaZqbo57o/AxuuqRNPT9MqeYNYsK1Owh8l plan-test-only"
   enable_azure        = false
-  enable_canada       = false
   enable_aws          = false
   enable_kvm          = false
   enable_bgp          = false
@@ -64,7 +62,7 @@ run "preview_identity_isolated_and_protected" {
   }
 
   assert {
-    condition     = local.azure_xc_labels["mcn-environment"] == "feature-a-3556d0cec0c1" && local.azure_xc_labels["mcn-source-commit"] == var.source_commit_sha && local.ca_xc_labels["mcn-owner-id"] == var.deployment_owner_id
+    condition     = local.azure_xc_labels["mcn-environment"] == "feature-a-3556d0cec0c1" && local.azure_xc_labels["mcn-source-commit"] == var.source_commit_sha
     error_message = "XC metadata maps must carry the protected environment, revision, and owner identity."
   }
 }
@@ -123,7 +121,7 @@ run "production_identity_preserves_existing_names" {
   }
 
   assert {
-    condition     = output.lb_domain == var.lb_domain && output.ca_lb_domain == var.ca_lb_domain && output.aws_lb_domain == var.aws_lb_domain
+    condition     = output.lb_domain == var.lb_domain && output.aws_lb_domain == var.aws_lb_domain
     error_message = "Production domains must remain unchanged."
   }
 }

@@ -146,3 +146,6 @@ terraform plan -var="origin_ip=203.0.113.10" -var="lb_domain=example.com"
 | `CertifiedHardwareEndpoint` in Cloud-Init | Renders `/etc/vpm/config.yaml` with `azure.yml` endpoint required by `vpmd` on marketplace `volterra-node` images. |
 | `namespace = ""` on `data.xcsh_namespace` | Required by the `xcsh_namespace` data source schema to prevent HCL validation errors. |
 | `private_ip_address_allocation` | Enforces explicit static/dynamic IP allocation syntax for Azure network interface resource blocks. |
+
+The Canadian regional deployment is maintained independently in
+[Canada Topology](https://f5-sales-demo.github.io/canada-topology/).

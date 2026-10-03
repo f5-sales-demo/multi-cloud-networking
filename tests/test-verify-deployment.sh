@@ -198,14 +198,14 @@ run_uat() {
 
 echo "1. healthy deployment passes every aggregate gate"
 if OUT=$(run_uat healthy 2>&1); then
-  for expected in 'sites_online=6/6' 'azure_vms_running=6/6' 'password_extensions_succeeded=6/6' 'us_ilb_reachable=yes' 'canada_ilb_reachable=yes' 'vip_samples=150' 'ca_lb_samples=150' 'ca_lb_failures=0' 'origin_failures=0' 'converged=yes'; do
+  for expected in 'sites_online=3/3' 'azure_vms_running=3/3' 'password_extensions_succeeded=3/3' 'us_ilb_reachable=yes' 'vip_samples=150' 'origin_failures=0' 'converged=yes'; do
     if grep -qF "$expected" <<<"$OUT"; then
       ok "reported ${expected}"
     else
       bad "missing ${expected} from output"
     fi
   done
-  if jq -e '.sites_online == 6 and .azure_vms_running == 6 and .password_extensions_succeeded == 6 and .us_ilb_reachable == "yes" and .canada_ilb_reachable == "yes" and .vip_samples == 150 and .ca_lb_samples == 150 and .ca_lb_failures == 0 and .converged == true' "${WORK}/evidence-healthy/summary.json" >/dev/null; then
+  if jq -e '.sites_online == 3 and .azure_vms_running == 3 and .password_extensions_succeeded == 3 and .us_ilb_reachable == "yes" and .vip_samples == 150 and .converged == true' "${WORK}/evidence-healthy/summary.json" >/dev/null; then
     ok "wrote a machine-readable aggregate summary"
   else
     bad "aggregate summary is missing or incorrect"
@@ -238,13 +238,6 @@ if AZ_ILB_MODE=missing run_uat missing-ilb >/dev/null 2>&1; then
   bad "UAT passed with an unreachable ILB"
 else
   ok "rejected the unreachable ILB"
-fi
-
-echo "5. Canadian advertised-LB traffic loss fails the UAT"
-if CURL_CANADA_LB_MODE=fail run_uat canada-lb-failure >/dev/null 2>&1; then
-  bad "UAT passed with Canadian advertised-LB traffic loss"
-else
-  ok "rejected Canadian advertised-LB traffic loss"
 fi
 
 echo "6. fewer than 100 possible samples is rejected before any API call"
@@ -309,10 +302,10 @@ if AZ_BGP_MODE=missing-ce run_uat missing-bgp >/dev/null 2>&1; then
 else
   ok "rejected a missing direct CE-FRR session"
 fi
-if grep -Fq 'azure_ilb_private_ip' "$SCRIPT" && grep -Fq 'canada_ilb_private_ip' "$SCRIPT"; then
-  ok "default verifier requires both US and Canada ILB endpoints"
+if grep -Fq 'azure_ilb_private_ip' "$SCRIPT"; then
+  ok "default verifier requires the retained US ILB endpoint"
 else
-  bad "default verifier does not require both supported ILB endpoints"
+  bad "default verifier does not require the retained ILB endpoint"
 fi
 
 if [ "$FAIL" -eq 0 ]; then

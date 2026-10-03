@@ -31,11 +31,6 @@ variable "enable_azure" {
 # Canada regional Azure placement & CIDRs
 # ---------------------------------------------------------
 
-variable "enable_canada_ilb" {
-  description = "Deploy the Canadian inside application and Site Console ILB frontends alongside the BGP path."
-  type        = bool
-  default     = true
-}
 
 variable "enable_azure_ilb" {
   description = "Deploy the US inside application and Site Console ILB frontends alongside the BGP path."
@@ -43,102 +38,18 @@ variable "enable_azure_ilb" {
   default     = true
 }
 
-variable "ca_location" {
-  description = "Azure region for Canadian regional resources."
-  type        = string
-  default     = "canadacentral"
-  validation {
-    condition     = contains(["canadacentral", "canadaeast"], var.ca_location)
-    error_message = "Canadian regional resources must use Canada Central or Canada East."
-  }
-}
 
-variable "ca_resource_group_name" {
-  description = "Resource group that holds the Canadian hub VNet, Route Server, CE VMs and test client. Leave null (the default) to derive `rg-<component>-ca-<deployer>`."
-  type        = string
-  default     = null
-}
 
-variable "ca_hub_cidr" {
-  description = "Canada Hub VNet address space."
-  type        = string
-  default     = "10.200.0.0/16"
-}
 
-variable "ca_mgmt_subnet_prefix" {
-  description = "Canada snet-hub-management prefix. CE eth0/SLO NICs live here."
-  type        = string
-  default     = "10.200.1.0/26"
-}
 
-variable "ca_external_subnet_prefix" {
-  description = "Canada snet-hub-external prefix."
-  type        = string
-  default     = "10.200.2.0/26"
-}
 
-variable "ca_internal_subnet_prefix" {
-  description = "Canada snet-hub-internal prefix. Test client lives here."
-  type        = string
-  default     = "10.200.3.0/26"
-}
 
-variable "ca_route_server_subnet_prefix" {
-  description = "Canada RouteServerSubnet prefix. MUST be exactly /27."
-  type        = string
-  default     = "10.200.4.0/27"
 
-  validation {
-    condition     = tonumber(split("/", var.ca_route_server_subnet_prefix)[1]) == 27
-    error_message = "ca_route_server_subnet_prefix must be a /27."
-  }
-}
 
-variable "ca_bastion_subnet_prefix" {
-  description = "Canada AzureBastionSubnet prefix. MUST be /26 or larger."
-  type        = string
-  default     = "10.200.5.0/26"
 
-  validation {
-    condition     = tonumber(split("/", var.ca_bastion_subnet_prefix)[1]) <= 26
-    error_message = "ca_bastion_subnet_prefix must be /26 or larger."
-  }
-}
 
-variable "ca_vip" {
-  description = "HA VIP for Canadian CEs advertised as a /32 via eBGP."
-  type        = string
-  default     = "10.250.1.10"
 
-  validation {
-    condition     = can(cidrhost("${var.ca_vip}/32", 0))
-    error_message = "ca_vip must be a valid IPv4 address."
-  }
-}
 
-variable "ca_route_server_name" {
-  description = "Canada Azure Route Server name. Leave null to derive `<component>-ca-rs`."
-  type        = string
-  default     = null
-}
-
-variable "ca_bastion_name" {
-  description = "Canada Azure Bastion host name. Leave null to derive `<component>-ca-bastion`."
-  type        = string
-  default     = null
-}
-
-variable "ca_client_vm_name" {
-  description = "Canada test client VM name. Leave null to derive `<component>-ca-client`."
-  type        = string
-  default     = null
-}
-
-variable "ca_region_short" {
-  description = "Short region token for Canada site names. Leave null to use var.ca_location."
-  type        = string
-  default     = null
-}
 
 # ---------------------------------------------------------
 # Network CIDRs
