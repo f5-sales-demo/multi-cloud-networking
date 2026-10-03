@@ -128,6 +128,7 @@ locals {
   kvm_registration_records = var.enable_kvm ? flatten([
     for item in coalesce(try(data.xcsh_site_registrations_by_site.kvm[0].items, null), []) : [
       for network in try(item.get_spec.infra.hw_info.network, []) : {
+        state    = try(item.object.status.current_state, "")
         hostname = try(item.get_spec.infra.hostname, "")
         provider = try(item.get_spec.infra.provider_ref, "")
         mac      = lower(try(network.mac_address, ""))
