@@ -112,8 +112,8 @@ fi
 
 echo "7. provider v13.0.2 uses one immutable API release identity"
 api_tag='v10.0.0'
-release_revision_left='1a0b5141f4589ffaf7b'
-release_revision_right='b696a4369a16ee74ae2ff'
+release_revision_left='ac024ccbfb8b9f844128'
+release_revision_right='13f3e2ab9f5821937ef2'
 for relative in terraform/aws_tgw_connect.tf terraform/tests/aws_tgw_connect.tftest.hcl \
   scripts/aws-smsv2-uat-preflight.sh tests/test-aws-smsv2-uat-preflight.sh \
   docs/en/demo/deploy.mdx docs/en/customer-edge/smsv2/azure-route-server.mdx; do
