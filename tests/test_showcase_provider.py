@@ -2,6 +2,7 @@
 
 # pylint: disable=invalid-name
 # ruff: noqa: INP001, PT027
+import ast
 import importlib.util
 import json
 import unittest
@@ -86,3 +87,21 @@ class ProviderIdentityTests(unittest.TestCase):
                 self.assertRaisesRegex(ValueError, "API release identity mismatch"),
             ):
                 provider.validate_identity(self.release(), self.api, self.artifact)
+
+
+class SavedPlanArtifactIdentityTests(unittest.TestCase):
+    def test_all_scope_gates_pin_verified_publication_artifact(self):
+        repository = Path(__file__).resolve().parents[1]
+        for name in ("showcase-plan-scope.py", "showcase-legacy-destroy-scope.py"):
+            with self.subTest(script=name):
+                tree = ast.parse((repository / "scripts" / name).read_text())
+                values = [
+                    ast.literal_eval(node.value)
+                    for node in tree.body
+                    if isinstance(node, ast.Assign)
+                    and any(
+                        isinstance(target, ast.Name) and target.id == "PROVIDER_SHA256"
+                        for target in node.targets
+                    )
+                ]
+                assert values == [provider.ZIP_SHA256]
