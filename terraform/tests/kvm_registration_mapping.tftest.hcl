@@ -146,3 +146,20 @@ run "configured_kvm_mapping_rejects_foreign_provider" {
 
   expect_failures = [terraform_data.gate[0]]
 }
+
+run "terminal_predecessor_does_not_conflict_with_online_replacement" {
+  command = plan
+  module { source = "./modules/kvm-registration-mapping" }
+  variables {
+    enforce  = true
+    ce_nodes = { "01" = { address = "10.100.0.11", mac = "52:54:00:10:00:11" } }
+    registration_records = [
+      { hostname = "retired-ce", provider = "KVM", mac = "52:54:00:10:00:11", state = "FAILED" },
+      { hostname = "replacement-ce", provider = "KVM", mac = "52:54:00:10:00:11", state = "ONLINE" },
+    ]
+  }
+  assert {
+    condition     = output.mapping_valid && output.expected_bgp_peers["node_01_slo"].node == "replacement-ce"
+    error_message = "A terminal predecessor must not conflict with the exact live replacement."
+  }
+}

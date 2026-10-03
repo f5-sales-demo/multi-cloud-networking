@@ -2,7 +2,8 @@ locals {
   registration_matches = {
     for key, node in var.ce_nodes : key => [
       for record in var.registration_records : record
-      if record.provider == "KVM" && lower(record.mac) == lower(node.mac)
+      if record.provider == "KVM" && lower(record.mac) == lower(node.mac) &&
+      !contains(["FAILED", "FAILED_INACTIVE", "DONE", "RETIRED"], record.state)
     ]
   }
   mapping_valid = (

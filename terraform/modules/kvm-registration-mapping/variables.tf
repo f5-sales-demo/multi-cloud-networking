@@ -9,6 +9,7 @@ variable "registration_records" {
     hostname = string
     provider = string
     mac      = string
+    state    = optional(string, "ONLINE")
   }))
 }
 
