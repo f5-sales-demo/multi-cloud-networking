@@ -95,11 +95,11 @@ resource "terraform_data" "aws_tgw_contract_gate" {
       condition = (
         data.xcsh_smsv2_contract.aws[0].contract_id == "f5xc-smsv2-api/v1" &&
         data.xcsh_smsv2_contract.aws[0].contract_version == "7.0.0" &&
-        data.xcsh_smsv2_contract.aws[0].api_release_tag == "v9.0.2" &&
+        data.xcsh_smsv2_contract.aws[0].api_release_tag == "v10.0.0" &&
         data.xcsh_smsv2_contract.aws[0].api_release_commit == local.aws_smsv2_api_release_commit &&
         data.xcsh_smsv2_contract.aws[0].telemetry_schema_id == "f5xc-smsv2-aws-tgw-telemetry/v2"
       )
-      error_message = "Provider v12.4.0 must expose the exact immutable SMSv2 API v9.0.2 contract."
+      error_message = "Provider v13.0.2 must expose the exact immutable SMSv2 API v10.0.0 contract."
     }
     precondition {
       condition = (
@@ -110,7 +110,7 @@ resource "terraform_data" "aws_tgw_contract_gate" {
         try(data.xcsh_smsv2_contract.aws[0].capabilities["tgw_connect"], "") == "available" &&
         try(data.xcsh_smsv2_contract.aws[0].capabilities["site_upgrade"], "") == "available"
       )
-      error_message = "Provider v12.4.0 must publish all and only the required SMSv2 capabilities, including evidence-backed AWS node configuration, as available."
+      error_message = "Provider v13.0.2 must publish all and only the required SMSv2 capabilities, including evidence-backed AWS node configuration, as available."
     }
     precondition {
       condition = try(

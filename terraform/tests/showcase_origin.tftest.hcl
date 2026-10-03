@@ -37,11 +37,11 @@ run "distinct_owned_origins_selected_by_region" {
   variables { enable_showcase_origin = true }
   override_data {
     target = data.xcsh_network_regional_edges.origin[0]
-    values = { cidr_blocks = ["192.0.2.0/24"], api_release_tag = "v9.0.2" }
+    values = { cidr_blocks = ["192.0.2.0/24"], api_release_tag = "v10.0.0" }
   }
   override_data {
     target = data.xcsh_network_cdn.origin[0]
-    values = { cidr_blocks = ["192.0.2.0/24"], api_release_tag = "v9.0.2" }
+    values = { cidr_blocks = ["192.0.2.0/24"], api_release_tag = "v10.0.0" }
   }
 
   override_module {
