@@ -307,7 +307,7 @@ git -C "$REPO_ROOT" archive "$SOURCE_COMMIT_SHA:terraform" | tar -x -C "$INPUT_D
 sed -i '/^[[:space:]]*backend "s3" {}[[:space:]]*$/d' "$INPUT_DIR/backend.tf"
 terraform -chdir="$INPUT_DIR" init -backend=false -input=false -lockfile=readonly \
   >"$PRIVATE_ROOT/input-console-init.log" 2>&1 || die "isolated input root initialization failed"
-input_expr='jsonencode({subscription=var.subscription_id,flags={aws=var.enable_aws,azure=var.enable_azure,canada=var.enable_canada,bgp=var.enable_bgp,us_ilb=var.enable_azure_ilb,ca_ilb=var.enable_canada_ilb,kvm=var.enable_kvm,kvm_lan=var.enable_kvm_lan},generation=var.smsv2_site_generation,site_prefix=local.site_prefix,aws_prefix=local.aws_resource_prefix,deployer=local.deployer,environment=var.environment})'
+input_expr='jsonencode({subscription=var.subscription_id,flags={aws=var.enable_aws,azure=var.enable_azure,bgp=var.enable_bgp,us_ilb=var.enable_azure_ilb,kvm=var.enable_kvm,kvm_lan=var.enable_kvm_lan},generation=var.smsv2_site_generation,site_prefix=local.site_prefix,aws_prefix=local.aws_resource_prefix,deployer=local.deployer,environment=var.environment})'
 input_line=$(printf '%s\n' "$input_expr" |
   "${TF_RUNNER[@]}" -chdir="$INPUT_DIR" console "${IDENTITY_TF_ARGS[@]}" \
     -var-file="$TFVARS" -var='enable_aws_tgw_connect=false' | tail -n 1) ||
@@ -507,8 +507,8 @@ wait_for_approvals() {
   local probe="$PRIVATE_ROOT/registration-wait.tfplan" gate digest projection_tmp projection_digest
   local -a args=(-input=false -no-color -lock=false -var-file="$TFVARS"
     -var="aws_site_configuration_phase=$phase" -var='enable_aws_tgw_connect=false'
-    -var='enable_azure=false' -var='enable_canada=false'
-    -var='enable_azure_ilb=false' -var='enable_canada_ilb=false'
+    -var='enable_azure=false'
+    -var='enable_azure_ilb=false'
     -var='kvm_lan_configuration_phase=hardware')
   if [ "$phase" = configured ]; then
     args+=(-var="aws_smsv2_device_mapping_file=$MAPPING_FILE")
@@ -650,8 +650,8 @@ build_cycle() {
   exercise_managed_drift "$cycle"
   phase_paths "$cycle" kvm_configured inside-vip
   tf_plan -input=false -no-color -var-file="$TFVARS" \
-    -var='enable_azure=false' -var='enable_canada=false' \
-    -var='enable_azure_ilb=false' -var='enable_canada_ilb=false' \
+    -var='enable_azure=false' \
+    -var='enable_azure_ilb=false' \
     -var='kvm_lan_configuration_phase=configured' \
     -var='azure_site_configuration_phase=configured' \
     -var='aws_site_configuration_phase=configured' \
@@ -660,7 +660,7 @@ build_cycle() {
   tf_exec python3 "$REPO_ROOT/scripts/verify-kvm-lan-client.py" \
     --terraform-dir "$TERRAFORM_DIR" --evidence-dir "$CYCLE_DIR/kvm-client" \
     --source-commit "$SOURCE_COMMIT_SHA"
-  phase_paths "$cycle" azure_build both-regions
+  phase_paths "$cycle" azure_build us-region
   tf_plan -input=false -no-color -var-file="$TFVARS" \
     -var='azure_site_configuration_phase=bootstrap' \
     -var='kvm_lan_configuration_phase=configured' \
@@ -704,7 +704,7 @@ wait_for_azure_approvals() {
       >"$EVIDENCE_DIR/registration-plan.log" 2>&1; then
       approval_count=$(tf show -json "$PLAN_FILE" |
         jq '[.resource_changes[]? | select(.type == "xcsh_registration_approval" and .name == "this" and .change.actions == ["create"])] | length')
-      if [ "$approval_count" -eq 6 ]; then
+      if [ "$approval_count" -eq 3 ]; then
         apply_scoped_plan azure-approvals
         return 0
       fi
@@ -712,16 +712,14 @@ wait_for_azure_approvals() {
     rm -f -- "$PLAN_FILE"
     sleep 30
   done
-  die "six Azure CE registrations did not reach an approvable state before the bounded deadline"
+  die "three Azure CE registrations did not reach an approvable state before the bounded deadline"
 }
 
 wait_for_azure_online() {
   local cycle=$1 deadline=$((SECONDS + 5400)) site state all_online
-  local -a sites=() canadian_sites=()
+  local -a sites=()
   mapfile -t sites < <(tf output -json xc_site_names | jq -r '.[]')
-  mapfile -t canadian_sites < <(tf output -json ca_xc_site_names | jq -r '.[]')
-  sites+=("${canadian_sites[@]}")
-  [ "${#sites[@]}" -eq 6 ] || die "Azure online wait requires six owned sites"
+  [ "${#sites[@]}" -eq 3 ] || die "Azure online wait requires three owned sites"
   while ((SECONDS < deadline)); do
     all_online=true
     for site in "${sites[@]}"; do
@@ -736,13 +734,13 @@ wait_for_azure_online() {
     done
     if [ "$all_online" = true ]; then
       jq -n --arg checked_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-        '{checked_at:$checked_at,online_sites:6,status:"passed"}' \
+        '{checked_at:$checked_at,online_sites:3,status:"passed"}' \
         >"$PRIVATE_ROOT/$cycle-azure-online-receipt.json"
       return 0
     fi
     sleep 30
   done
-  die "six Azure CEs did not become ONLINE before the bounded deadline"
+  die "three Azure CEs did not become ONLINE before the bounded deadline"
 }
 
 settle_azure() {
@@ -771,8 +769,6 @@ verify_final() {
   phase_paths "$cycle" final refresh-zero-change
   tf_exec bash "$REPO_ROOT/scripts/verify-deployment.sh" --terraform-dir "$TERRAFORM_DIR" \
     --evidence-dir "$PHASE_DIR/azure-uat" --subscription "$AZURE_SUBSCRIPTION" --skip-console
-  tf_exec python3 "$REPO_ROOT/scripts/verify-canadian-public-re.py" --terraform-dir "$TERRAFORM_DIR" \
-    --evidence-dir "$PHASE_DIR/canadian-public-re"
   if [ "$cycle" != verify ]; then
     tf_exec "$REPO_ROOT/scripts/verify-azure-failover.sh" --terraform-dir "$TERRAFORM_DIR" \
       --evidence-dir "$PHASE_DIR/azure-failover" --subscription "$AZURE_SUBSCRIPTION" \
@@ -792,9 +788,7 @@ destroy_all() {
   phase_paths "$cycle" full_destroy reviewed
   DESTROY_FALLBACK=false
   tf output -json xc_site_names >"$PRIVATE_ROOT/latest-destroy-us-sites.json" 2>/dev/null || printf '{}\n' >"$PRIVATE_ROOT/latest-destroy-us-sites.json"
-  tf output -json ca_xc_site_names >"$PRIVATE_ROOT/latest-destroy-ca-sites.json" 2>/dev/null || printf '{}\n' >"$PRIVATE_ROOT/latest-destroy-ca-sites.json"
   tf output -json resource_group_name >"$PRIVATE_ROOT/latest-destroy-us-rg.json" 2>/dev/null || printf 'null\n' >"$PRIVATE_ROOT/latest-destroy-us-rg.json"
-  tf output -json ca_resource_group_name >"$PRIVATE_ROOT/latest-destroy-ca-rg.json" 2>/dev/null || printf 'null\n' >"$PRIVATE_ROOT/latest-destroy-ca-rg.json"
   tf state pull >"$EVIDENCE_DIR/prior-state.json"
   tf_plan -destroy -json -input=false -no-color -var-file="$TFVARS" \
     -var='aws_site_configuration_phase=bootstrap' -var='enable_aws_tgw_connect=false' \
@@ -826,7 +820,7 @@ destroy_all() {
 verify_absence() {
   local response_file="$PRIVATE_ROOT/xc-absence.json" status site
   local -a azure_sites=()
-  mapfile -t azure_sites < <(jq -r '.[]' "$PRIVATE_ROOT/latest-destroy-us-sites.json" "$PRIVATE_ROOT/latest-destroy-ca-sites.json")
+  mapfile -t azure_sites < <(jq -r '.[]' "$PRIVATE_ROOT/latest-destroy-us-sites.json")
   for site in "${final_sites[@]}" "${bootstrap_sites[@]}" "${SITE_PREFIX}-kvm" "${azure_sites[@]}"; do
     status=$(printf 'header = "Authorization: APIToken %s"\n' "$XCSH_API_TOKEN" |
       curl -sS --connect-timeout 10 --max-time 30 --config - --output "$response_file" --write-out '%{http_code}' \
@@ -841,11 +835,10 @@ verify_absence() {
     --query 'length(Reservations[].Instances[])' --output text)
   [ "$instance_count" = 0 ] || die "owned AWS instances remain after destroy"
   local rg
-  for file in "$PRIVATE_ROOT/latest-destroy-us-rg.json" "$PRIVATE_ROOT/latest-destroy-ca-rg.json"; do
-    rg=$(jq -r '. // empty' "$file")
-    [ -z "$rg" ] || [ "$(az group exists --subscription "$AZURE_SUBSCRIPTION" --name "$rg")" = false ] ||
-      die "owned Azure resource group remains after destroy: $rg"
-  done
+  file="$PRIVATE_ROOT/latest-destroy-us-rg.json"
+  rg=$(jq -r '. // empty' "$file")
+  [ -z "$rg" ] || [ "$(az group exists --subscription "$AZURE_SUBSCRIPTION" --name "$rg")" = false ] ||
+    die "owned Azure resource group remains after destroy: $rg"
   jq -n --arg checked_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --argjson azure_site_count "${#azure_sites[@]}" \
     '{checked_at:$checked_at,azure_site_count:$azure_site_count,aws_instance_count:0,azure_resource_groups_absent:true,xc_sites_absent:true}' \
@@ -858,8 +851,8 @@ observe_refresh_only_drift() {
   phase_paths "$cycle" refresh_only "$step"
   tf_plan -refresh-only -input=false -no-color -var-file="$TFVARS" \
     -var='aws_site_configuration_phase=configured' -var='enable_aws_tgw_connect=true' \
-    -var='enable_azure=false' -var='enable_canada=false' \
-    -var='enable_azure_ilb=false' -var='enable_canada_ilb=false' \
+    -var='enable_azure=false' \
+    -var='enable_azure_ilb=false' \
     -var='kvm_lan_configuration_phase=hardware' \
     -var="aws_smsv2_device_mapping_file=$MAPPING_FILE" -out="$PLAN_FILE"
   drift_json=$(tf show -json "$PLAN_FILE")

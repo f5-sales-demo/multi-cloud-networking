@@ -71,59 +71,12 @@ variable "lb_domain" {
 # Canada Regional F5 XC inputs
 # ---------------------------------------------------------
 
-variable "enable_canada" {
-  description = "Enable parallel Canada-only regional infrastructure, Canadian virtual sites, and f5-sales-demo.ca load balancer."
-  type        = bool
-  default     = true
-}
 
-variable "ca_lb_domain" {
-  description = "Domain served by the Canada HTTP load balancer. Defaults to mcn-ce-ha.f5-sales-demo.ca."
-  type        = string
-  default     = "mcn-ce-ha.f5-sales-demo.ca"
 
-  validation {
-    condition     = can(regex("^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}$", var.ca_lb_domain))
-    error_message = "ca_lb_domain must be a fully-qualified lowercase domain name (for example mcn-ce-ha.f5-sales-demo.ca)."
-  }
-}
 
-variable "ca_re_cities" {
-  description = "List of cities for the Canadian Regional Edge Virtual Site selector. Defaults to Toronto and Montreal."
-  type        = list(string)
-  default     = ["toronto", "montreal"]
-  validation {
-    condition = (
-      length(var.ca_re_cities) > 0 &&
-      alltrue([for city in var.ca_re_cities : contains(["toronto", "montreal"], city)])
-    )
-    error_message = "Canadian RE advertisement must select Toronto and/or Montreal."
-  }
-}
 
-variable "ca_lb_name" {
-  description = "Name of the Canada HTTP load balancer. Leave null (the default) to derive `<component>-ca-f5se`."
-  type        = string
-  default     = null
-}
 
-variable "ca_origin_pool_name" {
-  description = "Name of the Canada origin pool. Leave null (the default) to derive `<component>-ca-pool`."
-  type        = string
-  default     = null
-}
 
-variable "ca_re_vsite_name" {
-  description = "Name of the Canadian Regional Edge virtual site. Leave null (the default) to derive `<component>-ca-re-vsite`."
-  type        = string
-  default     = null
-}
-
-variable "ca_ce_vsite_name" {
-  description = "Name of the Canadian Customer Edge virtual site. Leave null (the default) to derive `<component>-ca-ce-vsite`."
-  type        = string
-  default     = null
-}
 
 variable "vip" {
   description = "HA VIP advertised as a /32 by every CE via eBGP. MUST be outside all VNet CIDRs (Azure prefers the VNet system route over a more-specific BGP /32 otherwise)."
@@ -135,29 +88,5 @@ variable "vip" {
     # check{} block in main.tf (which may reference other variables).
     condition     = can(cidrhost("${var.vip}/32", 0))
     error_message = "vip must be a valid IPv4 address."
-  }
-}
-
-variable "enable_canada_public_re" {
-  description = "Advertise the Canadian HTTP-LB publicly on Toronto/Montreal using a dedicated allocated XC public IP. Requires ca_re_public_ip."
-  type        = bool
-  default     = false
-}
-variable "ca_re_public_ip" {
-  description = "Dedicated XC public-IP allocation reserved for this Canadian demo. Use an existing unused allocation or obtain an additional one through F5 support; keep the actual allocation in private tfvars."
-  type = object({
-    name      = string
-    namespace = string
-    ip        = string
-  })
-  default  = null
-  nullable = true
-  validation {
-    condition = var.ca_re_public_ip == null || try(
-      length(var.ca_re_public_ip.name) > 0 &&
-      length(var.ca_re_public_ip.namespace) > 0 &&
-      can(cidrhost("${var.ca_re_public_ip.ip}/32", 0)) &&
-    !strcontains(var.ca_re_public_ip.ip, ":"), false)
-    error_message = "ca_re_public_ip must identify an allocated IPv4 public-IP object by name and namespace."
   }
 }

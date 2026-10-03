@@ -257,19 +257,19 @@ def validate(
         approvals = [
             address
             for address, actions in changes
-            if address.startswith(("module.xc_site[", "module.xc_site_ca["))
+            if address.startswith(("module.xc_site[",))
             and ".xcsh_registration_approval.this[" in address
             and actions == ["create"]
         ]
-        if len(approvals) != 6:
+        if len(approvals) != 3:
             raise ValueError(
-                "Azure approval plan must create six registration approvals"
+                "Azure approval plan must create three registration approvals"
             )
         for address, actions in changes:
             if address in approvals:
                 continue
             if not (
-                address.startswith(("module.xc_site[", "module.xc_site_ca["))
+                address.startswith(("module.xc_site[",))
                 and ".xcsh_securemesh_site_v2.this[" in address
                 and actions == ["update"]
             ):
@@ -283,7 +283,7 @@ def validate(
             raise ValueError("Azure MAC binding plan has no actions")
         for address, actions in changes:
             if not (
-                address.startswith(("module.xc_site[", "module.xc_site_ca["))
+                address.startswith(("module.xc_site[",))
                 and ".xcsh_securemesh_site_v2.this[" in address
                 and actions == ["update"]
             ):

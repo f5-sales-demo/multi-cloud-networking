@@ -51,12 +51,6 @@ cp terraform.tfvars.example terraform.tfvars
 | --- | --- | --- |
 | `origin_ip` | *(no default)* | Public IP of your origin server (e.g. `203.0.113.10` from RFC 5737 documentation space). |
 | `lb_domain` | *(no default)* | FQDN for Rest of World traffic (e.g. `mcn-ce-ha.f5-sales-demo.com` or `mcn.example.com`). |
-| `ca_lb_domain` | `mcn-ce-ha.f5-sales-demo.ca` | FQDN for Canada-only traffic (e.g. `mcn.example.ca`). |
-| `enable_canada` | `true` | Toggle to deploy parallel Canadian regional infrastructure, virtual sites, and load balancer. |
-| `ca_location` | `canadacentral` | Azure region for Canadian CEs and Route Server. |
-| `ca_hub_cidr` | `10.200.0.0/16` | VNet CIDR block for Canadian Hub VNet (RFC 1918 space). |
-| `ca_vip` | `10.250.1.10` | HA VIP advertised by Canadian CEs via eBGP (must be outside VNet CIDRs). |
-| `ca_re_cities` | `["toronto", "montreal"]` | List of Regional Edge cities for Canadian RE Virtual Site selector expression. |
 
 For repeatable disposable demos, set `enable_showcase_origin = true`. Terraform
 creates an HTTP origin in the US hub, supplies its public IP to both regional
@@ -173,7 +167,7 @@ scripts/showcase-lifecycle.sh --mode full \
   --deployment-actor-id terraform-cli
 ```
 
-The private tfvars enables AWS TGW, Azure US, Azure Canada, BGP, both ILB
+The private tfvars enables AWS TGW, Azure US, BGP, the US ILB
 application paths, and the KVM physical LAN. Bastion remains opt-in. A failed
 live gate stops the command for a source fix and another reviewed iteration.
 Use the sections below when reviewing an individual AWS phase or the separate
@@ -435,3 +429,6 @@ terraform destroy
 
 The app namespace survives: it is read, never managed, so `destroy` cannot take a namespace
 holding unrelated demos with it. Everything else in the resource group goes.
+
+The Canadian regional deployment is maintained independently in
+[Canada Topology](https://f5-sales-demo.github.io/canada-topology/).

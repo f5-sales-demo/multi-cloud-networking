@@ -147,8 +147,6 @@ run_region() {
 }
 
 ORIGIN=$(tf_raw origin_ip)
-CA_ORIGIN=$(tf_raw ca_origin_ip)
-[[ "$CA_ORIGIN" =~ ^[0-9.]+$ ]] || die "ca_origin_ip is not an IPv4 literal"
 [[ "$ORIGIN" =~ ^[0-9.]+$ ]] || die "origin_ip is not an IPv4 literal"
 
 run_region us "$(tf_raw resource_group_name)" "$(tf_raw client_vm_name)" "$(tf_raw client_nic_name)" \
@@ -156,9 +154,3 @@ run_region us "$(tf_raw resource_group_name)" "$(tf_raw client_vm_name)" "$(tf_r
   "$(tf_raw azure_ilb_private_ip)" "$(tf_raw azure_ilb_console_ip)" \
   "$(tf_json ce_vm_names)" "$(tf_json azure_frr_vm_names)" \
   "$(tf_json ce_mgmt_private_ips | jq -c '[.[]]')" "$(tf_json route_server_peer_ips)" "$(tf_json azure_frr_peer_ips)"
-ORIGIN=$CA_ORIGIN
-run_region canada "$(tf_raw ca_resource_group_name)" "$(tf_raw ca_client_vm_name)" "$(tf_raw canada_client_nic_name)" \
-  "$(tf_raw ca_vip)" "$(tf_raw ca_lb_domain)" "$(tf_raw canada_ilb_application_domain)" \
-  "$(tf_raw canada_ilb_private_ip)" "$(tf_raw canada_ilb_console_ip)" \
-  "$(tf_json ca_ce_vm_names)" "$(tf_json canada_frr_vm_names)" \
-  "$(tf_json canada_ce_mgmt_private_ips | jq -c '[.[]]')" "$(tf_json canada_route_server_peer_ips)" "$(tf_json canada_frr_peer_ips)"

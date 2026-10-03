@@ -261,24 +261,18 @@ class ShowcasePlanScopeTest(unittest.TestCase):
         ):
             module.validate(document, "aws-kvm-build", "a" * 40)
 
-    def test_azure_approvals_require_six_scoped_creates(self):
+    def test_azure_approvals_require_three_scoped_creates(self):
         approvals = [
             (
                 f'module.xc_site["{i:02d}"].xcsh_registration_approval.this[0]',
                 ["create"],
             )
             for i in range(1, 4)
-        ] + [
-            (
-                f'module.xc_site_ca[0].module.site["{i:02d}"].xcsh_registration_approval.this[0]',
-                ["create"],
-            )
-            for i in range(1, 4)
         ]
         self.assertEqual(
-            module.validate(plan(approvals), "azure-approvals", "a" * 40), 6
+            module.validate(plan(approvals), "azure-approvals", "a" * 40), 3
         )
-        with self.assertRaisesRegex(ValueError, "six registration"):
+        with self.assertRaisesRegex(ValueError, "three registration"):
             module.validate(plan(approvals[:-1]), "azure-approvals", "a" * 40)
         with self.assertRaisesRegex(ValueError, "outside its scope"):
             module.validate(

@@ -91,20 +91,8 @@ locals {
   lb_domain = local.deployment_is_production ? var.lb_domain : "${local.deployment_environment_key}.${var.lb_domain}"
 
   # --- Derived Canada object names ---
-  ca_region_short        = coalesce(var.ca_region_short, var.ca_location)
-  ca_site_prefix_base    = coalesce(var.ca_site_prefix, "${local.site_prefix_base}-ca")
-  ca_site_prefix         = local.deployment_is_production ? local.ca_site_prefix_base : "${local.site_prefix}-ca"
-  kvm_site_name          = "${local.site_prefix}-kvm"
-  ca_resource_group_name = "${coalesce(var.ca_resource_group_name, "rg-${var.component}-ca-${local.deployer}")}${local.deployment_name_suffix}"
-  ca_route_server_name   = "${coalesce(var.ca_route_server_name, "${var.component}-ca-rs")}${local.deployment_name_suffix}"
-  ca_bastion_name        = "${coalesce(var.ca_bastion_name, "${var.component}-ca-bastion")}${local.deployment_name_suffix}"
-  ca_client_vm_name      = "${coalesce(var.ca_client_vm_name, "${var.component}-ca-client")}${local.deployment_name_suffix}"
-  ca_origin_pool_name    = "${coalesce(var.ca_origin_pool_name, "${var.component}-ca-pool")}${local.deployment_name_suffix}"
-  ca_lb_name             = "${coalesce(var.ca_lb_name, "${var.component}-ca-f5se")}${local.deployment_name_suffix}"
-  ca_re_vsite_name       = "${coalesce(var.ca_re_vsite_name, "${var.component}-ca-re-vsite")}${local.deployment_name_suffix}"
-  ca_ce_vsite_name       = "${coalesce(var.ca_ce_vsite_name, "${var.component}-ca-ce-vsite")}${local.deployment_name_suffix}"
-  ca_lb_domain           = local.deployment_is_production ? var.ca_lb_domain : "${local.deployment_environment_key}.${var.ca_lb_domain}"
-  aws_lb_domain          = local.deployment_is_production ? var.aws_lb_domain : "${local.deployment_environment_key}.${var.aws_lb_domain}"
+  kvm_site_name = "${local.site_prefix}-kvm"
+  aws_lb_domain = local.deployment_is_production ? var.aws_lb_domain : "${local.deployment_environment_key}.${var.aws_lb_domain}"
 
   # --- Standard tags (applied to every Azure resource) ---
   standard_tags = {
@@ -140,9 +128,6 @@ locals {
   })
   azure_xc_labels = merge(local.xc_provenance_labels, {
     "mcn-topology" = "${local.site_prefix}-azure"
-  })
-  ca_xc_labels = merge(local.xc_provenance_labels, {
-    "mcn-topology" = "${local.ca_site_prefix}-azure"
   })
   kvm_xc_labels = merge(local.xc_labels, {
     "mcn-topology" = "${local.site_prefix}-kvm"
@@ -185,13 +170,5 @@ locals {
   }
 
   # --- Canada CE cloud-init, rendered once per node ---
-  ca_ce_cloud_init = {
-    for key, node in try(module.ce_topology_ca[0].ce_nodes, {}) : key => templatefile("${path.module}/cloud-init/ce-node.yaml", {
-      probe_routing_script = file("${path.module}/cloud-init/azure-probe-routing.sh")
-      inside_subnet        = var.ca_internal_subnet_prefix
-      cluster_name         = node.site_name
-      token                = local.ce_registration_token
-      ssh_public_key       = chomp(local.ssh_public_key)
-    })
-  }
+
 }

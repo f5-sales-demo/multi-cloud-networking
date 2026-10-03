@@ -37,7 +37,6 @@ variables {
   lb_domain              = "mcn-ce-ha.f5-sales-demo.com"
   origin_ip              = "203.0.113.10"
   enable_azure           = true
-  enable_canada          = false
   enable_kvm             = false
   enable_aws             = false
   enable_aws_tgw_connect = false

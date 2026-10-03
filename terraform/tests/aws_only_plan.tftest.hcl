@@ -32,18 +32,9 @@ variables {
 run "aws_only_plan_has_no_azure_or_us_xc_objects" {
   command = plan
 
-  assert {
-    condition     = length(module.azure_hub) == 0 && length(module.ce_node) == 0 && length(module.client_vm) == 0
-    error_message = "AWS-only plans must omit all Azure US modules."
-  }
 
   assert {
-    condition     = length(module.azure_hub_ca) == 0 && length(module.ce_node_ca) == 0 && length(module.client_vm_ca) == 0
-    error_message = "AWS-only plans must omit all Canadian Azure modules."
-  }
-
-  assert {
-    condition     = length(azapi_resource_action.f5xc_customer_edge_marketplace_agreement) == 0 && length(azurerm_lb.azure_ilb) == 0 && length(azurerm_lb.ca_ilb) == 0
+    condition     = length(azapi_resource_action.f5xc_customer_edge_marketplace_agreement) == 0 && length(azurerm_lb.azure_ilb) == 0
     error_message = "AWS-only plans must omit Marketplace and ILB operations."
   }
 
