@@ -31,13 +31,10 @@ import modulesAwsTgwConnectOutputs from "../../_data/terraform/modules/aws-tgw-c
 import modulesAwsTgwConnectVariables from "../../_data/terraform/modules/aws-tgw-connect/variables.tf?raw";
 import modulesAwsTgwConnectVersions from "../../_data/terraform/modules/aws-tgw-connect/versions.tf?raw";
 import variablesAws from "../../_data/terraform/variables_aws.tf?raw";
-import caIlb from "../../_data/terraform/ca_ilb.tf?raw";
 import modulesAzureHubMain from "../../_data/terraform/modules/azure-hub/main.tf?raw";
 import modulesAzureHubOutputs from "../../_data/terraform/modules/azure-hub/outputs.tf?raw";
 import modulesAzureHubVariables from "../../_data/terraform/modules/azure-hub/variables.tf?raw";
 import modulesAzureHubVersions from "../../_data/terraform/modules/azure-hub/versions.tf?raw";
-import modulesAzureRouteServerBgpMain from "../../_data/terraform/modules/azure-route-server-bgp/main.tf?raw";
-import modulesAzureRouteServerBgpVersions from "../../_data/terraform/modules/azure-route-server-bgp/versions.tf?raw";
 import modulesCeNodeMain from "../../_data/terraform/modules/ce-node/main.tf?raw";
 import modulesCeNodeOutputs from "../../_data/terraform/modules/ce-node/outputs.tf?raw";
 import modulesCeNodeVariables from "../../_data/terraform/modules/ce-node/variables.tf?raw";
@@ -160,11 +157,6 @@ Subscription, region, CIDRs, Bastion, Canadian ILB variant option, and the Azure
 
 <Code code={variablesAzure} lang="hcl" title="terraform/variables_azure.tf" />
 
-### `terraform/ca_ilb.tf`
-
-Azure Internal Load Balancer (ILB) variant configuration for the Canadian regional path (`enable_canada_ilb`).
-
-<Code code={caIlb} lang="hcl" title="terraform/ca_ilb.tf" />
 
 ### `terraform/variables_ce.tf`
 
