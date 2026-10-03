@@ -44,7 +44,7 @@ Copy and paste the prompt below into a clean `xcsh` session:
 ```text
 Act as an expert F5 Distributed Cloud (XC) and Microsoft Azure Infrastructure-as-Code architect.
 
-Write the complete, modular, production-grade Terraform codebase under `terraform/` for an Active/Active eBGP/ECMP F5 XC Customer Edge (Secure Mesh v2) deployment on Azure with a parallel Canadian regional extension.
+Write the complete, modular, production-grade Terraform codebase under `terraform/` for an Active/Active eBGP/ECMP F5 XC Customer Edge (Secure Mesh v2) deployment on Azure across Azure, AWS, and KVM.
 
 ### Core Architectural Specifications
 
@@ -92,10 +92,9 @@ Write the complete, modular, production-grade Terraform codebase under `terrafor
    - Azure Standard ILBs provide supported TCP/65500 CE Site Console health and traffic verification for both Azure regions.
    - `client-vm`: Ubuntu test client in `snet-hub-internal` (`private_ip_address_allocation = "Dynamic"`).
 
-5. **App Tier & Canada Extension**:
+5. **Application Tier**:
    - Token `xcsh_token.ce` (`mcn-ce-registration` in `system` namespace, no type argument), `data.xcsh_namespace.mcn` (`multi-cloud-networking`, `namespace = ""`), origin pool `xcsh_origin_pool.this` (`var.origin_ip:var.origin_port`),
      HTTP LB `xcsh_http_loadbalancer.this` (`mcn-ce-ha-f5se`, `domains = [var.lb_domain]`, `advertise_custom` VIP `10.250.0.10` on `SITE_NETWORK_OUTSIDE` per CE site, `depends_on = [module.xc_site]`).
-   - Canada (`enable_canada = true`): Parallel Hub VNet (`10.200.0.0/16` in `canadacentral`), 3 CE VMs, Standard ILB, Client VM, `xcsh_virtual_site` (`canada_re` cities `toronto`,`montreal` & `canada_ce`), Origin Pool & HTTP LB (`mcn-ce-ha.f5-sales-demo.ca` VIP `10.250.1.10/32`).
 
 6. **Outputs**:
    - Export node maps, private/public IPs, route server IDs, BGP peer IPs, domain names, VIPs, sensitive `ce_registration_token` and `site_console_admin_passwords`.

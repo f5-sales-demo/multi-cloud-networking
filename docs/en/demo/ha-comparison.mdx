@@ -23,10 +23,8 @@ The same ILB also has a separate frontend at `.11` for Site Console TCP/65500.
 Its rule is **nonfloating**. The console endpoint is a health and management
 path, not the application VIP.
 
-The Canadian load balancer and BGP VIP use Canadian CEs only. The Canadian
-Regional Edge virtual site continues to select Toronto and Montreal. Run the
-traffic probe from the Canadian client and inspect its effective routes to
-prove the Canadian path; a US client request cannot establish that isolation.
+Canadian regional access control is demonstrated independently in
+[Canada Topology](https://f5-sales-demo.github.io/canada-topology/).
 
 The AWS path has three sites, six Transit Gateway Connect peers, and twelve
 BGP sessions. The KVM path has one CE with a NAT SLO and physical-LAN SLI;
@@ -41,7 +39,7 @@ TCP port 80 to an assigned primary address of a CE that still advertises that
 exact VIP. This avoids Azure dropping packets addressed to an unassigned VIP
 between FRR and CE. The relay preserves the VIP seen by the client and follows
 valid CE BGP paths every three seconds; it removes the translation when no valid
-CE path remains. Canadian relays select only Canadian CE addresses.
+CE path remains.
 
 The inside ILB sends traffic directly to CE internal NICs. Azure health-probe
 responses use an exact source and destination policy route through that internal

@@ -56,11 +56,6 @@ FRR. The client must have one VIP next hop during the FRR outage and two after
 recovery. The script restarts a stopped VM if a gate fails and stops the
 lifecycle for a source fix.
 
-The Canadian Regional Edge virtual site selects Toronto and Montreal, and the
-Canadian CE virtual site selects only Canadian sites. Traffic from the
-Canadian client through the Canadian VIP and ILB is required alongside those
-selectors; a selector alone is not live path evidence.
-
 ## AWS
 
 The live UAT uses the same isolated AWS SSO credential-process route as the

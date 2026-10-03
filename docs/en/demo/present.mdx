@@ -1,6 +1,6 @@
 ---
 title: Present the demo
-description: Show the deployed routing, inside load balancing, regional isolation, and failure recovery.
+description: Show the deployed routing, inside load balancing, interface binding, and failure recovery.
 sidebar:
   order: 40
   label: Present
@@ -12,7 +12,7 @@ relay or inside-VIP paths.
 
 ## Start with the route
 
-In each Azure region, three CEs peer with both local FRR relays. Both FRRs peer
+In Azure US, three CEs peer with both local FRR relays. Both FRRs peer
 with both Azure Route Server endpoints. The relays export only the CE-learned
 application VIP `/32`. The client's effective route table should show **two
 FRR next hops**. Select the configured subscription explicitly:
@@ -34,12 +34,12 @@ TCP/65500 with a nonfloating rule.
 
 ## Demonstration order
 
-1. Show three `ONLINE` CEs in US and three in Canada.
+1. Show three `ONLINE` Azure CEs with registered, MAC-bound interfaces.
 2. Show six CE–FRR and four FRR–Route Server sessions per region, the VIP at
    both FRRs, and two effective client next hops.
 3. Send HTTP requests from each region's client through its BGP VIP and ILB
    application VIP. Show the same owned origin response and healthy console
-   frontend. Keep Canadian traffic on the Canadian client and VIP.
+   frontend.
 4. Stop one CE, demonstrate route withdrawal and continuous traffic, then
    start it and show recovery. Repeat with one FRR to demonstrate one surviving
    next hop. Use the lifecycle's sanitized failure and recovery receipts.
@@ -49,11 +49,6 @@ TCP/65500 with a nonfloating rule.
    independent client response through its custom inside VIP. Verify the host
    bridge and default route remain intact.
 7. Finish with the refresh-enabled zero-change plan from the second build.
-
-The Canadian Regional Edge virtual site selects Toronto and Montreal, and
-its Customer Edge selector names only the Canadian sites. The selector alone
-is configuration evidence; pair it with Canadian client route and traffic
-receipts before describing the path as healthy.
 
 The Canadian regional deployment is maintained independently in
 [Canada Topology](https://f5-sales-demo.github.io/canada-topology/).
