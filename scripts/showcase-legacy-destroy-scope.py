@@ -14,7 +14,7 @@ import subprocess
 import sys
 from typing import Any
 
-PROVIDER_SHA256 = "003117462a099e37eafc447a2f466f26a3b578b66cc5f6296fc4df156971861c"
+PROVIDER_SHA256 = "d157b36153a23f973f0e32d3e62143983b88407b5cc87471d5438d38b8ea00de"
 PRODUCTION_KEY = "mcn-ce-ha-smsv2/showcase.tfstate"
 LEGACY_KVM_BGP = "xcsh_bgp.onprem_ebgp[0]"
 
