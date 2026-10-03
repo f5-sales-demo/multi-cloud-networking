@@ -172,6 +172,37 @@ XC-owned child directly to force a successful plan. A provider or API contract
 rejection belongs in its owning repository; deliver and verify the repair before
 claiming the recovery complete.
 
+### When the retained site cannot recover
+
+In a single-node KVM recovery, the retained site can keep the deleted node's
+terminal registration as **Control** and enroll the new runtime hostname as a
+**Worker**, even with the original MAC addresses. The replacement may briefly
+report ONLINE before heartbeats fail. Hardware creation and initial enrollment
+therefore do not prove a working replacement Control node.
+
+Inspect the owning site's node roles, registration states and guest bootstrap
+logs. If the old Control remains terminal and the replacement cannot sustain
+health, use an explicit teardown and rebuild of the owned KVM site and its
+dependent CE hardware. Keep the full private inputs and lifecycle lock. Save a
+destroy plan targeting `xcsh_securemesh_site_v2.onprem_kvm`, inspect its dependency
+closure, and require only owned KVM site, token, boot-image, hardware, runtime
+adoption and dependent routing/demo objects. Preserve the shared bridge/uplink,
+host management, backend bootstrap and all unrelated cloud resources.
+
+The runtime-interface resource must restore DHCP through the owning site's
+versioned update route before the site is deleted. A terminal predecessor still
+requires exact site UID, child ownership, hostname, device, MAC and saved static
+address checks. If the published provider rejects that teardown, stop and deliver
+the provider repair; do not delete the platform child or remove adoption state
+to bypass the error.
+
+After applying the reviewed destroy plan, prove the old site and owned hardware
+are absent. Rebuild through Terraform's hardware phase, verify a fresh
+single-Control-node registration, then converge the configured phase. Repeat
+the independent physical-client routing and exact-origin traffic checks above
+and require a full refresh-enabled zero-change plan. This is an explicit site
+generation change; ordinary repeat plans must preserve the boot disk and VM.
+
 ### `terraform/kvm_frr.tf`
 
 The router is a Terraform-owned, digest-pinned FRR container attached to the
