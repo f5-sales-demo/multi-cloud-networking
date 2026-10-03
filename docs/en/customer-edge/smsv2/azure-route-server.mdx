@@ -8,7 +8,7 @@ sidebar:
 ## Regional routing design
 
 The unified root pins `f5-sales-demo/xcsh` v12.4.0, built from
-`api-specs-enriched` v9.0.2. Each Azure region has three Customer Edges (CEs),
+`api-specs-enriched` v9.0.2. Azure US has three Customer Edges (CEs),
 two Terraform-managed FRR routers, and one Azure Route Server. A CE peers directly
 with both FRRs on the management subnet. Each FRR peers with both Route Server
 endpoints using eBGP multihop. Route Server peers with the FRRs at management
@@ -16,8 +16,7 @@ addresses `.20` and `.21`; it does not peer directly with the CEs.
 
 The FRR import and export policy permits only the regional application VIP `/32`
 learned from a CE. Each FRR enables packet forwarding. The expected client route
-for that VIP has two FRR next hops. The US and Canadian VIPs, peers, and route
-servers stay in their respective regional VNets.
+for that VIP has two FRR next hops. The VIP, peers, and route server remain in the Azure US VNet.
 
 The Azure marketplace image is the certified
 `f5-networks:f5xc_customer_edge:f5xc-ce-crt-20260201:20260201.0178.1` tuple.
@@ -37,35 +36,9 @@ uses TCP/65500 without floating IP. The ILB backend pool attaches the CE interna
 NICs. A separate private application domain matches the inside VIP; the existing
 external application domain and VIP remain the BGP path.
 
-With `enable_canada_public_re=true` and a dedicated `ca_re_public_ip` allocation,
-the Canadian HTTP load balancer advertises through the Toronto and Montreal
-Regional Edge virtual-site selector and the three Canadian CEs. The public-IP
-binding scopes availability to those REs, and the LB uses
-`advertise_on_public.public_ip`; the CE-only `virtual_site` advertisement field
-cannot reference a Regional Edge selector. Use an existing unused allocated IP for the project, or request an additional IP through F5
-support. The RE selector must live in the allocated public IP namespace, usually shared.
-Terraform manages the regional binding and restores its original binding on teardown;
-it does not allocate or delete the IP. Keep its name, namespace and address in private tfvars. The selector
-uses their published `ves.io/region` labels: `ves-io-toronto` and
-`ves-io-montreal`. The CE VIP and
-primary-IP listeners remain available for the FRR routing path.
-
-With `enable_showcase_origin=true`, Terraform creates a separate HTTP origin in
-the Canadian hub's Azure region, which must be Canada Central or Canada East.
-The Canadian pool points only to that origin, discovered through the Canadian CE
-virtual site. Its `DISTRIBUTED` endpoint selection lets Toronto/Montreal Regional
-Edges reach those Canadian endpoints. The origin ACL includes all provider
-Regional Edge/CDN source CIDRs, both private developer exceptions, and exact
-Canadian demo sources; other ingress is denied and origin SSH is disabled.
-
-The US origin remains separate. Canadian traffic and failover controls use
-`ca_origin_ip`. For externally hosted origins, set `ca_origin_ip` explicitly.
-Traffic tests run from each region's own client and resolve that region's domain
-to its VIP. Regional Edge acceptance also checks the Canadian origin response
-through the public Canadian HTTP load balancer. `scripts/verify-canadian-public-re.py`
-reads the private `canada_public_re` output, verifies the exact allocation, RE and CE
-selectees, and checks the response marker and `x-volterra-location` header. The full
-lifecycle runs it before the final refresh-enabled zero-change plan.
+Canadian hosting, Toronto/Montreal public advertisement, and Canada-only GeoIP
+access control are demonstrated independently by
+[Canada Topology](https://f5-sales-demo.github.io/canada-topology/).
 
 ## Deployment and acceptance
 
