@@ -59,8 +59,8 @@ resource "terraform_data" "origin_f5_acl_gate" {
   lifecycle {
     precondition {
       condition = (length(local.origin_f5_cidrs) > 0 &&
-        data.xcsh_network_regional_edges.origin[0].api_release_tag == "v9.0.1" &&
-      data.xcsh_network_cdn.origin[0].api_release_tag == "v9.0.1")
+        data.xcsh_network_regional_edges.origin[0].api_release_tag == "v9.0.2" &&
+      data.xcsh_network_cdn.origin[0].api_release_tag == "v9.0.2")
       error_message = "Origin ingress requires nonempty F5 provider CIDRs from the pinned API release."
     }
   }
@@ -157,7 +157,7 @@ output "origin_ingress_acl" {
     f5_cidrs           = local.origin_f5_cidrs
     developer_cidrs    = var.origin_developer_cidrs
     owned_demo_cidrs   = local.origin_demo_cidrs
-    provider_version   = "12.3.0"
+    provider_version   = "12.4.0"
     all_regional_edges = true
   }
 }
@@ -173,7 +173,7 @@ output "ca_origin_ingress_acl" {
     f5_cidrs           = local.origin_f5_cidrs
     developer_cidrs    = var.origin_developer_cidrs
     owned_demo_cidrs   = local.ca_origin_demo_cidrs
-    provider_version   = "12.3.0"
+    provider_version   = "12.4.0"
     all_regional_edges = true
   }
 }
