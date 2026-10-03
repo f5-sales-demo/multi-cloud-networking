@@ -100,9 +100,8 @@ class SavedPlanArtifactIdentityTests(unittest.TestCase):
                     for node in tree.body
                     if isinstance(node, ast.Assign)
                     and any(
-                        isinstance(target, ast.Name)
-                        and target.id == "PROVIDER_SHA256"
+                        isinstance(target, ast.Name) and target.id == "PROVIDER_SHA256"
                         for target in node.targets
                     )
                 ]
-                self.assertEqual(values, [provider.ZIP_SHA256])
+                assert values == [provider.ZIP_SHA256]
