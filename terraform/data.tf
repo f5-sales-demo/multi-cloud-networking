@@ -9,7 +9,7 @@ data "azuread_user" "current" {
   object_id = data.azuread_client_config.current[0].object_id
 }
 
-# The v12.4.0 provider embeds the v9.0.2 published network allowlist. These
+# The v13.0.2 provider embeds the v10.0.0 published network allowlist. These
 # values identify destinations, not firewall rules: protocol, port, direction,
 # and reachability are checked explicitly by the lifecycle preflight.
 data "xcsh_network_customer_edge_defaults" "system_services" {}

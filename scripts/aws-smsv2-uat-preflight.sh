@@ -355,7 +355,7 @@ terraform {
   required_providers {
     xcsh = {
       source  = "f5-sales-demo/xcsh"
-      version = "= 12.4.0"
+      version = "= 13.0.2"
     }
   }
 }
@@ -380,7 +380,7 @@ TF_DATA_DIR="$SCRATCH_TF_DATA_DIR" TF_CLI_CONFIG_FILE="$REGISTRY_CLI_CONFIG" TF_
   terraform -chdir="$SCRATCH" init -backend=false -input=false -no-color >/dev/null 2>&1 || block v11_provider_install_failed
 PROVIDER_VERSION=$(TF_DATA_DIR="$SCRATCH_TF_DATA_DIR" TF_CLI_CONFIG_FILE="$SELECTED_CLI_CONFIG" terraform -chdir="$SCRATCH" version -json 2>/dev/null |
   jq -r '.provider_selections["registry.terraform.io/f5-sales-demo/xcsh"] // empty')
-[ "$PROVIDER_VERSION" = "12.4.0" ] || block v11_provider_resolution_mismatch
+[ "$PROVIDER_VERSION" = "13.0.2" ] || block v11_provider_resolution_mismatch
 TF_DATA_DIR="$SCRATCH_TF_DATA_DIR" TF_CLI_CONFIG_FILE="$SELECTED_CLI_CONFIG" TF_VAR_api_url="$API_URL" XCSH_API_TOKEN="$API_TOKEN" \
   terraform -chdir="$SCRATCH" plan -refresh=false -input=false -lock=false \
   -out=contract.tfplan -no-color >/dev/null 2>&1 || block v11_contract_query_failed
@@ -394,7 +394,7 @@ EXPECTED_API_COMMIT="$(printf '%s%s' '1a0b5141f4589ffaf7b' 'b696a4369a16ee74ae2f
 jq -e --arg api_commit "$EXPECTED_API_COMMIT" '
   .contract_id == "f5xc-smsv2-api/v1" and
   .contract_version == "7.0.0" and
-  .api_release_tag == "v9.0.2" and
+  .api_release_tag == "v10.0.0" and
   .api_release_commit == $api_commit and
   .telemetry_schema_id == "f5xc-smsv2-aws-tgw-telemetry/v2"' <<<"$CONTRACT" >/dev/null || block v11_contract_identity_mismatch
 jq -e '

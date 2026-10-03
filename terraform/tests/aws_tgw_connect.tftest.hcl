@@ -30,7 +30,7 @@ override_data {
   values = {
     contract_id         = "f5xc-smsv2-api/v1"
     contract_version    = "7.0.0"
-    api_release_tag     = "v9.0.2"
+    api_release_tag     = "v10.0.0"
     api_release_commit  = join("", ["1a0b5141f4", "589ffaf7bb696a4369a16ee74ae2ff"])
     telemetry_schema_id = "f5xc-smsv2-aws-tgw-telemetry/v2"
     capabilities = {

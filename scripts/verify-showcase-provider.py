@@ -16,11 +16,11 @@ from pathlib import Path
 from typing import Any
 
 REPOSITORY = "f5-sales-demo/terraform-provider-xcsh"
-VERSION = "12.4.0"
-COMMIT = "c0169b220fe41a707260a88378dfb4d0b339f9b3"
-ZIP_SHA256 = "627cf77453171094d327bb6b1f782b14f14355ce057ebebd73606caf5b95b76b"
-SPEC_SHA256 = "62f71ec22260bc99f65753ef4581eb9e0dec1b65c506bb0d53099db73a05e19e"
-SPEC_COMMIT = "1a0b5141f4589ffaf7bb696a4369a16ee74ae2ff"
+VERSION = "13.0.2"
+COMMIT = "6d488749cd8995795a91e43b9a1892866fd73f87"
+ZIP_SHA256 = "003117462a099e37eafc447a2f466f26a3b578b66cc5f6296fc4df156971861c"
+SPEC_SHA256 = "0e278b4afb598ac8628ac74dca6a1b2831cd8607de1d26f56e72e3461a7440c7"
+SPEC_COMMIT = "ac024ccbfb8b9f84412813f3e2ab9f5821937ef2"
 SIGNING_FINGERPRINT = "BA597F4496B744EB2EF9D9E67282C542DC88E217"
 ZIP_NAME = f"terraform-provider-xcsh_{VERSION}_linux_amd64.zip"
 
@@ -50,9 +50,9 @@ def validate_identity(release: dict[str, Any], spec: bytes, artifact: bytes) -> 
         raise ValueError("embedded API receipt digest mismatch")
     api = json.loads(spec)
     if (api.get("release_tag"), api.get("target_commit"), api.get("version")) != (
-        "v9.0.2",
+        "v10.0.0",
         SPEC_COMMIT,
-        "9.0.2",
+        "10.0.0",
     ):
         raise ValueError("embedded API release identity mismatch")
 
@@ -191,7 +191,7 @@ def main() -> int:
         "version": VERSION,
         "source_commit": COMMIT,
         "provider_zip_sha256": ZIP_SHA256,
-        "api_release_tag": "v9.0.2",
+        "api_release_tag": "v10.0.0",
         "api_release_commit": SPEC_COMMIT,
         "spec_release_sha256": SPEC_SHA256,
         "signing_fingerprint": SIGNING_FINGERPRINT,
@@ -201,7 +201,7 @@ def main() -> int:
         json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8"
     )
     print(
-        f"PASS: published xcsh {VERSION}, signed artifact, source and API v9.0.2 identity"
+        f"PASS: published xcsh {VERSION}, signed artifact, source and API v10.0.0 identity"
     )
     return 0
 

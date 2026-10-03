@@ -23,15 +23,15 @@ class ProviderIdentityTests(unittest.TestCase):
     def setUp(self):
         self.api = json.dumps(
             {
-                "release_tag": "v9.0.2",
-                "version": "9.0.2",
+                "release_tag": "v10.0.0",
+                "version": "10.0.0",
                 "target_commit": provider.SPEC_COMMIT,
             }
         ).encode()
         self.artifact = b"synthetic published ZIP"
         self.receipt = {
-            "tag": "v12.4.0",
-            "version": "12.4.0",
+            "tag": "v13.0.2",
+            "version": "13.0.2",
             "commit": provider.COMMIT,
             "spec_release_sha256": provider.SPEC_SHA256,
             "assets": {provider.ZIP_NAME: "sha256:" + provider.ZIP_SHA256},
@@ -39,7 +39,7 @@ class ProviderIdentityTests(unittest.TestCase):
 
     def release(self):
         return {
-            "tagName": "v12.4.0",
+            "tagName": "v13.0.2",
             "body": "<!-- provider-publication-receipt:"
             + json.dumps(self.receipt)
             + " -->",
