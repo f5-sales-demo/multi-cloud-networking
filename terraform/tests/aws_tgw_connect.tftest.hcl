@@ -130,6 +130,11 @@ run "plans_three_sites_six_peers_and_workload_attachment" {
   command = plan
 
   assert {
+    condition     = local.aws_smsv2_api_release_commit == "ac024ccbfb8b9f84412813f3e2ab9f5821937ef2"
+    error_message = "Runtime contract must bind the actual API 10.0.0 commit."
+  }
+
+  assert {
     condition     = length(xcsh_securemesh_site_v2.aws) == 3 && alltrue([for site in values(xcsh_securemesh_site_v2.aws) : length(site.aws.not_managed.node_list) == 1])
     error_message = "The topology must contain three independent one-node sites."
   }
