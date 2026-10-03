@@ -8,7 +8,7 @@ for file in terraform/versions.tf terraform/recovery/aws-smsv2-orphans/versions.
   terraform/modules/azure-ilb-app/versions.tf terraform/preflight/ce-egress/main.tf \
   coverage/smsv2/versions.tf; do
   block=$(sed -n '/^[[:space:]]*xcsh = {/,/^[[:space:]]*}/p' "$root/$file")
-  grep -Eq 'version[[:space:]]*=[[:space:]]*"= 13\.0\.2"' <<<"$block" || {
+  grep -Eq 'version[[:space:]]*=[[:space:]]*"= 13\.0\.3"' <<<"$block" || {
     echo "provider v11 pin missing: $file" >&2
     exit 1
   }

@@ -12,7 +12,7 @@ reject() { if grep -Eq -- "$1" "$2"; then
   exit 1
 fi; }
 
-check 'version = "= 13\.0\.2"' terraform/versions.tf
+check 'version = "= 13\.0\.3"' terraform/versions.tf
 check 'xcsh_network_customer_edge_egress' terraform/data.tf
 check 'module "azure_frr_us"' terraform/main.tf
 reject 'module "azure_frr_ca"' terraform/main.tf

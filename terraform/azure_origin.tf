@@ -96,7 +96,7 @@ output "origin_ingress_acl" {
     f5_cidrs           = local.origin_f5_cidrs
     developer_cidrs    = var.origin_developer_cidrs
     owned_demo_cidrs   = local.origin_demo_cidrs
-    provider_version   = "13.0.2"
+    provider_version   = "13.0.3"
     all_regional_edges = true
   }
 }
