@@ -63,6 +63,5 @@ traffic rg client demo.example 10.250.0.10 inside.example 10.0.3.10 10.0.3.11 19
             ).returncode
 
 
-
 if __name__ == "__main__":
     unittest.main()
