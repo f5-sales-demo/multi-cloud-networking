@@ -227,8 +227,8 @@ def validate(
     xcsh = providers.get("xcsh", {})
     if xcsh.get("full_name") != "registry.terraform.io/f5-sales-demo/xcsh" or xcsh.get(
         "version_constraint"
-    ) not in ("12.3.0", "= 12.3.0"):
-        raise ValueError("saved plan does not pin xcsh 12.3.0")
+    ) not in ("12.4.0", "= 12.4.0"):
+        raise ValueError("saved plan does not pin xcsh 12.4.0")
 
     changes = []
     if document.get("action_invocations"):

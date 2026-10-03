@@ -77,7 +77,7 @@ init)
   exit 0
   ;;
 version)
-  printf '{"provider_selections":{"registry.terraform.io/f5-sales-demo/xcsh":"12.3.0"}}\n'
+  printf '{"provider_selections":{"registry.terraform.io/f5-sales-demo/xcsh":"12.4.0"}}\n'
   ;;
 plan)
   : >"${chdir}/contract.tfplan"
@@ -131,8 +131,8 @@ show)
     fi
   else
     capability=${FAKE_CAPABILITY_STATE:-available}
-    api_release_tag=${FAKE_API_RELEASE_TAG:-v9.0.1}
-    api_release_commit=${FAKE_API_RELEASE_COMMIT:-$(printf '%s%s' '158db014109f2a838b95' 'bccd8eb1870a39f8ca71')}
+    api_release_tag=${FAKE_API_RELEASE_TAG:-v9.0.2}
+    api_release_commit=${FAKE_API_RELEASE_COMMIT:-$(printf '%s%s' '1a0b5141f4589ffaf7b' 'b696a4369a16ee74ae2ff')}
     node_strategy=${FAKE_AWS_NODE_STRATEGY:-discovery_rebuild}
     printf '%s\n' "{\"planned_values\":{\"outputs\":{\"contract\":{\"value\":{\"contract_id\":\"f5xc-smsv2-api/v1\",\"contract_version\":\"7.0.0\",\"api_release_tag\":\"${api_release_tag}\",\"api_release_commit\":\"${api_release_commit}\",\"telemetry_schema_id\":\"f5xc-smsv2-aws-tgw-telemetry/v2\",\"capabilities\":{\"aws_ce_create\":\"${capability}\",\"aws_node_configuration\":\"${capability}\",\"runtime_status\":\"${capability}\",\"site_upgrade\":\"${capability}\",\"tgw_connect\":\"${capability}\"},\"aws_node_configuration\":\"{\\\"strategy\\\":\\\"${node_strategy}\\\",\\\"enforcement\\\":\\\"required\\\",\\\"invariants\\\":{\\\"device_source\\\":\\\"observed_registration_only\\\"},\\\"mapping\\\":{\\\"cardinality\\\":\\\"one_to_one\\\"}}\",\"f5xc_authorities\":[\"smsv2_configuration\",\"runtime_health\",\"bgp_peers\",\"bgp_routes\",\"simplified_routes\",\"site_upgrade_observation\"],\"aws_authorities\":[\"eni\",\"transit_gateway\",\"transit_gateway_connect\",\"gre_endpoints\",\"bgp_inside_cidrs\",\"autonomous_system_numbers\"]}}}}}"
   fi
@@ -259,7 +259,7 @@ fi
 assert_sanitized "$evidence" "$output"
 [ "$(jq -r .provider_mode "$evidence/summary.json")" = registry ] || fail "registry mode not recorded"
 [ "$(jq -r .provider_sha256 "$evidence/summary.json")" = null ] || fail "registry digest must be null"
-echo "ok - exact v12.3.0 available contract passes with sanitized evidence"
+echo "ok - exact v12.4.0 available contract passes with sanitized evidence"
 
 evidence="${TMP_ROOT}/no-explicit-region"
 mkdir "$evidence"
