@@ -203,6 +203,14 @@ the independent physical-client routing and exact-origin traffic checks above
 and require a full refresh-enabled zero-change plan. This is an explicit site
 generation change; ordinary repeat plans must preserve the boot disk and VM.
 
+The owned-site rebuild was verified after the retained-site replacement failed:
+the fresh site enrolled exactly one ONLINE Control node, adopted its static SLI
+through the owning-site update, established FRR routing and served ten
+exact-origin VIP requests from the independent physical client. The shared
+bridge, uplink and default routes remained intact. The full refreshed plan then
+reported no resource or output changes. Keep these as acceptance gates for every
+recovery; an earlier successful run does not establish a new deployment's health.
+
 ### `terraform/kvm_frr.tf`
 
 The router is a Terraform-owned, digest-pinned FRR container attached to the
