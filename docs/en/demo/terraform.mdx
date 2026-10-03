@@ -127,6 +127,51 @@ plan without querying the image endpoint.
 
 <Code code={kvm} lang="hcl" title="terraform/kvm.tf" />
 
+### Recovering a deleted KVM CE
+
+Terraform can recreate missing managed hardware while preserving the configured
+site, MAC addresses, shared bridge and routing identities. Recreating hardware is
+not a backup restore: if the writable disk was deleted, its guest-local contents
+are lost. The retained verified base image and provider-issued cloud-init start a
+new CE registration.
+
+First distinguish an I/O pause, a missing domain definition and a deleted disk.
+Inspect libvirt domain state and block errors, disk availability, Terraform state,
+and the site's registration inventory. Reclaim verified disposable caches when
+the host filesystem is full. Resume an I/O-paused guest after correcting storage;
+do not replace its disk solely because it is paused.
+
+For an externally deleted domain and disk:
+
+1. Keep the exact reviewed source and private inputs, acquire the lifecycle lock,
+   and verify backend, site and disk ownership. Preserve shared bridge/uplink and
+   host management.
+2. Create a saved targeted plan for `libvirt_domain.ce_node` in the hardware phase.
+   Keep the full deployment inputs and source identity; the target includes its
+   dependencies. Review every action before applying the exact saved plan.
+3. When only the CE domain, writable disk and cloud-init ISO are missing, require
+   those three creates and no unrelated cloud, site or shared-network mutation.
+   If the plan includes another action, investigate it before applying.
+4. Wait for the replacement registration to become ONLINE. A valid site-bound JWT
+   may permit enrollment under the existing site, but successful VM creation does
+   not establish registration or routing health.
+5. Return to a full refresh-enabled plan in the configured phase. Reconcile the
+   new runtime hostname, MAC-owned SLO/SLI and BGP references through Terraform.
+   XC may retain terminal registrations and old platform children; these must
+   remain distinct from the exact live replacement. A missing or ambiguous
+   identity remains a failure.
+6. Verify static SLI readback, one Established FRR session, the expected route,
+   private DNS and exact-origin VIP traffic from the independent physical client.
+   Require preserved management/default routes and a final refresh-enabled
+   zero-change plan with every showcase path enabled.
+
+A saved targeted plan is an exceptional recovery step, not completion evidence.
+The final full plan must converge. Never remove stale runtime adoption from state
+without exact ownership and replacement evidence, and never delete an
+XC-owned child directly to force a successful plan. A provider or API contract
+rejection belongs in its owning repository; deliver and verify the repair before
+claiming the recovery complete.
+
 ### `terraform/kvm_frr.tf`
 
 The router is a Terraform-owned, digest-pinned FRR container attached to the
