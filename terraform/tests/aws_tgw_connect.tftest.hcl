@@ -31,7 +31,7 @@ override_data {
     contract_id         = "f5xc-smsv2-api/v1"
     contract_version    = "7.0.0"
     api_release_tag     = "v10.0.0"
-    api_release_commit  = join("", ["1a0b5141f4", "589ffaf7bb696a4369a16ee74ae2ff"])
+    api_release_commit  = join("", ["ac024ccbfb8b9f844128", "13f3e2ab9f5821937ef2"])
     telemetry_schema_id = "f5xc-smsv2-aws-tgw-telemetry/v2"
     capabilities = {
       aws_ce_create          = "available"
@@ -128,6 +128,11 @@ variables {
 
 run "plans_three_sites_six_peers_and_workload_attachment" {
   command = plan
+
+  assert {
+    condition     = local.aws_smsv2_api_release_commit == join("", ["ac024ccbfb8b9f844128", "13f3e2ab9f5821937ef2"])
+    error_message = "Runtime contract must bind the actual API 10.0.0 commit."
+  }
 
   assert {
     condition     = length(xcsh_securemesh_site_v2.aws) == 3 && alltrue([for site in values(xcsh_securemesh_site_v2.aws) : length(site.aws.not_managed.node_list) == 1])

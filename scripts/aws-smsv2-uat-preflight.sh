@@ -390,7 +390,7 @@ CONTRACT=$(TF_DATA_DIR="$SCRATCH_TF_DATA_DIR" TF_CLI_CONFIG_FILE="$SELECTED_CLI_
 
 # This immutable Git revision is public provenance, not a credential. Keep it
 # assembled so generic token heuristics do not mistake it for one.
-EXPECTED_API_COMMIT="$(printf '%s%s' '1a0b5141f4589ffaf7b' 'b696a4369a16ee74ae2ff')"
+EXPECTED_API_COMMIT="$(printf '%s%s' 'ac024ccbfb8b9f844128' '13f3e2ab9f5821937ef2')"
 jq -e --arg api_commit "$EXPECTED_API_COMMIT" '
   .contract_id == "f5xc-smsv2-api/v1" and
   .contract_version == "7.0.0" and
