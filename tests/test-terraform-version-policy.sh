@@ -25,17 +25,17 @@ else
   bad "Terraform workflow jobs do not both pin 1.16.3"
 fi
 
-echo "2. every xcsh consumer pins exactly v13.0.3"
+echo "2. every xcsh consumer pins exactly v15.0.3"
 for relative in terraform/versions.tf \
   terraform/recovery/aws-smsv2-orphans/versions.tf \
   terraform/modules/xc-site/versions.tf \
   terraform/modules/kvm/providers.tf coverage/smsv2/versions.tf; do
   file="${REPO_ROOT}/${relative}"
   block=$(sed -n '/^[[:space:]]*xcsh = {/,/^[[:space:]]*}/p' "$file")
-  if printf '%s\n' "$block" | grep -Eq 'version[[:space:]]*=[[:space:]]*"= 13\.0\.3"'; then
-    ok "${relative} pins = 13.0.3"
+  if printf '%s\n' "$block" | grep -Eq 'version[[:space:]]*=[[:space:]]*"= 15\.0\.3"'; then
+    ok "${relative} pins = 15.0.3"
   else
-    bad "${relative} does not pin exactly = 13.0.3"
+    bad "${relative} does not pin exactly = 15.0.3"
   fi
   count=$(printf '%s\n' "$block" | grep -Ec '^[[:space:]]*version[[:space:]]*=' || true)
   [ "$count" -eq 1 ] || bad "${relative} has ${count} xcsh version constraints"
@@ -44,10 +44,10 @@ done
 for relative in .github/workflows/terraform.yml prompt.txt docs/en/demo/deploy.mdx \
   docs/en/demo/prompt.mdx docs/en/demo/spec.mdx docs/en/demo/terraform.mdx \
   tests/test-verify-deployment.sh; do
-  if grep -Fq '13.0.3' "${REPO_ROOT}/${relative}"; then
-    ok "${relative} references v13.0.3"
+  if grep -Fq '15.0.3' "${REPO_ROOT}/${relative}"; then
+    ok "${relative} references v15.0.3"
   else
-    bad "${relative} is missing the v13.0.3 reference"
+    bad "${relative} is missing the v15.0.3 reference"
   fi
 done
 legacy_version='7''.''4''.''1'
@@ -110,10 +110,10 @@ else
   bad "expected two workflow path filters, found ${trigger_count}"
 fi
 
-echo "7. provider v13.0.3 uses one immutable API release identity"
-api_tag='v10.0.0'
-release_revision_left='ac024ccbfb8b9f844128'
-release_revision_right='13f3e2ab9f5821937ef2'
+echo "7. provider v15.0.3 uses one immutable API release identity"
+api_tag='v12.0.0'
+release_revision_left='a9be0360815e3fd3fa08'
+release_revision_right='ded845e03c0bd4afd6ec'
 for relative in terraform/aws_tgw_connect.tf terraform/tests/aws_tgw_connect.tftest.hcl \
   scripts/aws-smsv2-uat-preflight.sh tests/test-aws-smsv2-uat-preflight.sh \
   docs/en/demo/deploy.mdx docs/en/customer-edge/smsv2/azure-route-server.mdx; do
@@ -127,9 +127,9 @@ for relative in terraform/aws_tgw_connect.tf \
   scripts/aws-smsv2-uat-preflight.sh tests/test-aws-smsv2-uat-preflight.sh; do
   if grep -Fq "$release_revision_left" "${REPO_ROOT}/${relative}" &&
     grep -Fq "$release_revision_right" "${REPO_ROOT}/${relative}"; then
-    ok "${relative} requires the exact v10.0.0 commit"
+    ok "${relative} requires the exact v12.0.0 commit"
   else
-    bad "${relative} is missing the exact v10.0.0 commit"
+    bad "${relative} is missing the exact v12.0.0 commit"
   fi
 done
 fixture_revision=$(

@@ -4,7 +4,7 @@ locals {
   # Keep the immutable source revision machine-readable without resembling an
   # access token to secret scanners. The evaluated value is the full release
   # commit recorded by the contract data source.
-  aws_smsv2_api_release_commit = format("%s%s", "ac024ccbfb8b9f844128", "13f3e2ab9f5821937ef2")
+  aws_smsv2_api_release_commit = format("%s%s", "a9be0360815e3fd3fa08", "ded845e03c0bd4afd6ec")
   aws_smsv2_bindings = var.enable_aws && var.enable_aws_tgw_connect && var.aws_site_configuration_phase == "configured" ? merge(
     {
       for index in range(var.enable_aws ? var.aws_ce_count : 0) :
@@ -95,11 +95,11 @@ resource "terraform_data" "aws_tgw_contract_gate" {
       condition = (
         data.xcsh_smsv2_contract.aws[0].contract_id == "f5xc-smsv2-api/v1" &&
         data.xcsh_smsv2_contract.aws[0].contract_version == "7.0.0" &&
-        data.xcsh_smsv2_contract.aws[0].api_release_tag == "v10.0.0" &&
+        data.xcsh_smsv2_contract.aws[0].api_release_tag == "v12.0.0" &&
         data.xcsh_smsv2_contract.aws[0].api_release_commit == local.aws_smsv2_api_release_commit &&
         data.xcsh_smsv2_contract.aws[0].telemetry_schema_id == "f5xc-smsv2-aws-tgw-telemetry/v2"
       )
-      error_message = "Provider v13.0.3 must expose the exact immutable SMSv2 API v10.0.0 contract."
+      error_message = "Provider v15.0.3 must expose the exact immutable SMSv2 API v12.0.0 contract."
     }
     precondition {
       condition = (
@@ -110,7 +110,7 @@ resource "terraform_data" "aws_tgw_contract_gate" {
         try(data.xcsh_smsv2_contract.aws[0].capabilities["tgw_connect"], "") == "available" &&
         try(data.xcsh_smsv2_contract.aws[0].capabilities["site_upgrade"], "") == "available"
       )
-      error_message = "Provider v13.0.3 must publish all and only the required SMSv2 capabilities, including evidence-backed AWS node configuration, as available."
+      error_message = "Provider v15.0.3 must publish all and only the required SMSv2 capabilities, including evidence-backed AWS node configuration, as available."
     }
     precondition {
       condition = try(

@@ -25,8 +25,7 @@ resource "xcsh_securemesh_site_v2" "onprem_kvm" {
   disable_management_network = {}
 
   # Match the non-AppStack SMSv2 Console defaults during first-boot software
-  # installation. Provider v13.0.3 does not expose software_settings.waf_signatures;
-  # every supported default from the Console-created KVM object is explicit here.
+  # installation. Keep the intended Console-created KVM defaults explicit here.
   dns_ntp_config {
     f5_dns_default = {}
     f5_ntp_default = {}

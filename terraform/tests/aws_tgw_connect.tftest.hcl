@@ -30,8 +30,8 @@ override_data {
   values = {
     contract_id         = "f5xc-smsv2-api/v1"
     contract_version    = "7.0.0"
-    api_release_tag     = "v10.0.0"
-    api_release_commit  = join("", ["ac024ccbfb8b9f844128", "13f3e2ab9f5821937ef2"])
+    api_release_tag     = "v12.0.0"
+    api_release_commit  = join("", ["a9be0360815e3fd3fa08", "ded845e03c0bd4afd6ec"])
     telemetry_schema_id = "f5xc-smsv2-aws-tgw-telemetry/v2"
     capabilities = {
       aws_ce_create          = "available"
@@ -130,8 +130,8 @@ run "plans_three_sites_six_peers_and_workload_attachment" {
   command = plan
 
   assert {
-    condition     = local.aws_smsv2_api_release_commit == join("", ["ac024ccbfb8b9f844128", "13f3e2ab9f5821937ef2"])
-    error_message = "Runtime contract must bind the actual API 10.0.0 commit."
+    condition     = local.aws_smsv2_api_release_commit == join("", ["a9be0360815e3fd3fa08", "ded845e03c0bd4afd6ec"])
+    error_message = "Runtime contract must bind the actual API 12.0.0 commit."
   }
 
   assert {
