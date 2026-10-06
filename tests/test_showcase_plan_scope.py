@@ -21,10 +21,8 @@ def plan(changes):
     flags = {
         "source_commit_sha": "a" * 40,
         "enable_azure": True,
-        "enable_canada": True,
         "enable_bgp": True,
         "enable_azure_ilb": True,
-        "enable_canada_ilb": True,
         "enable_kvm_lan": True,
         "enable_kvm": True,
         "enable_aws": True,
@@ -66,7 +64,6 @@ class KVMStatusOutputScopeTest(unittest.TestCase):
     def test_only_healthy_kvm_count_settlement_is_accepted(self):
         document = plan([])
         document["variables"]["enable_azure"]["value"] = False
-        document["variables"]["enable_canada"]["value"] = False
         document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
         healthy = {
             "bgp_converged": True,
@@ -136,7 +133,6 @@ class AWSStatusOutputScopeTest(unittest.TestCase):
     def test_aws_status_output_refresh_accepts_only_successful_settlement(self):
         document = plan([])
         document["variables"]["enable_azure"]["value"] = False
-        document["variables"]["enable_canada"]["value"] = False
         document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
         before = {
             site: {
@@ -186,26 +182,14 @@ class AWSStatusOutputScopeTest(unittest.TestCase):
 
 
 class CanadianPublicIPScopeTest(unittest.TestCase):
-    def test_azure_build_owns_only_canadian_public_ip_binding(self):
-        self.assertEqual(
-            module.validate(
-                plan(
-                    [
-                        ("xcsh_public_ip_binding.canada[0]", ["create"]),
-                        ("terraform_data.canada_public_ip_gate[0]", ["create"]),
-                    ]
-                ),
-                "azure-build",
-                "a" * 40,
-            ),
-            2,
-        )
-        with self.assertRaises(ValueError):
-            module.validate(
-                plan([("xcsh_public_ip_binding.unrelated[0]", ["update"])]),
-                "azure-build",
-                "a" * 40,
-            )
+    def test_azure_build_rejects_canadian_and_foreign_public_ip_bindings(self):
+        for address in [
+            "xcsh_public_ip_binding.canada[0]",
+            "terraform_data.canada_public_ip_gate[0]",
+            "xcsh_public_ip_binding.unrelated[0]",
+        ]:
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                module.validate(plan([(address, ["create"])]), "azure-build", "a" * 40)
 
 
 class KVMBootReceiptScopeTest(unittest.TestCase):
@@ -215,15 +199,28 @@ class KVMBootReceiptScopeTest(unittest.TestCase):
         )
         document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
         document["variables"]["enable_azure"]["value"] = False
-        document["variables"]["enable_canada"]["value"] = False
         self.assertEqual(module.validate(document, "aws-kvm-build", "a" * 40), 1)
+
+
+class ExtractedGraphScopeTest(unittest.TestCase):
+    def test_final_scope_uses_only_current_mcn_flags(self):
+        document = plan([])
+        self.assertNotIn("enable_canada", document["variables"])
+        self.assertNotIn("enable_canada_ilb", document["variables"])
+        self.assertEqual(module.validate(document, "zero-change", "a" * 40), 0)
+
+    def test_azure_build_rejects_extracted_canada_actions(self):
+        document = plan(
+            [("module.azure_hub_ca[0].azurerm_virtual_network.this", ["create"])]
+        )
+        with self.assertRaisesRegex(ValueError, "outside its scope"):
+            module.validate(document, "azure-build", "a" * 40)
 
 
 class ShowcasePlanScopeTest(unittest.TestCase):
     def test_aws_kvm_stage_accepts_exact_saved_plan_boolean_strings(self):
         document = plan([("aws_vpc.aws[0]", ["create"])])
         document["variables"]["enable_azure"]["value"] = "false"
-        document["variables"]["enable_canada"]["value"] = "false"
         document["variables"]["enable_kvm_lan"]["value"] = "true"
         document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
         self.assertEqual(module.validate(document, "aws-kvm-build", "a" * 40), 1)
@@ -231,7 +228,6 @@ class ShowcasePlanScopeTest(unittest.TestCase):
     def test_saved_plan_boolean_strings_must_be_exact(self):
         document = plan([("aws_vpc.aws[0]", ["create"])])
         document["variables"]["enable_azure"]["value"] = "False"
-        document["variables"]["enable_canada"]["value"] = "false"
         document["variables"]["enable_kvm_lan"]["value"] = "true"
         document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
         with self.assertRaisesRegex(ValueError, "invalid boolean"):
@@ -254,7 +250,6 @@ class ShowcasePlanScopeTest(unittest.TestCase):
         document = plan([("aws_vpc.aws[0]", ["create"])])
         document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
         document["variables"]["enable_azure"]["value"] = "false"
-        document["variables"]["enable_canada"]["value"] = "false"
         document["variables"]["enable_azure_ilb"]["value"] = "FALSE"
         with self.assertRaisesRegex(
             ValueError, "invalid boolean variable enable_azure_ilb"
@@ -560,7 +555,6 @@ class ShowcasePlanScopeTest(unittest.TestCase):
     def test_aws_kvm_stage_rejects_azure_action(self):
         document = plan([("azurerm_resource_group.hub", ["create"])])
         document["variables"]["enable_azure"]["value"] = False
-        document["variables"]["enable_canada"]["value"] = False
         document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
         with self.assertRaisesRegex(ValueError, "outside its scope"):
             module.validate(document, "aws-kvm-build", "a" * 40)
@@ -568,7 +562,6 @@ class ShowcasePlanScopeTest(unittest.TestCase):
     def test_kvm_configuration_rejects_aws_change(self):
         document = plan([('aws_instance.ce["01"]', ["update"])])
         document["variables"]["enable_azure"]["value"] = False
-        document["variables"]["enable_canada"]["value"] = False
         with self.assertRaisesRegex(ValueError, "outside its scope"):
             module.validate(document, "kvm-configured", "a" * 40)
 
@@ -582,7 +575,6 @@ class ShowcasePlanScopeTest(unittest.TestCase):
             ]
         )
         document["variables"]["enable_azure"]["value"] = False
-        document["variables"]["enable_canada"]["value"] = False
         document["variables"]["kvm_lan_configuration_phase"]["value"] = "hardware"
         with self.assertRaisesRegex(ValueError, "not zero-change"):
             module.validate(document, "aws-kvm-zero", "a" * 40)
@@ -623,7 +615,7 @@ class RefreshOnlyPlanScopeTest(unittest.TestCase):
 
 
 class CanadianOriginScopeTests(unittest.TestCase):
-    def test_azure_build_allows_canadian_origin_without_aws_mutation(self):
+    def test_azure_build_rejects_canadian_origin(self):
         document = plan(
             [
                 (
@@ -634,7 +626,8 @@ class CanadianOriginScopeTests(unittest.TestCase):
                 ("xcsh_http_loadbalancer.canada[0]", ["update"]),
             ]
         )
-        self.assertEqual(module.validate(document, "azure-build", "a" * 40), 3)
+        with self.assertRaisesRegex(ValueError, "outside its scope"):
+            module.validate(document, "azure-build", "a" * 40)
 
 
 if __name__ == "__main__":

@@ -885,7 +885,7 @@ SH
 } >"$scope_probe"
 SCOPE_CALLS="$scope_calls" SCOPE_MAPPING="$scope_mapping" SCOPE_PLAN="${TMP_ROOT}/status.tfplan" \
   bash "$scope_probe"
-for region_flag in enable_azure enable_canada enable_azure_ilb enable_canada_ilb; do
+for region_flag in enable_azure enable_azure_ilb; do
   grep -Fxq -- "-var=${region_flag}=false" "$scope_calls" ||
     fail "AWS UAT refresh-only plan must disable ${region_flag} before Azure build"
 done

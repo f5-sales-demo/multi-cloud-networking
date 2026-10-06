@@ -205,8 +205,8 @@ TF_PHASE_ARGS=(-var="aws_site_configuration_phase=$PHASE")
 # This helper owns the AWS and initial two-NIC KVM stages. Azure is added only
 # after the AWS/KVM registration and mapping gates have passed.
 TF_PHASE_ARGS+=(
-  -var='enable_azure=false' -var='enable_canada=false'
-  -var='enable_azure_ilb=false' -var='enable_canada_ilb=false'
+  -var='enable_azure=false'
+  -var='enable_azure_ilb=false'
   -var='kvm_lan_configuration_phase=hardware'
 )
 if [ "$PHASE" = configured ]; then
