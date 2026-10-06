@@ -14,7 +14,7 @@ import subprocess
 import sys
 from typing import Any
 
-PROVIDER_SHA256 = "d157b36153a23f973f0e32d3e62143983b88407b5cc87471d5438d38b8ea00de"
+PROVIDER_SHA256 = "1336457feafbd7753de500f73db514a8a2e5c5d516a1f3dfc6a484ea956bfc53"
 AZURE_PREFIXES = (
     "module.azure_hub[",
     "module.azure_hub_ca[",
@@ -227,8 +227,8 @@ def validate(
     xcsh = providers.get("xcsh", {})
     if xcsh.get("full_name") != "registry.terraform.io/f5-sales-demo/xcsh" or xcsh.get(
         "version_constraint"
-    ) not in ("13.0.3", "= 13.0.3"):
-        raise ValueError("saved plan does not pin xcsh 13.0.3")
+    ) not in ("15.0.3", "= 15.0.3"):
+        raise ValueError("saved plan does not pin xcsh 15.0.3")
 
     changes = []
     if document.get("action_invocations"):

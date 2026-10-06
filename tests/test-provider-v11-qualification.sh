@@ -8,8 +8,8 @@ for file in terraform/versions.tf terraform/recovery/aws-smsv2-orphans/versions.
   terraform/modules/azure-ilb-app/versions.tf terraform/preflight/ce-egress/main.tf \
   coverage/smsv2/versions.tf; do
   block=$(sed -n '/^[[:space:]]*xcsh = {/,/^[[:space:]]*}/p' "$root/$file")
-  grep -Eq 'version[[:space:]]*=[[:space:]]*"= 13\.0\.3"' <<<"$block" || {
-    echo "provider v11 pin missing: $file" >&2
+  grep -Eq 'version[[:space:]]*=[[:space:]]*"= 15\.0\.3"' <<<"$block" || {
+    echo "provider v15.0.3 pin missing: $file" >&2
     exit 1
   }
 done
@@ -25,4 +25,4 @@ if grep -Eq '^[[:space:]]*(namespace|force)[[:space:]]*=' "$root/terraform/aws_u
   exit 1
 fi
 
-echo 'PASS: provider v11 pin and independent AWS upgrade targets'
+echo 'PASS: provider v15.0.3 pin and independent AWS upgrade targets'
