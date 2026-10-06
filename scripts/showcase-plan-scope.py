@@ -17,22 +17,14 @@ from typing import Any
 PROVIDER_SHA256 = "1336457feafbd7753de500f73db514a8a2e5c5d516a1f3dfc6a484ea956bfc53"
 AZURE_PREFIXES = (
     "module.azure_hub[",
-    "module.azure_hub_ca[",
     "module.ce_node[",
     "module.ce_vm[",
-    "module.ce_node_ca[",
-    "module.ce_vm_ca[",
     "module.xc_site[",
-    "module.xc_site_ca[",
     "module.azure_frr_us[",
-    "module.azure_frr_ca[",
     "terraform_data.origin_f5_acl_gate[",
     "module.showcase_origin[",
-    "module.showcase_origin_ca[",
     "module.client_vm[",
-    "module.client_vm_ca[",
     "module.azure_ilb_application[",
-    "module.azure_ilb_application_ca[",
     "azurerm_lb.",
     "azurerm_lb_rule.",
     "azurerm_lb_probe.",
@@ -41,13 +33,7 @@ AZURE_PREFIXES = (
     "azurerm_virtual_machine_extension.site_console_password",
     "random_password.site_console_admin",
     "xcsh_origin_pool.this[",
-    "xcsh_origin_pool.canada[",
     "xcsh_http_loadbalancer.this[",
-    "xcsh_http_loadbalancer.canada[",
-    "xcsh_virtual_site.canada_re[",
-    "xcsh_public_ip_binding.canada[",
-    "terraform_data.canada_public_ip_gate[",
-    "xcsh_virtual_site.canada_ce[",
     "xcsh_virtual_site.regional_ce[",
     "xcsh_token.ce[",
     "azapi_resource_action.f5xc_customer_edge_marketplace_agreement[",
@@ -84,10 +70,8 @@ AWS_PREFIXES = (
 )
 FULL_FLAGS = (
     "enable_azure",
-    "enable_canada",
     "enable_bgp",
     "enable_azure_ilb",
-    "enable_canada_ilb",
     "enable_kvm",
     "enable_kvm_lan",
     "enable_aws",
@@ -306,10 +290,8 @@ def validate(
     elif scope == "azure-build":
         required = {
             "enable_azure": True,
-            "enable_canada": True,
             "enable_bgp": True,
             "enable_azure_ilb": True,
-            "enable_canada_ilb": True,
             "enable_kvm_lan": True,
         }
         for name, expected in required.items():
@@ -329,10 +311,7 @@ def validate(
                     f"Azure build contains a destructive action: {address}"
                 )
     elif scope == "aws-kvm-build":
-        if (
-            _value(document, "enable_azure") is not False
-            or _value(document, "enable_canada") is not False
-        ):
+        if _value(document, "enable_azure") is not False:
             raise ValueError("AWS/KVM stage must disable Azure")
         if (
             _value(document, "enable_kvm_lan") is not True
@@ -351,10 +330,7 @@ def validate(
                     f"AWS/KVM build contains an unsupported action: {address}"
                 )
     elif scope == "kvm-configured":
-        if (
-            _value(document, "enable_azure") is not False
-            or _value(document, "enable_canada") is not False
-        ):
+        if _value(document, "enable_azure") is not False:
             raise ValueError("KVM configuration stage must disable Azure")
         if _value(document, "kvm_lan_configuration_phase") != "configured":
             raise ValueError("KVM configuration stage requires configured phase")
@@ -372,10 +348,7 @@ def validate(
     elif scope == "aws-kvm-zero":
         if changes or output_changes:
             raise ValueError("AWS/KVM verification plan is not zero-change")
-        if (
-            _value(document, "enable_azure") is not False
-            or _value(document, "enable_canada") is not False
-        ):
+        if _value(document, "enable_azure") is not False:
             raise ValueError("AWS/KVM verification must disable Azure")
         if _value(document, "kvm_lan_configuration_phase") != "hardware":
             raise ValueError("AWS/KVM verification must preserve the hardware phase")
@@ -384,7 +357,6 @@ def validate(
             raise ValueError("KVM status refresh must change only its status output")
         if (
             _value(document, "enable_azure") is not False
-            or _value(document, "enable_canada") is not False
             or _value(document, "kvm_lan_configuration_phase") != "hardware"
         ):
             raise ValueError("KVM status refresh must preserve the AWS/KVM stage")
@@ -425,7 +397,6 @@ def validate(
             raise ValueError("AWS status refresh must change only its status output")
         if (
             _value(document, "enable_azure") is not False
-            or _value(document, "enable_canada") is not False
             or _value(document, "kvm_lan_configuration_phase") != "hardware"
         ):
             raise ValueError("AWS status refresh must preserve the AWS/KVM stage")

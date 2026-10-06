@@ -320,7 +320,7 @@ AZURE_SUBSCRIPTION=$(jq -er '.subscription | select(type == "string" and test("^
   die "configured Azure subscription is unavailable"
 az account show --subscription "$AZURE_SUBSCRIPTION" --query state --output tsv | grep -qx Enabled ||
   die "configured Azure subscription is not enabled"
-jq -e '.flags | length == 8 and all(.[]; . == true)' <<<"$INPUT_VALUES_JSON" >/dev/null ||
+jq -e '.flags | keys == ["aws","azure","bgp","kvm","kvm_lan","us_ilb"] and all(.[]; . == true)' <<<"$INPUT_VALUES_JSON" >/dev/null ||
   die "all non-TGW showcase paths must be enabled in tfvars"
 if [ "$(grep -Ec '^[[:space:]]*enable_aws_tgw_connect[[:space:]]*=' "$TFVARS")" -ne 1 ] ||
   ! grep -Eq '^[[:space:]]*enable_aws_tgw_connect[[:space:]]*=[[:space:]]*true[[:space:]]*(#.*)?$' "$TFVARS"; then
