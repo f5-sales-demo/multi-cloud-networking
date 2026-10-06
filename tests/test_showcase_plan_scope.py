@@ -202,7 +202,7 @@ class KVMBootReceiptScopeTest(unittest.TestCase):
         self.assertEqual(module.validate(document, "aws-kvm-build", "a" * 40), 1)
 
 
-class ShowcasePlanScopeTest(unittest.TestCase):
+class ExtractedGraphScopeTest(unittest.TestCase):
     def test_final_scope_uses_only_current_mcn_flags(self):
         document = plan([])
         self.assertNotIn("enable_canada", document["variables"])
@@ -216,6 +216,8 @@ class ShowcasePlanScopeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "outside its scope"):
             module.validate(document, "azure-build", "a" * 40)
 
+
+class ShowcasePlanScopeTest(unittest.TestCase):
     def test_aws_kvm_stage_accepts_exact_saved_plan_boolean_strings(self):
         document = plan([("aws_vpc.aws[0]", ["create"])])
         document["variables"]["enable_azure"]["value"] = "false"
