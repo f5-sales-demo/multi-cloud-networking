@@ -454,9 +454,9 @@ if [ "$PLAN_MODE" != destroy ] && { [ "$PLAN_COMPLETE" = true ] || [ "$EXECUTE_U
     select(([.[]] | unique | length) == 3) |
     select(all(.[];
       type == "string" and
-      (split(".")) as $octets |
+      ((split(".")) as $octets |
       ($octets | length) == 4 and
-      all($octets[]; test("^(0|[1-9][0-9]{0,2})$") and (tonumber <= 255))))' \
+      all($octets[]; test("^(0|[1-9][0-9]{0,2})$") and (tonumber <= 255)))))' \
     <<<"$DEPLOYMENT_PLAN" 2>/dev/null) || block plan_site_listener_identities_invalid
 fi
 jq -e '
