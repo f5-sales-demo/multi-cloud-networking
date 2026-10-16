@@ -413,6 +413,9 @@ data "xcsh_site_cloud_init" "ce" {
 
 }
 resource "aws_instance" "ce" {
+  lifecycle {
+    ignore_changes = [user_data]
+  }
   iam_instance_profile = aws_iam_instance_profile.ce.name
 
   count         = local.active ? 1 : 0
