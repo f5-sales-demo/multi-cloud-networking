@@ -71,3 +71,22 @@ Validation is credential-free:
 terraform validate
 terraform test
 ```
+
+Azure NSGs see the original public destination on CE transit packets. The fixture therefore
+includes an explicit `client-transit` ingress rule scoped to the client subnet, owned origin
+public IP and TCP 80/443; the default VirtualNetwork destination rule does not establish this
+permission. Ubuntu starts nginx during package installation, so origin initialization explicitly
+restarts it after writing the controlled configuration. Traffic VM custom data remains an
+immutable bootstrap input during policy cycles; image changes still require a reviewed plan.
+
+The shared traffic verifier supports `--cloud azure` and checks the actual client NIC's effective
+user route through the CE SLI, fresh response and origin case IDs, and the CE public source:
+
+```sh
+python3 ../../../scripts/smsv2_traffic_receipt.py --cloud azure \
+  --facts /private/path/fixture.json --ssh-config /private/path/ssh.config \
+  --evidence /private/path/receipts --label scoped-deny --http deny --https allow
+```
+
+First failed transit attempts, the default nginx response and refused TLS, and the rejected origin
+replacement plan remain preserved separately from corrective source/plan/service actions.
