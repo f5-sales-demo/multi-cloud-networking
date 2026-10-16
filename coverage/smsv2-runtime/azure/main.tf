@@ -363,6 +363,7 @@ resource "azurerm_linux_virtual_machine" "ce" {
   lifecycle { ignore_changes = [custom_data] }
 }
 resource "azurerm_linux_virtual_machine" "traffic" {
+  lifecycle { ignore_changes = [custom_data] }
   for_each                        = { origin = azurerm_network_interface.origin.id, client = azurerm_network_interface.client.id }
   name                            = "${var.task_id}-${each.key}"
   location                        = var.location

@@ -11,7 +11,7 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
   -subj /CN=origin.qualification.test \
   -addext subjectAltName=DNS:origin.qualification.test
 chmod 0600 /etc/nginx/qualification/origin.key
-cat > /etc/nginx/nginx.conf <<'EOF'
+cat >/etc/nginx/nginx.conf <<'EOF'
 events {}
 http {
   log_format qualification escape=json '{"case":"$arg_case","source":"$remote_addr","status":$status,"uri":"$uri"}';
@@ -30,3 +30,4 @@ http {
 EOF
 nginx -t
 systemctl enable --now nginx
+systemctl restart nginx

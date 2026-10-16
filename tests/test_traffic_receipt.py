@@ -2,14 +2,16 @@
 
 """Prevent fixture failures and bypass traffic from passing policy acceptance."""
 
+import json
 import sys
 import unittest
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from smsv2_traffic_receipt import accepted
+from smsv2_traffic_receipt import accepted, route_to_ce
 
 
 class TrafficAcceptanceTests(unittest.TestCase):
@@ -68,6 +70,43 @@ class TrafficAcceptanceTests(unittest.TestCase):
             client_exit=255, http_200=False, origin_observations=0
         )
         self.assertFalse(accepted(self.receipt, {"http": "deny", "https": "allow"}))
+
+    def test_azure_route_requires_owned_active_user_next_hop(self):
+        facts = {"client_nic": "task-owned-nic", "ce_sli_ip": "192.0.2.4"}
+        route = {
+            "source": "User",
+            "state": "Active",
+            "nextHopType": "VirtualAppliance",
+            "addressPrefix": ["0.0.0.0/0"],
+            "nextHopIpAddress": ["192.0.2.4"],
+        }
+        with patch(
+            "smsv2_traffic_receipt.subprocess.check_output",
+            return_value=json.dumps({"value": [route]}).encode(),
+        ):
+            self.assertTrue(route_to_ce(facts, "azure"))
+        for key, value in (
+            ("state", "Invalid"),
+            ("source", "Default"),
+            ("nextHopIpAddress", ["192.0.2.5"]),
+        ):
+            with self.subTest(key=key):
+                wrong = {**route, key: value}
+                with patch(
+                    "smsv2_traffic_receipt.subprocess.check_output",
+                    return_value=json.dumps({"value": [wrong]}).encode(),
+                ):
+                    self.assertFalse(route_to_ce(facts, "azure"))
+
+    def test_azure_source_and_generic_route_receipt(self):
+        receipt = deepcopy(self.receipt)
+        receipt.pop("aws_default_route_to_ce")
+        receipt["ce_default_route_verified"] = True
+        for request in receipt["requests"]:
+            request["origin_source_matches_ce_public_ip"] = request.pop(
+                "origin_source_matches_ce_eip"
+            )
+        self.assertTrue(accepted(receipt, {"http": "allow", "https": "allow"}))
 
 
 if __name__ == "__main__":
