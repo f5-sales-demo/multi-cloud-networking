@@ -417,7 +417,7 @@ resource "aws_instance" "ce" {
 
   count         = local.active ? 1 : 0
   ami           = data.aws_ami.ce.id
-  instance_type = "m5.xlarge"
+  instance_type = "m5.2xlarge"
   key_name      = aws_key_pair.fixture.key_name
   network_interface {
     network_interface_id = aws_network_interface.slo.id
