@@ -168,3 +168,11 @@ override_resource {
   target = azurerm_network_interface.client
   values = { id = "/subscriptions/${format("%08d-%04d-%04d-%04d-%012d", 0, 0, 0, 0, 1)}/resourceGroups/qualification-test/providers/Microsoft.Network/networkInterfaces/qualification-test-client", private_ip_address = "10.246.3.4", mac_address = "00-00-5E-00-53-04" }
 }
+
+run "transit_ingress_is_scoped" {
+  command = plan
+  assert {
+    condition     = alltrue([for rule in azurerm_network_security_group.fixture.security_rule : rule.source_address_prefix == azurerm_subnet.client.address_prefixes[0] && rule.destination_address_prefix == azurerm_public_ip.origin.ip_address && toset(rule.destination_port_ranges) == toset(["80", "443"]) && rule.protocol == "Tcp" && rule.access == "Allow" if rule.name == "client-transit"]) && length([for rule in azurerm_network_security_group.fixture.security_rule : rule if rule.name == "client-transit"]) == 1
+    error_message = "Explicit NSG transit must permit only the owned client-to-origin HTTP/HTTPS tuple."
+  }
+}
