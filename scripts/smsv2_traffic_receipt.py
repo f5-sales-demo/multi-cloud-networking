@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fresh, origin-observed AWS fixture traffic; all raw evidence stays private."""
+"""Fresh, origin-observed AWS/Azure fixture traffic; raw evidence stays private."""
 
 import argparse
 import ipaddress
@@ -17,7 +17,9 @@ CURL_TIMEOUT = 28
 
 def accepted(receipt: dict, expected: dict[str, str]) -> bool:
     """Require a proven CE path and a positive control for every deny case."""
-    if not receipt.get("aws_default_route_to_ce"):
+    if not receipt.get(
+        "ce_default_route_verified", receipt.get("aws_default_route_to_ce")
+    ):
         return False
     requests = {request["scheme"]: request for request in receipt["requests"]}
     if requests.keys() != expected.keys():
@@ -32,7 +34,10 @@ def accepted(receipt: dict, expected: dict[str, str]) -> bool:
                 and request["http_200"]
                 and request["body_case_matches"]
                 and observed == 1
-                and request["origin_source_matches_ce_eip"]
+                and request.get(
+                    "origin_source_matches_ce_public_ip",
+                    request.get("origin_source_matches_ce_eip"),
+                )
             )
             if not good:
                 return False
@@ -49,32 +54,13 @@ def accepted(receipt: dict, expected: dict[str, str]) -> bool:
     return bool(controls)
 
 
-def capture(facts: dict, ssh_config: Path, evidence: Path, label: str) -> dict:
+def capture(
+    facts: dict, ssh_config: Path, evidence: Path, label: str, cloud: str = "aws"
+) -> dict:
     """Capture routing, fresh clients and private origin logs on the owned fixture."""
     origin = str(ipaddress.ip_address(facts["origin_public_ip"]))
     ce_source = str(ipaddress.ip_address(facts["ce_public_ip"]))
-    routes = json.loads(
-        subprocess.check_output(  # noqa: S603 - fixed executable and argv, no shell
-            [
-                shutil.which("aws") or "",
-                "ec2",
-                "describe-route-tables",
-                "--region",
-                facts["region"],
-                "--route-table-ids",
-                facts["client_route_table"],
-                "--output",
-                "json",
-            ],
-            timeout=60,
-        )
-    )["RouteTables"][0]["Routes"]
-    route_ok = any(
-        route.get("DestinationCidrBlock") == "0.0.0.0/0"
-        and route.get("NetworkInterfaceId") == facts["sli_eni"]
-        and route.get("State") == "active"
-        for route in routes
-    )
+    route_ok = route_to_ce(facts, cloud)
     ssh = [shutil.which("ssh") or "", "-F", str(ssh_config)]
     cert = subprocess.check_output(  # noqa: S603 - fixed executable and argv, no shell
         [*ssh, "qualification-origin", "sudo cat /etc/nginx/qualification/origin.crt"],
@@ -111,10 +97,73 @@ def capture(facts: dict, ssh_config: Path, evidence: Path, label: str) -> dict:
     for request in requests:
         matched = [item for item in observations if item.get("case") == request["case"]]
         request["origin_observations"] = len(matched)
-        request["origin_source_matches_ce_eip"] = bool(matched) and all(
+        source_key = (
+            "origin_source_matches_ce_eip"
+            if cloud == "aws"
+            else "origin_source_matches_ce_public_ip"
+        )
+        request[source_key] = bool(matched) and all(
             item.get("source") == ce_source for item in matched
         )
-    return {"label": label, "aws_default_route_to_ce": route_ok, "requests": requests}
+    return {
+        "label": label,
+        "cloud": cloud,
+        "ce_default_route_verified": route_ok,
+        **({"aws_default_route_to_ce": route_ok} if cloud == "aws" else {}),
+        "requests": requests,
+    }
+
+
+def route_to_ce(facts: dict, cloud: str) -> bool:
+    """Require an active route on the fixture client to the owned CE inside NIC."""
+    if cloud == "azure":
+        response = json.loads(
+            subprocess.check_output(  # noqa: S603 - fixed Azure CLI, argv only
+                [
+                    shutil.which("az") or "",
+                    "network",
+                    "nic",
+                    "show-effective-route-table",
+                    "--ids",
+                    facts["client_nic"],
+                    "-o",
+                    "json",
+                ],
+                timeout=60,
+            )
+        )
+        return any(
+            route.get("source") == "User"
+            and route.get("state") == "Active"
+            and route.get("nextHopType") == "VirtualAppliance"
+            and "0.0.0.0/0" in route.get("addressPrefix", [])
+            and facts["ce_sli_ip"] in route.get("nextHopIpAddress", [])
+            for route in response["value"]
+        )
+    if cloud != "aws":
+        return False
+    routes = json.loads(
+        subprocess.check_output(  # noqa: S603 - fixed executable and argv, no shell
+            [
+                shutil.which("aws") or "",
+                "ec2",
+                "describe-route-tables",
+                "--region",
+                facts["region"],
+                "--route-table-ids",
+                facts["client_route_table"],
+                "--output",
+                "json",
+            ],
+            timeout=60,
+        )
+    )["RouteTables"][0]["Routes"]
+    return any(
+        route.get("DestinationCidrBlock") == "0.0.0.0/0"
+        and route.get("NetworkInterfaceId") == facts["sli_eni"]
+        and route.get("State") == "active"
+        for route in routes
+    )
 
 
 def client_requests(
@@ -170,6 +219,7 @@ def client_requests(
 def main() -> None:
     """Run bounded traffic acceptance with explicitly supplied private evidence paths."""
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--cloud", choices=("aws", "azure"), default="aws")
     parser.add_argument("--facts", type=Path, required=True)
     parser.add_argument("--ssh-config", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
@@ -186,7 +236,7 @@ def main() -> None:
     path = args.evidence / f"{args.label}-receipt.json"
     if path.exists():
         parser.error("Evidence label already exists; preserve the first attempt")
-    receipt = capture(facts, args.ssh_config, args.evidence, args.label)
+    receipt = capture(facts, args.ssh_config, args.evidence, args.label, args.cloud)
     receipt["accepted"] = accepted(receipt, {"http": args.http, "https": args.https})
     path.write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(receipt))

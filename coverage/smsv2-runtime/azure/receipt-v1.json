@@ -1,0 +1,585 @@
+{
+  "cleanup": {
+    "empty_managed_state": true,
+    "registrations": [
+      {
+        "registration_count": 0,
+        "site": "smsv2-2586-az-c1-bootstrap"
+      },
+      {
+        "registration_count": 0,
+        "site": "smsv2-2586-az-c1-configured"
+      }
+    ],
+    "resource_group_exists": false,
+    "same_subscription": true,
+    "tagged_resource_count": 0,
+    "xc_objects": [
+      {
+        "kind": "securemesh_site_v2s",
+        "name": "smsv2-2586-az-c1-bootstrap",
+        "status": 404
+      },
+      {
+        "kind": "securemesh_site_v2s",
+        "name": "smsv2-2586-az-c1-configured",
+        "status": 404
+      },
+      {
+        "kind": "tokens",
+        "name": "smsv2-2586-az-c1-bootstrap-reg",
+        "status": 404
+      },
+      {
+        "kind": "tokens",
+        "name": "smsv2-2586-az-c1-configured-reg",
+        "status": 404
+      },
+      {
+        "kind": "enhanced_firewall_policys",
+        "name": "smsv2-2586-az-c1-efw",
+        "status": 404
+      },
+      {
+        "kind": "enhanced_firewall_policys",
+        "name": "smsv2-2586-az-c1-efw-companion",
+        "status": 404
+      }
+    ]
+  },
+  "cloud": "azure",
+  "cycle": 1,
+  "destroy": {
+    "changes": {
+      "azurerm_linux_virtual_machine.ce[0]": ["delete"],
+      "azurerm_linux_virtual_machine.traffic[\"client\"]": ["delete"],
+      "azurerm_linux_virtual_machine.traffic[\"origin\"]": ["delete"],
+      "azurerm_network_interface.client": ["delete"],
+      "azurerm_network_interface.origin": ["delete"],
+      "azurerm_network_interface.sli": ["delete"],
+      "azurerm_network_interface.slo": ["delete"],
+      "azurerm_network_interface_security_group_association.fixture[\"client\"]": ["delete"],
+      "azurerm_network_interface_security_group_association.fixture[\"origin\"]": ["delete"],
+      "azurerm_network_interface_security_group_association.fixture[\"sli\"]": ["delete"],
+      "azurerm_network_interface_security_group_association.fixture[\"slo\"]": ["delete"],
+      "azurerm_network_security_group.fixture": ["delete"],
+      "azurerm_public_ip.ce": ["delete"],
+      "azurerm_public_ip.origin": ["delete"],
+      "azurerm_resource_group.fixture": ["delete"],
+      "azurerm_route_table.client": ["delete"],
+      "azurerm_subnet.client": ["delete"],
+      "azurerm_subnet.sli": ["delete"],
+      "azurerm_subnet.slo": ["delete"],
+      "azurerm_subnet_route_table_association.client": ["delete"],
+      "azurerm_user_assigned_identity.ce": ["delete"],
+      "azurerm_virtual_network.fixture": ["delete"],
+      "xcsh_registration_approval.ce[0]": ["delete"],
+      "xcsh_securemesh_site_v2.ce[0]": ["delete"],
+      "xcsh_token.ce[0]": ["delete"]
+    },
+    "count": 25,
+    "ownership_verified": true,
+    "sha256": "1643ce7535bf6585cc9dd0a8d9fe09c7a0a810f0ed74a827736e03fd7cb45619"
+  },
+  "first_failures": [
+    {
+      "correction": "refresh owned NIC facts and use explicit Azure observed-driver selection retaining aliases.",
+      "failure": "MACs initially unavailable in pre-attachment NIC state; generic join then found a netvsc/VF pair for each MAC.",
+      "owner": "fixture"
+    },
+    {
+      "correction": "reviewed NSG-only addition for client subnet to owned origin TCP 80/443.",
+      "failure": "HTTP and HTTPS timeout before CE ingress; the default NSG VirtualNetwork destination rule omitted public-destination transit.",
+      "owner": "fixture"
+    },
+    {
+      "correction": "reviewed task-origin service restart; bootstrap now restarts nginx after writing configuration.",
+      "failure": "Ubuntu nginx remained on its package default: HTTP 404, TLS refused.",
+      "owner": "fixture"
+    },
+    {
+      "correction": "rejected plan retained; traffic custom_data remains immutable during policy cycles.",
+      "failure": "updated immutable bootstrap data would replace the origin VM.",
+      "owner": "fixture"
+    },
+    {
+      "correction": "preserved first failure; serialized fresh-label plan succeeded.",
+      "failure": "overlapping plan probe hit state lock.",
+      "owner": "orchestration"
+    },
+    {
+      "failure": "Azure pinned parent import lost software_settings and added empty interface labels.",
+      "issue": "https://github.com/f5-sales-demo/terraform-provider-xcsh/issues/1387",
+      "owner": "contract",
+      "status": "unqualified without exclusions or cloud mutations."
+    }
+  ],
+  "fixture_revision": "f5b3f44fb0496a1af198432e900503aa0e9fc4b6",
+  "format_version": 1,
+  "import": {
+    "all_scoped_attributes_equal": true,
+    "exclusions": [],
+    "saved_noop_plan_sha256": [
+      "e09d9d99395ad7f01427683e7d0d9c8273c4745c034854377bcf49c91f10bca0",
+      "e53fce993a00a97398783dcc033fd107905ef2b12f135586a9588ea12d04a8e6"
+    ]
+  },
+  "pins": {
+    "api": "12.0.8",
+    "azurerm": "4.81.0",
+    "ce_disk_gib": 100,
+    "ce_marketplace_image": "f5-networks:f5xc_customer_edge:crt-20260801:20260801.0205.1",
+    "ce_size": "Standard_D8s_v5",
+    "origin_image": "Canonical:ubuntu-24_04-lts:server:24.04.202609040",
+    "provider_binary_sha256": "f71b752ae266982fc2c12e4c2584ef46126689fa6a235f34ebf30a558977b480",
+    "provider_commit": "35cce9b33b3037b3ef4b4883dd9ced22542f20e3",
+    "terraform": "1.16.5",
+    "upstream_source_revision": "8e60c07c1d028cdbb49608452f0838e05471be84",
+    "xcsh_provider": "15.9.0"
+  },
+  "privacy": "Only synthetic names, artifact pins, hashes and boolean/count findings are public. Subscription, addresses, keys, credentials, state, plans, registration and raw CLI/traffic evidence stay private.",
+  "qualified_subset": [
+    "scoped TCP 80 deny and allow with HTTPS control",
+    "ordered rule enforcement",
+    "reference replacement",
+    "parent-only association order preservation",
+    "detachment",
+    "policy import with all attributes equal and no exclusions",
+    "policy/data-source scoped-rule equality",
+    "repeated zero-change plans",
+    "rule-order drift reconciliation with resource version retained",
+    "omitted default allow traffic, explicit default selection, and both follow-up no-op plans",
+    "policy deletion",
+    "task-owned cloud and XC cleanup"
+  ],
+  "reviewed_plans": [
+    {
+      "changes": {
+        "xcsh_registration_approval.ce[0]": ["create"]
+      },
+      "label": "approval-20261016",
+      "sha256": "c7c7e066831862fe851e15c71ef96906313c85987ed3d8bd8727abde73e12ba8",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "azurerm_linux_virtual_machine.ce[0]": ["create"],
+        "xcsh_securemesh_site_v2.ce[0]": ["create"],
+        "xcsh_token.ce[0]": ["create"]
+      },
+      "label": "configured-20261016",
+      "sha256": "7bac7f4e37d61260dc5ecbe51f054b94a306ac85a87066c8147ec255d7a59ca1",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_registration_approval.ce[0]": ["create"]
+      },
+      "label": "configured-approval-20261016",
+      "sha256": "ac65593b3db525da76b9f2bd1b0528b1a3ad3e700389995c14b3801c8650da3c",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.traffic[0]": ["update"]
+      },
+      "label": "firewall-allow-update-20261016",
+      "sha256": "e4713c1ce13d73244ff1d96f3578f435624daf95b70c447fcdb350faa7094bb8",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_securemesh_site_v2.ce[0]": ["update"]
+      },
+      "label": "firewall-attach-20261016",
+      "sha256": "27397dd2481f042b5cf6ccf7856cda5681a0d90a6cb6f4c1098df68d472ac469",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.companion[0]": ["create"],
+        "xcsh_enhanced_firewall_policy.traffic[0]": ["create"]
+      },
+      "label": "firewall-create-20261016",
+      "sha256": "f08e2e499c2dfddac9055f42b400a8ba179125fb634ecdc5d29224e39966942c",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.companion[0]": ["delete"],
+        "xcsh_enhanced_firewall_policy.traffic[0]": ["delete"]
+      },
+      "label": "firewall-delete-20261016",
+      "sha256": "712b4789df323381981a70cde2799473dc5a515920d821970db605c56d883cdd",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_securemesh_site_v2.ce[0]": ["update"]
+      },
+      "label": "firewall-detach-20261016",
+      "sha256": "faabfaa568356864ef04556990cfd9e9851087b431a61ae33e66434356478ae3",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.companion[0]": ["update"],
+        "xcsh_securemesh_site_v2.ce[0]": ["update"]
+      },
+      "label": "firewall-detach-default-20261016",
+      "sha256": "fba8dde2b1be1577dd07db71ec7578f15825ba3539838113b0e81e72109a4f6b",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_securemesh_site_v2.ce[0]": ["update"]
+      },
+      "label": "firewall-detach-final-20261016",
+      "sha256": "060d68c4a820989dc523a833006fddf00e392eee271c818ed2de0a4381c5b1b1",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {},
+      "label": "firewall-drift-noop-20261016",
+      "sha256": "6827d967a5e86a95468040073d1df43e43a9306320655d374e978eae0251bd85",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.traffic[0]": ["update"]
+      },
+      "label": "firewall-drift-reconcile-20261016",
+      "sha256": "13eb211af381e1e9c40749f1ec419e375e1908750ecf5123aeeffd7cfb0b057f",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.companion[0]": ["update"]
+      },
+      "label": "firewall-explicit-default-20261016",
+      "sha256": "3bbc15a257d9690646e98c891ae4317303874c8e49030cbaf5f976174b8906a2",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {},
+      "label": "firewall-explicit-default-noop-20261016",
+      "sha256": "99ba2ddd3a9ae0bfa4bf879b3d8e34174b17b18dd62ee399cbf5eaa5fac658b4",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.companion[0]": ["update"]
+      },
+      "label": "firewall-omitted-default-20261016",
+      "sha256": "e6b98ff00dd1de714bd6d4c4d5e30e436f242548d6155bdab7ad427bdc6735bf",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {},
+      "label": "firewall-omitted-default-noop-20261016",
+      "sha256": "64b1b8bb80e853c13dce2e88441f84e1a5f9310834b185e181225a612bdd85d7",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_securemesh_site_v2.ce[0]": ["update"]
+      },
+      "label": "firewall-reference-replacement-r2-20261016",
+      "sha256": "9327b2b18a226e57ecd1bc419b36f7adebd480e738f329f0ffb545f9f4c3845d",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_securemesh_site_v2.ce[0]": ["update"]
+      },
+      "label": "firewall-reverse-policies-20261016",
+      "sha256": "5225a41c62f6a1f218552afd0d109675b6029de1eebced1ed3a76eab65f65250",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.traffic[0]": ["update"]
+      },
+      "label": "firewall-reverse-rules-20261016",
+      "sha256": "0b07e71d6928e21ec59560c3a0acc000d92fd3e4cf140b4c30ffcdc06e6beef3",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.traffic[0]": ["update"]
+      },
+      "label": "firewall-rule-deny-20261016",
+      "sha256": "c1c2de22b8534b1230aa8e4cbfbaf67f8e85d7ef96ccc0bc84478b5ce08c981d",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.traffic[0]": ["update"]
+      },
+      "label": "firewall-scoped-order-20261016",
+      "sha256": "c1302c4f608e6071059ad2a86204380b84edcdc521fbeb262b690df480643b44",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "xcsh_securemesh_site_v2.ce[0]": ["update"]
+      },
+      "label": "firewall-two-policies-20261016",
+      "sha256": "2457a790c3e16975967a0fff2b07f45b1b79c1ff31b42d6f96310ce0bced3f47",
+      "substrate_unchanged": true
+    },
+    {
+      "changes": {
+        "azurerm_linux_virtual_machine.ce[0]": ["delete"],
+        "xcsh_registration_approval.ce[0]": ["delete"],
+        "xcsh_securemesh_site_v2.ce[0]": ["delete"],
+        "xcsh_token.ce[0]": ["delete"]
+      },
+      "label": "retired-20261016",
+      "sha256": "be82ba7dcbb0d72679b41d2349a8ad5fbe692c44b8536d301f9ce9cb8962ead0",
+      "substrate_unchanged": true
+    }
+  ],
+  "runtime": {
+    "completed_installed_os": "9.2026.17",
+    "completed_installed_software": "crt-20260801-0205",
+    "configured_mac_device_match": true,
+    "device_selection": "One observed hv_netvsc per owned MAC; known VF alias retained. Argo reports net_failsafe on configured eth1.",
+    "health_state": "PROVISIONED",
+    "mapping_checksum": "f2e982b1113e3e08feb9d296259e3820b7ff50eec1fc1dbc651c025c13d09861",
+    "measured_inside_dataplane_mtu": 1500,
+    "mtu_measurement_source": "live vif --list; not an inferred config default",
+    "private_client_effective_route": "active user default route to owned CE SLI",
+    "real_image_boot": true,
+    "registration_online": true
+  },
+  "task": "smsv2-2586-az-c1",
+  "traffic": {
+    "baseline-verified-20261016": {
+      "accepted": true,
+      "ce_default_route_verified": true,
+      "evidence_sha256": "0c04084bd9eaad530b01f1614e8ce988e6ca77809565a0a1eaec48f0539ee717",
+      "requests": [
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "http"
+        },
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "firewall-allow-update-traffic-20261016": {
+      "accepted": true,
+      "ce_default_route_verified": true,
+      "evidence_sha256": "20686089d29549096244878b7740e1bfd70853ef61cd92a288f45b851e2a234d",
+      "requests": [
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "http"
+        },
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "firewall-deny-first-20261016": {
+      "accepted": true,
+      "ce_default_route_verified": true,
+      "evidence_sha256": "c2bfdf969e28b10a671c976ff0b3fdac056d59bf20800d60f6e49637ecdbc94c",
+      "requests": [
+        {
+          "body_case_matches": false,
+          "client_exit": 28,
+          "http_200": false,
+          "origin_observations": 0,
+          "origin_source_matches_ce_public_ip": false,
+          "scheme": "http"
+        },
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "firewall-detached-traffic-20261016": {
+      "accepted": true,
+      "ce_default_route_verified": true,
+      "evidence_sha256": "0bc1dfd65d536b899e31b997bee4bc57eda8f0dc9840bec7ac273651fad502a1",
+      "requests": [
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "http"
+        },
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "firewall-omitted-default-traffic-20261016": {
+      "accepted": true,
+      "ce_default_route_verified": true,
+      "evidence_sha256": "7e613a53b514372b20247a5c59719e9324d9fba895dfd282437a30af79baa0aa",
+      "requests": [
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "http"
+        },
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "firewall-reference-replacement-traffic-20261016": {
+      "accepted": true,
+      "ce_default_route_verified": true,
+      "evidence_sha256": "2145f91487bb9872697b751400d2f11ff061a83af429e1dc6e4491d6d43c061d",
+      "requests": [
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "http"
+        },
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "firewall-reverse-policy-deny-20261016": {
+      "accepted": true,
+      "ce_default_route_verified": true,
+      "evidence_sha256": "a755b2a30ec86b341328dd0baeec66d760d990b71d48bbc6fad89ed528c6742e",
+      "requests": [
+        {
+          "body_case_matches": false,
+          "client_exit": 28,
+          "http_200": false,
+          "origin_observations": 0,
+          "origin_source_matches_ce_public_ip": false,
+          "scheme": "http"
+        },
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "firewall-reverse-rules-traffic-20261016": {
+      "accepted": true,
+      "ce_default_route_verified": true,
+      "evidence_sha256": "bf9c53ec5b40605adbdf7a7cb44e20e208bb219dc7a514b1d27924be2ad14f18",
+      "requests": [
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "http"
+        },
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "firewall-two-policy-deny-20261016": {
+      "accepted": true,
+      "ce_default_route_verified": true,
+      "evidence_sha256": "f89edb7371ab990af66e1c664a6002ea8123ae5111bb1124a42f2c44e26c1b1c",
+      "requests": [
+        {
+          "body_case_matches": false,
+          "client_exit": 28,
+          "http_200": false,
+          "origin_observations": 0,
+          "origin_source_matches_ce_public_ip": false,
+          "scheme": "http"
+        },
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_public_ip": true,
+          "scheme": "https"
+        }
+      ]
+    }
+  },
+  "unqualified": [
+    "Cross-policy enforcement precedence: both attachment orders deny HTTP; authoritative contract remains required.",
+    "Pinned parent import: software_settings is create-only/write-only, imported state differs; no exclusions or replacement workaround.",
+    "Forward Proxy and later capability families."
+  ],
+  "validation": {
+    "actionlint": "pass",
+    "azure_mapping_tests": 6,
+    "configured_pylint": "10.00",
+    "full_python_tests": 140,
+    "mock_fixture_tests": 9,
+    "mypy": "pass",
+    "pii": "pass",
+    "provider_contradictory_selection_probes": 2,
+    "ruff": "pass",
+    "runner_routing": "pass",
+    "shellcheck": "pass",
+    "traffic_acceptance_tests": 8
+  }
+}
