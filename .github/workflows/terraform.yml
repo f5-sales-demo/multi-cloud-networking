@@ -306,7 +306,7 @@ jobs:
 
   coverage-smsv2-runtime-aws:
     name: coverage-smsv2-runtime-aws
-    runs-on: ubuntu-latest
+    runs-on: managed-socketless
     defaults:
       run:
         working-directory: coverage/smsv2-runtime/aws
