@@ -1,0 +1,483 @@
+{
+  "cleanup": {
+    "describe-addresses": 0,
+    "describe-instances": 0,
+    "describe-internet-gateways": 0,
+    "describe-key-pairs": 0,
+    "describe-network-interfaces": 0,
+    "describe-route-tables": 0,
+    "describe-security-groups": 0,
+    "describe-subnets": 0,
+    "describe-volumes": 0,
+    "describe-vpcs": 0,
+    "empty_managed_state": true,
+    "get-instance-profile": "NoSuchEntity",
+    "get-role": "NoSuchEntity",
+    "recorded_root_volumes": "NotFound",
+    "registrations": [
+      {
+        "registration_count": 0,
+        "site": "smsv2-2586-c1-bootstrap",
+        "status": 200
+      },
+      {
+        "registration_count": 0,
+        "site": "smsv2-2586-c1-configured",
+        "status": 200
+      }
+    ],
+    "same_aws_account": true,
+    "xc_objects": [
+      {
+        "kind": "securemesh_site_v2s",
+        "name": "smsv2-2586-c1-bootstrap",
+        "status": 404
+      },
+      {
+        "kind": "securemesh_site_v2s",
+        "name": "smsv2-2586-c1-configured",
+        "status": 404
+      },
+      {
+        "kind": "tokens",
+        "name": "smsv2-2586-c1-bootstrap-reg",
+        "status": 404
+      },
+      {
+        "kind": "tokens",
+        "name": "smsv2-2586-c1-configured-reg",
+        "status": 404
+      },
+      {
+        "kind": "enhanced_firewall_policys",
+        "name": "smsv2-2586-c1-efw",
+        "status": 404
+      },
+      {
+        "kind": "enhanced_firewall_policys",
+        "name": "smsv2-2586-c1-efw-companion",
+        "status": 404
+      }
+    ]
+  },
+  "cloud": "aws",
+  "cycle": 1,
+  "destroy": {
+    "apply_exit": 0,
+    "managed_resources_deleted": 24,
+    "sha256": "52fb225588fdde0ac0ad2f18a32f1f17a95b815ffd22d4228591dbc61eb3ca0a"
+  },
+  "first_failures": [
+    {
+      "correction": "m5.2xlarge; retained existing substrate",
+      "failure": "m5.xlarge unsupported Marketplace configuration",
+      "owner": "fixture"
+    },
+    {
+      "correction": "waited for all 31 upgrade stages; fresh traffic passed",
+      "failure": "initial 600-second traffic/runtime probe during UPGRADING",
+      "owner": "fixture"
+    },
+    {
+      "correction": "parent-only attachment with CE user_data lifecycle retention",
+      "failure": "attachment plan would replace CE through deferred user_data",
+      "owner": "fixture"
+    },
+    {
+      "failure": "omitted MTU reads 0 and aws_runtime rejects invalid MTU 0",
+      "issue": "https://github.com/f5-sales-demo/terraform-provider-xcsh/issues/2600",
+      "owner": "provider contract",
+      "status": "unqualified"
+    },
+    {
+      "failure": "baseline AWS preflight jq groups boolean as IPv4 octets",
+      "issue": "https://github.com/f5-sales-demo/multi-cloud-networking/issues/1500",
+      "owner": "consumer",
+      "status": "repaired in merged PR #1501"
+    }
+  ],
+  "fixture_revision": "4c2c8ae0f16c6ec14046c0edf32b0f6093c5f6b2",
+  "format_version": 1,
+  "import": {
+    "all_attributes_equal": true,
+    "excluded_attributes": [],
+    "no_op_plans": [
+      {
+        "changes": [],
+        "sha256": "2181cb2e9fcd0d9a08ffcf4cc96e1c1f7d72f7631cc6843b85be7fa56858fd7a"
+      },
+      {
+        "changes": [],
+        "sha256": "25be8309da8ce3c4dbcba412e3e1ac60e531e8cbd4127f2130227079e09a6012"
+      }
+    ]
+  },
+  "pins": {
+    "api": "12.0.8",
+    "aws_provider": "5.100.0",
+    "consumer_base": "947d3f60098eec5f4c1536aa2d338523e53f8687",
+    "provider_binary_sha256": "f71b752ae266982fc2c12e4c2584ef46126689fa6a235f34ebf30a558977b480",
+    "provider_commit": "35cce9b33b3037b3ef4b4883dd9ced22542f20e3",
+    "schema_sha256": "1125c6dccd7425104dc64a71ce36bb7b2d9a4ac78d3c47f7b5ebb6ec6b80e7e5",
+    "terraform": "1.16.5",
+    "upstream_source_revision": "8e60c07c1d028cdbb49608452f0838e05471be84",
+    "xcsh_provider": "15.9.0"
+  },
+  "privacy": "Only synthetic labels, version pins, digests and boolean/count findings are published. State, plans, addresses, credentials, SSH keys, registrations and raw traffic logs remain private.",
+  "qualified_subset": [
+    "scoped TCP 80 allow and deny",
+    "unrelated HTTPS control",
+    "policy creation and deletion",
+    "parent-only attachment and detachment",
+    "rule update",
+    "ordered rule enforcement",
+    "reference replacement",
+    "import attribute equality without exclusions",
+    "policy data-source ordered-rule equality",
+    "repeated zero-change plans",
+    "out-of-band rule-order drift reconciliation"
+  ],
+  "reviewed_plans": [
+    {
+      "changes": [
+        {
+          "actions": ["update"],
+          "address": "xcsh_enhanced_firewall_policy.traffic[0]"
+        }
+      ],
+      "label": "allow",
+      "sha256": "6786756cd47fc87d3ca7e4b988e966b074d4be824418439a93ce39c12b7f7bd8"
+    },
+    {
+      "changes": [
+        {
+          "actions": ["create"],
+          "address": "xcsh_enhanced_firewall_policy.traffic[0]"
+        }
+      ],
+      "label": "create",
+      "sha256": "85ec7ab2aad3dd97847a88460f66fb18c22c16e02cc77c23f476f7c094989e5d"
+    },
+    {
+      "changes": [
+        {
+          "actions": ["delete"],
+          "address": "xcsh_enhanced_firewall_policy.traffic[0]"
+        }
+      ],
+      "label": "delete",
+      "sha256": "818db270d1f5346e0448734349965176d823578da9931c85b7f741174a510252"
+    },
+    {
+      "changes": [
+        {
+          "actions": ["update"],
+          "address": "xcsh_securemesh_site_v2.ce[0]"
+        }
+      ],
+      "label": "deny",
+      "sha256": "fc79fef1a335321ac25149bb3521bd89ab3220b46e4e9e8b9e27bb46bead08a1"
+    },
+    {
+      "changes": [
+        {
+          "actions": ["update"],
+          "address": "xcsh_securemesh_site_v2.ce[0]"
+        }
+      ],
+      "label": "detach",
+      "sha256": "6e4b26c309d87c4f2a724270513c2438b6309b3a578a349181793b0afed14d53"
+    },
+    {
+      "changes": {
+        "xcsh_securemesh_site_v2.ce[0]": ["update"]
+      },
+      "label": "ordered-allow-first-20261016",
+      "sha256": "3cf3db2c48e0ca62a3214741c45f1478ebb641b625a666e2646b397898133218"
+    },
+    {
+      "changes": {},
+      "label": "ordered-allow-first-noop-20261016",
+      "sha256": "b40f376e656f10de60d0a830dbbe618de46358ad5574e20fde3519459bb9f1ca"
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.companion[0]": ["create"],
+        "xcsh_enhanced_firewall_policy.traffic[0]": ["create"]
+      },
+      "label": "ordered-create-20261016",
+      "sha256": "d4c4ef5840fdb817efee62576a6d0b38d12d7a8fc968654c341bc5202d3851af"
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.companion[0]": ["delete"],
+        "xcsh_enhanced_firewall_policy.traffic[0]": ["delete"]
+      },
+      "label": "ordered-delete-20261016",
+      "sha256": "44d049b4e5932ef04b3458c59f330c0a0e7dda35e6eb8ab57001af180d5de3c9"
+    },
+    {
+      "changes": {
+        "xcsh_securemesh_site_v2.ce[0]": ["update"]
+      },
+      "label": "ordered-deny-first-review3-20261016",
+      "sha256": "496f67cc39b4001bfe143905f990996294a41af9a3bacb7d4288b3d04781ee05"
+    },
+    {
+      "changes": {
+        "xcsh_securemesh_site_v2.ce[0]": ["update"]
+      },
+      "label": "ordered-detach-20261016",
+      "sha256": "ad3b1f23d6eac2c1160e591d4db55f1b2b50a3e1cbc8cf8b84251d27d88b8cca"
+    },
+    {
+      "changes": {},
+      "label": "ordered-drift-noop-20261016",
+      "sha256": "4263d36116f28b610db16252f741ed2bde2e6510add17a5d560fbbaee91b26d0"
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.traffic[0]": ["update"]
+      },
+      "label": "ordered-drift-reconcile-20261016",
+      "sha256": "cd82a6c7404c56065643a2e2dcca8d01db0fd305983d7ad9d192eff7b0ad2778"
+    },
+    {
+      "changes": {
+        "xcsh_securemesh_site_v2.ce[0]": ["update"]
+      },
+      "label": "ordered-reference-replacement-20261016",
+      "sha256": "084e3b24a0d9d46d7aa7251b66477e385221f204554241079224e61903eb23c3"
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.traffic[0]": ["update"],
+        "xcsh_securemesh_site_v2.ce[0]": ["update"]
+      },
+      "label": "ordered-rules-reversed-20261016",
+      "sha256": "732fc0a66f19a6cb0b1dc426b51665e84223bb7ddc2fc178ba25f0a2dfd27cb7"
+    },
+    {
+      "changes": {
+        "xcsh_securemesh_site_v2.ce[0]": ["update"]
+      },
+      "label": "ordered-single-deny-20261016",
+      "sha256": "daf37c0e94d8a881956ce6f5e65f305f2408d5fe24082a0270335d522d1224ed"
+    },
+    {
+      "changes": {
+        "xcsh_enhanced_firewall_policy.traffic[0]": ["update"]
+      },
+      "label": "ordered-single-reverse-rules-20261016",
+      "sha256": "9b048d63df291abe6722481f7d24dc052bfbdc4fa89b5c3243a88b0c3f5220c5"
+    }
+  ],
+  "runtime": {
+    "client_default_route": "CE SLI",
+    "client_has_public_ip": false,
+    "configured_upgrade_stages_complete": 31,
+    "dataplane_ready": true,
+    "mapping_sha256": "9eee84381c15e66dbb17ba20fe6ab8287427b6edff1f6d3d6a5f4389dcc16db1",
+    "nic_identity": "observed registration MAC to owned ENI",
+    "origin_security_group_permits_acceptance_flows": true,
+    "os": "9.2026.17",
+    "real_image_boot": true,
+    "registration_online": true,
+    "software": "crt-20260801-0205"
+  },
+  "task": "smsv2-2586-c1",
+  "traffic": {
+    "baseline-pair": {
+      "evidence_sha256": "5f34bf0f0bb95e0d4d7144bcb1122b6dfce09866078f527206fb6d4bee62df18",
+      "requests": [
+        {
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "http"
+        },
+        {
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "firewall-allow-update": {
+      "evidence_sha256": "6783a97a43231e34bb96d749318f0e49e43ec4ff49d8a5be958f7c63e8a764ae",
+      "requests": [
+        {
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "http"
+        },
+        {
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "firewall-deny-first": {
+      "evidence_sha256": "04a8d8b8113a43c5a6231dc8cf153418ecbd3052c957b82309eb446afb45cfd4",
+      "requests": [
+        {
+          "client_exit": 28,
+          "http_200": false,
+          "origin_observations": 0,
+          "origin_source_matches_ce_eip": false,
+          "scheme": "http"
+        },
+        {
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "firewall-detached": {
+      "evidence_sha256": "98ae3705bd4b6497d660f74ddadcce78c2d6a0d5d3cd5e2b19d039a66655f43b",
+      "requests": [
+        {
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "http"
+        },
+        {
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "ordered-allow-first-fresh2-20261016": {
+      "evidence_sha256": "4cb62f5fbb8eb42dfaaadfc893f607cbc6f886ac192f4f7bc819770a60c54105",
+      "requests": [
+        {
+          "client_exit": 28,
+          "http_200": false,
+          "origin_observations": 0,
+          "origin_source_matches_ce_eip": false,
+          "scheme": "http"
+        },
+        {
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "ordered-deny-first-traffic-20261016": {
+      "evidence_sha256": "1f2972fef3ce2f6d248bcd3be777bf1a79a0776cc6f887c0a9eaff4bf76bf54c",
+      "requests": [
+        {
+          "client_exit": 28,
+          "http_200": false,
+          "origin_observations": 0,
+          "origin_source_matches_ce_eip": false,
+          "scheme": "http"
+        },
+        {
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "ordered-detached-verified-20261016": {
+      "evidence_sha256": "961a464cfa18bbcf719c94f075d218e60b658152218df96f780bb9336c48c9ae",
+      "requests": [
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "http"
+        },
+        {
+          "body_case_matches": true,
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "ordered-replacement-traffic-20261016": {
+      "evidence_sha256": "ac8d60d0d385e8e26d33854734d9a713727643def795b034c2eba1681eb94aaf",
+      "requests": [
+        {
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "http"
+        },
+        {
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "https"
+        }
+      ]
+    },
+    "ordered-rules-reversed-traffic-20261016": {
+      "evidence_sha256": "9cdebd7e7269f744a8c69f566d0c9e580d18c4c74de9e8bfa8058bd1c28a49b4",
+      "requests": [
+        {
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "http"
+        },
+        {
+          "client_exit": 0,
+          "http_200": true,
+          "origin_observations": 1,
+          "origin_source_matches_ce_eip": true,
+          "scheme": "https"
+        }
+      ]
+    }
+  },
+  "unqualified": [
+    "cross-policy enforcement precedence: both allow/deny attachment orders denied HTTP",
+    "Azure live policies",
+    "Forward Proxy",
+    "all later capability families"
+  ],
+  "validation": {
+    "actionlint": "pass",
+    "mapping_tests": 4,
+    "mock_terraform_tests": 9,
+    "mypy": "pass",
+    "pylint": "10.00",
+    "python_full_suite": 132,
+    "ruff": "pass",
+    "shell_suite": "Full suite retained three first failures. Two pass with exact showcase Terraform 1.16.3; baseline preflight repair #1501 merged and its full regression passes.",
+    "shellcheck": "pass",
+    "traffic_negative_tests": 6,
+    "yaml": "pass"
+  }
+}
