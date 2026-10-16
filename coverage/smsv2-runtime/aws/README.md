@@ -7,7 +7,7 @@ It uses no existing showcase state or resource address. The versioned receipt re
 registration, dataplane readiness, MAC identity, routing and fresh origin-observed traffic.
 This fixture delivery does not establish completion of the SMSv2 capability families or Azure.
 
-The fixture pins Terraform 1.16.5, AWS provider 5.100.0 and XC provider 15.9.0. Supply exact approved
+The fixture pins Terraform 1.16.5, AWS provider 5.100.0 and XC provider 15.10.0. Supply exact approved
 CE and Amazon Linux 2023 image IDs and matching CE software/OS versions. Origin initialization uses
 Amazon Linux `dnf`. Credentials stay in session environment; do not put them in variables or source.
 
@@ -111,3 +111,11 @@ to model the retained SLO ENI retirement/reuse. These exceptions preserve the te
 are not production security recommendations. Rule descriptions, detailed EC2 monitoring and
 EBS optimization are explicit. Capability tests, private-client routing, origin observations,
 first failures and cleanup gates remain mandatory.
+
+The Forward Proxy controls are qualified separately in cycle 2. `proxy_http_action` and
+`proxy_tls_action` select scoped URL and SNI rules; `proxy_fallback_action` and
+`proxy_companion_action` support ordered rules and `NEXT_POLICY`. Create policies unattached
+first, then supply the ordered `proxy_policies` parent references. The HTTP matcher defaults
+to `/deny`; pass `--http-path /deny` to the traffic verifier and use `/allow` as an independent
+path control. TLS filtering uses the same owned origin and certificate-validated connections.
+HTTPS filtering does not establish TLS decryption.

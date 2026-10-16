@@ -3,7 +3,10 @@
 """Prevent fixture failures and bypass traffic from passing policy acceptance."""
 
 import json
+import shlex
+import subprocess
 import sys
+import tempfile
 import unittest
 from copy import deepcopy
 from pathlib import Path
@@ -11,7 +14,7 @@ from typing import Any
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from smsv2_traffic_receipt import accepted, route_to_ce
+from smsv2_traffic_receipt import TrafficTarget, accepted, client_requests, route_to_ce
 
 
 class TrafficAcceptanceTests(unittest.TestCase):
@@ -30,6 +33,36 @@ class TrafficAcceptanceTests(unittest.TestCase):
                 for scheme in ("http", "https")
             ],
         }
+
+    def test_scoped_http_path_keeps_https_control(self):
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch(
+                "smsv2_traffic_receipt.subprocess.run",
+                return_value=subprocess.CompletedProcess([], 28, b"", b""),
+            ) as run,
+        ):
+            client_requests(
+                ["ssh"],
+                TrafficTarget(
+                    "192.0.2.10", str(Path(directory) / "certificate.pem"), "/deny"
+                ),
+                Path(directory),
+                "scope",
+            )
+        urls = [
+            next(arg for arg in shlex.split(call.args[0][-1]) if arg.startswith(scheme))
+            for call, scheme in zip(
+                run.call_args_list, ("http://", "https://"), strict=True
+            )
+        ]
+        self.assertTrue(
+            urls[0].startswith("http://origin.qualification.test/deny?case=")
+        )
+        self.assertTrue(
+            urls[1].startswith("https://origin.qualification.test/allow?case=")
+        )
+        self.assertNotEqual(urls[0].split("case=")[1], urls[1].split("case=")[1])
 
     def test_observed_baseline(self):
         self.assertTrue(accepted(self.receipt, {"http": "allow", "https": "allow"}))

@@ -175,3 +175,45 @@ run "forward_proxy_url_and_sni_rules" {
     error_message = "Fallback must explicitly continue to the next policy."
   }
 }
+
+run "forward_proxy_scope_and_order" {
+  command = apply
+  variables {
+    phase                  = "configured"
+    device_mapping_file    = "tests/mapping-valid.json"
+    proxy_http_action      = "DENY"
+    proxy_tls_action       = "ALLOW"
+    proxy_rule_order       = ["fallback", "tls", "http"]
+    proxy_companion_action = "DENY"
+    proxy_policies         = [{ name = "qualification-test-fpx", namespace = "system" }, { name = "qualification-test-fpx-next", namespace = "system" }]
+  }
+  assert {
+    condition     = xcsh_forward_proxy_policy.traffic[0].rule_list.rules[0].all_destinations != null && xcsh_forward_proxy_policy.traffic[0].rule_list.rules[2].prefix_list.prefixes[0] == aws_subnet.client.cidr_block
+    error_message = "Rule order and client scope must reach the policy unchanged."
+  }
+  assert {
+    condition     = xcsh_securemesh_site_v2.ce[0].no_forward_proxy == null && [for ref in xcsh_securemesh_site_v2.ce[0].active_forward_proxy_policies.forward_proxy_policies : ref.name] == ["qualification-test-fpx", "qualification-test-fpx-next"]
+    error_message = "Only the parent writes ordered proxy associations."
+  }
+}
+run "forward_proxy_detached_defaults" {
+  command = plan
+  variables {
+    phase               = "configured"
+    device_mapping_file = "tests/mapping-valid.json"
+  }
+  assert {
+    condition     = length(xcsh_forward_proxy_policy.traffic) == 0 && length(xcsh_forward_proxy_policy.companion) == 0 && xcsh_securemesh_site_v2.ce[0].active_forward_proxy_policies == null && xcsh_securemesh_site_v2.ce[0].no_forward_proxy != null
+    error_message = "Omitted controls must remove policies and return the parent to no proxy."
+  }
+}
+run "invalid_forward_proxy_action" {
+  command = plan
+  variables { proxy_http_action = "drop" }
+  expect_failures = [var.proxy_http_action]
+}
+run "duplicate_forward_proxy_rule_order" {
+  command = plan
+  variables { proxy_rule_order = ["http", "http", "fallback"] }
+  expect_failures = [var.proxy_rule_order]
+}

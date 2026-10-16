@@ -10,9 +10,19 @@ import shutil
 import subprocess
 import uuid
 from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
 
 CURL_TIMEOUT = 28
+
+
+@dataclass(frozen=True)
+class TrafficTarget:
+    """Owned origin and client certificate used for independent protocol controls."""
+
+    origin: str
+    certificate: str
+    http_path: str = "/allow"
 
 
 def accepted(receipt: dict, expected: dict[str, str]) -> bool:
@@ -55,7 +65,11 @@ def accepted(receipt: dict, expected: dict[str, str]) -> bool:
 
 
 def capture(
-    facts: dict, ssh_config: Path, evidence: Path, label: str, cloud: str = "aws"
+    facts: dict,
+    ssh_config: Path,
+    evidence: Path,
+    label: str,
+    cloud: str = "aws",
 ) -> dict:
     """Capture routing, fresh clients and private origin logs on the owned fixture."""
     origin = str(ipaddress.ip_address(facts["origin_public_ip"]))
@@ -80,7 +94,12 @@ def capture(
         timeout=30,
     )
     try:
-        requests = client_requests(ssh, origin, cert_path, evidence, label)
+        requests = client_requests(
+            ssh,
+            TrafficTarget(origin, cert_path, facts.get("http_path", "/allow")),
+            evidence,
+            label,
+        )
     finally:
         subprocess.run(  # noqa: S603 - fixed SSH alias; path escaped as one argument
             [*ssh, "qualification-client", "rm -- " + shlex.quote(cert_path)],
@@ -88,23 +107,18 @@ def capture(
             timeout=30,
             check=True,
         )
-    raw = subprocess.check_output(  # noqa: S603 - fixed executable and argv, no shell
-        [*ssh, "qualification-origin", "sudo cat /var/log/nginx/qualification.jsonl"],
-        timeout=30,
-    )
-    (evidence / f"{label}-origin.jsonl").write_bytes(raw)
-    observations = [json.loads(line) for line in raw.decode().splitlines() if line]
-    for request in requests:
-        matched = [item for item in observations if item.get("case") == request["case"]]
-        request["origin_observations"] = len(matched)
-        source_key = (
+    observe_origin(
+        ssh,
+        evidence,
+        label,
+        requests,
+        (
             "origin_source_matches_ce_eip"
             if cloud == "aws"
-            else "origin_source_matches_ce_public_ip"
-        )
-        request[source_key] = bool(matched) and all(
-            item.get("source") == ce_source for item in matched
-        )
+            else "origin_source_matches_ce_public_ip",
+            ce_source,
+        ),
+    )
     return {
         "label": label,
         "cloud": cloud,
@@ -112,6 +126,29 @@ def capture(
         **({"aws_default_route_to_ce": route_ok} if cloud == "aws" else {}),
         "requests": requests,
     }
+
+
+def observe_origin(
+    ssh: list[str],
+    evidence: Path,
+    label: str,
+    requests: list[dict],
+    source: tuple[str, str],
+) -> None:
+    """Match each fresh request to the owned origin and CE source address."""
+    raw = subprocess.check_output(  # noqa: S603 - fixed executable and argv, no shell
+        [*ssh, "qualification-origin", "sudo cat /var/log/nginx/qualification.jsonl"],
+        timeout=30,
+    )
+    (evidence / f"{label}-origin.jsonl").write_bytes(raw)
+    observations = [json.loads(line) for line in raw.decode().splitlines() if line]
+    source_key, ce_source = source
+    for request in requests:
+        matched = [item for item in observations if item.get("case") == request["case"]]
+        request["origin_observations"] = len(matched)
+        request[source_key] = bool(matched) and all(
+            item.get("source") == ce_source for item in matched
+        )
 
 
 def route_to_ce(facts: dict, cloud: str) -> bool:
@@ -167,12 +204,16 @@ def route_to_ce(facts: dict, cloud: str) -> bool:
 
 
 def client_requests(
-    ssh: list[str], origin: str, cert_path: str, evidence: Path, label: str
+    ssh: list[str],
+    target: TrafficTarget,
+    evidence: Path,
+    label: str,
 ) -> list[dict]:
     """Issue independent HTTP and certificate-validated HTTPS connections."""
     requests: list[dict] = []
     for scheme, port in (("http", 80), ("https", 443)):
         case = str(uuid.uuid4())
+        path = target.http_path if scheme == "http" else "/allow"
         args = [
             "curl",
             "-sS",
@@ -183,13 +224,13 @@ def client_requests(
             "-H",
             "Connection: close",
             "--resolve",
-            f"origin.qualification.test:{port}:{origin}",
-            f"{scheme}://origin.qualification.test/allow?case={case}",
+            f"origin.qualification.test:{port}:{target.origin}",
+            f"{scheme}://origin.qualification.test{path}?case={case}",
             "-w",
             "\n%{http_code}\n",
         ]
         if scheme == "https":
-            args += ["--cacert", cert_path]
+            args += ["--cacert", target.certificate]
         result = subprocess.run(  # noqa: S603 - fixed SSH aliases; remote curl argv uses shlex.join
             [*ssh, "qualification-client", shlex.join(args)],
             capture_output=True,
@@ -224,11 +265,14 @@ def main() -> None:
     parser.add_argument("--ssh-config", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--label", required=True)
+    parser.add_argument("--http-path", default="/allow")
     parser.add_argument("--http", choices=("allow", "deny"), required=True)
     parser.add_argument("--https", choices=("allow", "deny"), default="allow")
     args = parser.parse_args()
     if not re.fullmatch(r"[a-z0-9-]+", args.label):
         parser.error("Use a lowercase non-personal evidence label")
+    if not re.fullmatch(r"/[a-zA-Z0-9/_-]*", args.http_path):
+        parser.error("Use an origin-relative HTTP path without query or fragment")
     facts = json.loads(args.facts.read_text())
     if not re.fullmatch(r"[a-z][a-z0-9-]{2,19}", facts["task_id"]):
         parser.error("Invalid fixture task identity")
@@ -236,6 +280,7 @@ def main() -> None:
     path = args.evidence / f"{args.label}-receipt.json"
     if path.exists():
         parser.error("Evidence label already exists; preserve the first attempt")
+    facts["http_path"] = args.http_path
     receipt = capture(facts, args.ssh_config, args.evidence, args.label, args.cloud)
     receipt["accepted"] = accepted(receipt, {"http": args.http, "https": args.https})
     path.write_text(json.dumps(receipt, indent=2) + "\n")

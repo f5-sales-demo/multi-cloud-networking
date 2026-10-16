@@ -6,7 +6,7 @@ Runtime acceptance is pending until real image boot, registration, completed rea
 MAC identity, routing and fresh HTTP/HTTPS origin observations pass. Historical Azure receipts
 without a backing VM do not qualify this fixture.
 
-This root pins Terraform 1.16.5, azurerm 4.81.0 and xcsh 15.9.0. It creates a separate task-owned
+This root pins Terraform 1.16.5, azurerm 4.81.0 and xcsh 15.10.0. It creates a separate task-owned
 resource group, single CE, two ordered SLO/SLI NICs, private client, controlled origin and UDR.
 Use exact Marketplace SKU/version/plan and Ubuntu version inputs. The CE SKU must support the
 image generation and NIC count; the OS disk is explicitly 100 GiB. Check Marketplace terms,
@@ -90,3 +90,10 @@ python3 ../../../scripts/smsv2_traffic_receipt.py --cloud azure \
 
 First failed transit attempts, the default nginx response and refused TLS, and the rejected origin
 replacement plan remain preserved separately from corrective source/plan/service actions.
+
+Forward Proxy URL/SNI cases use the same controls as the AWS root: `proxy_http_action`,
+`proxy_tls_action`, ordered `proxy_rule_order`, `proxy_fallback_action` and an independent
+`proxy_companion_action`. Parent `proxy_policies` remains the sole association writer.
+Use the traffic verifier's `--http-path /deny` for the scoped URL and `/allow` for the path control.
+The source and mock coverage do not establish live enforcement; preserve separate cycle-2 receipts.
+TLS/SNI filtering does not establish TLS decryption.
