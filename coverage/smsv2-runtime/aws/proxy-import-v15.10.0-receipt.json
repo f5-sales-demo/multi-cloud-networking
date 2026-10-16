@@ -1,0 +1,31 @@
+{
+  "api_version": "12.0.9",
+  "classification": "unqualified; authoritative default semantics and owning repair required",
+  "cloud": "aws",
+  "cycle": 2,
+  "different_attributes": [
+    "any_proxy"
+  ],
+  "excluded_attributes": [],
+  "fixture_commit": "9e6f3b0d9c99c57449f71ce647263276bfdfd9b0",
+  "import_all_attributes_equal": false,
+  "import_plan_managed_changes": {
+    "xcsh_forward_proxy_policy.traffic": [
+      "update"
+    ]
+  },
+  "import_plan_sha256": "9031a958ddd18b0f22d14624717f4fe521513522c6ce47b7194809c44ad20194",
+  "import_xc_mutations": 0,
+  "imported_any_proxy": {},
+  "imported_plan_applied": false,
+  "issue": "https://github.com/f5-sales-demo/terraform-provider-xcsh/issues/2626",
+  "original_managed_any_proxy": null,
+  "original_managed_noop_plan_hashes": [
+    "9d64661ae2a35bdb77f5108820546c0d50323b3f1957675b09026c4fa812d2a2",
+    "8f7c269727c4b3d05d1c0d541d35b3fa47709adf3f6e63420e69a62ba0385681"
+  ],
+  "policy_data_source_ordered_rules_equal": true,
+  "privacy": "Raw state, imported configuration, API objects, plans, addresses and credentials remain private.",
+  "provider_version": "15.10.0",
+  "scope": "Forward Proxy any_proxy omitted-default import; no enforcement qualification"
+}

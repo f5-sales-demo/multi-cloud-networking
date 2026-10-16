@@ -119,3 +119,10 @@ first, then supply the ordered `proxy_policies` parent references. The HTTP matc
 to `/deny`; pass `--http-path /deny` to the traffic verifier and use `/allow` as an independent
 path control. TLS filtering uses the same owned origin and certificate-validated connections.
 HTTPS filtering does not establish TLS decryption.
+
+The cycle-2 [omitted-default import receipt](proxy-import-v15.10.0-receipt.json) preserves a
+failed acceptance gate on v15.10.0: managed creation retains `any_proxy = null`, while import
+hydrates `{}` and proposes an update. No imported plan was applied and no attributes were
+excluded. [Provider #2626](https://github.com/f5-sales-demo/terraform-provider-xcsh/issues/2626)
+tracks authoritative default semantics and owning repair. Original managed no-op plans and
+ordered policy data-source equality pass; they do not erase the import failure.
