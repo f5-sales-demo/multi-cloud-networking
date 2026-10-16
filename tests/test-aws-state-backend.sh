@@ -63,8 +63,13 @@ require 'variable "access_log_retention_days"' "$variables"
 reject 'backend "s3" {}' "$bootstrap_versions"
 require 'alias  = "replica"' "$bootstrap_versions"
 require 'Terraform state backend bootstrap validation' "$repo_root/.github/workflows/terraform.yml"
-require 'runs-on: ubuntu-latest' "$repo_root/.github/workflows/terraform.yml"
-reject 'runs-on: managed-socketless' "$repo_root/.github/workflows/terraform.yml"
+# The state-backend validation job retains its approved hosted route. Other
+# fixture jobs have independently governed routes and are outside this contract.
+validate_job=$(sed -n '/^  validate:/,/^  [a-z]/p' "$repo_root/.github/workflows/terraform.yml")
+grep -Fq 'runs-on: ubuntu-latest' <<<"$validate_job" || fail 'state-backend validation must use its approved hosted runner'
+if grep -Fq 'runs-on: managed-socketless' <<<"$validate_job"; then
+  fail 'state-backend validation must not move to the fixture runner'
+fi
 [ -x "$configure_script" ] || fail "backend configuration script is not executable"
 
 # The live AWS SMSv2 root is independently initialized, so its provider
