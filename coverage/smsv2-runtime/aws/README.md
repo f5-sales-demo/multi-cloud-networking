@@ -3,8 +3,9 @@
 This standalone root supports [#1495](https://github.com/f5-sales-demo/multi-cloud-networking/issues/1495)
 and provider umbrella [#2586](https://github.com/f5-sales-demo/terraform-provider-xcsh/issues/2586).
 It creates one CE, a private traffic client and a controlled HTTP/HTTPS origin in a task-owned VPC.
-It uses no existing showcase state or resource address. Runtime acceptance remains pending until
-boot, registration, ONLINE readiness, MAC identity, routing and fresh origin-observed traffic pass.
+It uses no existing showcase state or resource address. The versioned receipt records AWS boot,
+registration, dataplane readiness, MAC identity, routing and fresh origin-observed traffic.
+This fixture delivery does not establish completion of the SMSv2 capability families or Azure.
 
 The fixture pins Terraform 1.16.5, AWS provider 5.100.0 and XC provider 15.9.0. Supply exact approved
 CE and Amazon Linux 2023 image IDs and matching CE software/OS versions. Origin initialization uses
@@ -73,3 +74,31 @@ terraform validate
 terraform test
 python3 ../../../tests/test_fixture_mapping.py
 ```
+
+The optional scoped firewall controls create policies without attaching them. Set
+`firewall_action = "deny"` or `"allow"`; use `firewall_scoped_first = false` to place the
+unrelated-traffic allow rule first. `firewall_companion_action` creates a second independent
+policy for reference replacement and ordered-list tests. Set `firewall_policies` explicitly
+in the parent to select associations. Policy data sources read back ordered rules.
+The live AWS receipt distinguishes proven rule ordering from cross-policy precedence, which
+remains unqualified: both orders of the attached allow/deny pair blocked the scoped request.
+
+Use the reusable verifier with private fixture outputs, adding the frozen AWS region to the
+facts document:
+
+```sh
+python3 ../../../scripts/smsv2_traffic_receipt.py \
+  --facts /private/path/traffic-facts.json --ssh-config /private/path/ssh.config \
+  --evidence /private/path/receipts --label scoped-deny --http deny --https allow
+```
+
+The facts document must contain `task_id`, `region`, `origin_public_ip`, `ce_public_ip`,
+`client_route_table` and `sli_eni`. The SSH configuration resolves `qualification-origin` and
+`qualification-client` to the owned instances. Each label is immutable. The verifier checks
+an active default route to the CE SLI, a fresh UUID in the response and origin log, and the CE
+source IP. It rejects an SSH failure or two blocked protocols as proof of enforcement; denial
+requires an unaffected positive control. TLS/SNI denial and TLS decryption need their own cases.
+
+Run `bash ../../../tests/test-fixture-mapping.sh` for mapping and traffic acceptance regressions.
+The dedicated CI job installs Terraform 1.16.5, initializes the locked providers without a
+backend, validates the fixture and runs mocked lifecycle tests without cloud credentials.

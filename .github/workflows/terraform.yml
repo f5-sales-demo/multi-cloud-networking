@@ -303,3 +303,28 @@ jobs:
 
       - name: Numeric-validator gate (accept valid bounds + reject out-of-range)
         run: ./verify.sh
+
+  coverage-smsv2-runtime-aws:
+    name: coverage-smsv2-runtime-aws
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: coverage/smsv2-runtime/aws
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+      - name: Initialize frozen providers without a backend
+        run: terraform init -backend=false -input=false -lockfile=readonly
+      - name: Validate disposable fixture
+        run: terraform validate -no-color
+      - name: Exercise fixture lifecycle with mocked providers
+        run: terraform test -no-color
+      - name: Test mapping and traffic acceptance
+        working-directory: .
+        run: bash tests/test-fixture-mapping.sh

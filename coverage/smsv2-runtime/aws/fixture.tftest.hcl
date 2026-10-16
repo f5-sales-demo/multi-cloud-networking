@@ -127,3 +127,27 @@ run "scoped_firewall_policy" {
     error_message = "Firewall rule must target only HTTP port 80."
   }
 }
+
+run "reversed_firewall_rules" {
+  command = plan
+  variables {
+    phase                     = "configured"
+    device_mapping_file       = "tests/mapping-valid.json"
+    firewall_action           = "deny"
+    firewall_scoped_first     = false
+    firewall_companion_action = "allow"
+  }
+  assert {
+    condition     = xcsh_enhanced_firewall_policy.traffic[0].rule_list.rules[0].metadata.name == "allow-unrelated" && xcsh_enhanced_firewall_policy.traffic[0].rule_list.rules[1].metadata.name == "scoped-http"
+    error_message = "Configured rule order must reach the policy payload unchanged."
+  }
+  assert {
+    condition     = xcsh_enhanced_firewall_policy.companion[0].rule_list.rules[0].allow != null && xcsh_enhanced_firewall_policy.companion[0].rule_list.rules[0].deny == null
+    error_message = "Companion policy must use the independent scoped action."
+  }
+}
+run "invalid_firewall_action" {
+  command = plan
+  variables { firewall_action = "NEXT_POLICY" }
+  expect_failures = [var.firewall_action]
+}

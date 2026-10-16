@@ -1,0 +1,74 @@
+# ruff: noqa: PT009
+
+"""Prevent fixture failures and bypass traffic from passing policy acceptance."""
+
+import sys
+import unittest
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from smsv2_traffic_receipt import accepted
+
+
+class TrafficAcceptanceTests(unittest.TestCase):
+    def setUp(self):
+        self.receipt: dict[str, Any] = {
+            "aws_default_route_to_ce": True,
+            "requests": [
+                {
+                    "scheme": scheme,
+                    "client_exit": 0,
+                    "http_200": True,
+                    "body_case_matches": True,
+                    "origin_observations": 1,
+                    "origin_source_matches_ce_eip": True,
+                }
+                for scheme in ("http", "https")
+            ],
+        }
+
+    def test_observed_baseline(self):
+        self.assertTrue(accepted(self.receipt, {"http": "allow", "https": "allow"}))
+
+    def test_drop_requires_control(self):
+        receipt = deepcopy(self.receipt)
+        denied = receipt["requests"][0]
+        denied.update(
+            client_exit=28,
+            http_200=False,
+            body_case_matches=False,
+            origin_observations=0,
+            origin_source_matches_ce_eip=False,
+        )
+        self.assertTrue(accepted(receipt, {"http": "deny", "https": "allow"}))
+        receipt["requests"][1].update(
+            client_exit=28, http_200=False, origin_observations=0
+        )
+        self.assertFalse(accepted(receipt, {"http": "deny", "https": "deny"}))
+
+    def test_bypass_never_passes(self):
+        self.receipt["aws_default_route_to_ce"] = False
+        self.assertFalse(accepted(self.receipt, {"http": "allow", "https": "allow"}))
+
+    def test_foreign_source_never_passes(self):
+        self.receipt["requests"][0]["origin_source_matches_ce_eip"] = False
+        self.assertFalse(accepted(self.receipt, {"http": "allow", "https": "allow"}))
+
+    def test_stale_or_duplicate_response_never_passes(self):
+        for key, value in (("body_case_matches", False), ("origin_observations", 2)):
+            with self.subTest(key=key):
+                receipt = deepcopy(self.receipt)
+                receipt["requests"][0][key] = value
+                self.assertFalse(accepted(receipt, {"http": "allow", "https": "allow"}))
+
+    def test_ssh_failure_is_not_a_policy_drop(self):
+        self.receipt["requests"][0].update(
+            client_exit=255, http_200=False, origin_observations=0
+        )
+        self.assertFalse(accepted(self.receipt, {"http": "deny", "https": "allow"}))
+
+
+if __name__ == "__main__":
+    unittest.main()
