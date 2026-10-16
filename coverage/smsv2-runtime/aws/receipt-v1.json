@@ -96,7 +96,7 @@
       "status": "repaired in merged PR #1501"
     }
   ],
-  "fixture_revision": "4c2c8ae0",
+  "fixture_revision": "4c2c8ae0f16c6ec14046c0edf32b0f6093c5f6b2",
   "format_version": 1,
   "import": {
     "all_attributes_equal": true,
