@@ -528,6 +528,7 @@ output "fixture" {
     phase              = var.phase
     site_name          = local.active ? local.site_name : null
     ce_public_ip       = aws_eip.ce.public_ip
+    ce_instance_id     = local.active ? aws_instance.ce[0].id : null
     client_private_ip  = aws_instance.client.private_ip
     origin_public_ip   = aws_instance.origin.public_ip
     slo_mac            = aws_network_interface.slo.mac_address

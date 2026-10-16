@@ -71,6 +71,14 @@ run "configured_observed_mapping" {
     error_message = "Configured site must use a distinct identity."
   }
 }
+override_data {
+  target = data.aws_ami.ce
+  values = { id = "ami-0123456789abcdef0" }
+}
+override_data {
+  target = data.aws_ami.client
+  values = { id = "ami-0123456789abcdef1" }
+}
 run "ordered_parent_attachments" {
   command = apply
   variables {
@@ -86,5 +94,18 @@ run "ordered_parent_attachments" {
   assert {
     condition     = xcsh_securemesh_site_v2.ce[0].active_forward_proxy_policies.forward_proxy_policies[0].name == "proxy-first"
     error_message = "Parent forward proxy association order must be preserved."
+  }
+}
+
+run "attachment_keeps_instance" {
+  command = plan
+  variables {
+    phase               = "configured"
+    device_mapping_file = "tests/mapping-valid.json"
+    firewall_policies   = [{ name = "replacement", namespace = "system" }]
+  }
+  assert {
+    condition     = aws_instance.ce[0].id == run.ordered_parent_attachments.fixture.ce_instance_id
+    error_message = "Policy association changes must preserve the running CE."
   }
 }
