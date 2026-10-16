@@ -93,7 +93,7 @@
       "failure": "baseline AWS preflight jq groups boolean as IPv4 octets",
       "issue": "https://github.com/f5-sales-demo/multi-cloud-networking/issues/1500",
       "owner": "consumer",
-      "status": "focused repair pending CI"
+      "status": "repaired in merged PR #1501"
     }
   ],
   "fixture_revision": "4c2c8ae0",
@@ -511,7 +511,7 @@
     "pylint": "10.00",
     "python_full_suite": 132,
     "ruff": "pass",
-    "shell_suite": "three first failures; two pass with exact root Terraform 1.16.3; remaining baseline bug repaired separately in #1500",
+    "shell_suite": "Full suite retained three first failures. Two pass with exact showcase Terraform 1.16.3; baseline preflight repair #1501 merged and its full regression passes.",
     "shellcheck": "pass",
     "traffic_negative_tests": 6,
     "yaml": "pass"
