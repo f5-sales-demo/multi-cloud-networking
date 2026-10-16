@@ -92,3 +92,10 @@ data "xcsh_enhanced_firewall_policy" "companion" {
   name      = xcsh_enhanced_firewall_policy.companion[0].name
   namespace = "system"
 }
+
+output "firewall_readback" {
+  value = {
+    traffic   = try(data.xcsh_enhanced_firewall_policy.traffic[0].rule_list == xcsh_enhanced_firewall_policy.traffic[0].rule_list, null)
+    companion = try(data.xcsh_enhanced_firewall_policy.companion[0].rule_list == xcsh_enhanced_firewall_policy.companion[0].rule_list, null)
+  }
+}

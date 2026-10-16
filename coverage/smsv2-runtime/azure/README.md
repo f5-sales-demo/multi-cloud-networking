@@ -35,7 +35,19 @@ section and appends the image admin account's operator key; it does not invent a
 Azure VM provisioning uses `azureuser`, because Azure rejects the reserved `admin` provisioning
 username. The appliance operator account remains `admin`. Two MACs are normalized from Azure's
 hyphen notation to registration colon notation. Join real registration devices to the owned NICs
-and save the checksummed mapping privately. `phase = "retired"` removes only the bootstrap CE,
+and save the checksummed mapping privately. Azure registrations can report both a synthetic
+`hv_netvsc` interface and a bonded SR-IOV alias under the same MAC. The Azure-specific mapper
+selects exactly one observed synthetic interface and retains the known VF alias. It rejects
+unknown or ambiguous pairs; device names are never guessed. See Microsoft
+[application binding requirements](https://learn.microsoft.com/en-us/azure/virtual-network/accelerated-networking-overview).
+
+```sh
+python3 ../../../scripts/smsv2_azure_fixture_mapping.py \
+  --fixture /private/path/fixture.json --hardware /private/path/hardware.json \
+  --output /private/path/device-mapping.json
+```
+
+ `phase = "retired"` removes only the bootstrap CE,
 site, token and approval, retaining all substrate. Then `phase = "configured"` creates a distinct
 site using `device_mapping_file`. Never guess devices or convert a bootstrap site in place.
 
