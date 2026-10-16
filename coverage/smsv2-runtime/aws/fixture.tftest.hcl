@@ -1,4 +1,5 @@
 mock_provider "aws" {
+  mock_resource "aws_instance" { defaults = { public_ip = "192.0.2.20" } }
   mock_resource "aws_eip" { defaults = { public_ip = "192.0.2.10" } }
   mock_resource "aws_network_interface" { defaults = { mac_address = "00:00:5e:00:53:01" } }
   mock_data "aws_availability_zones" { defaults = { names = ["ap-northeast-1a"] } }
@@ -107,5 +108,22 @@ run "attachment_keeps_instance" {
   assert {
     condition     = aws_instance.ce[0].id == run.ordered_parent_attachments.fixture.ce_instance_id
     error_message = "Policy association changes must preserve the running CE."
+  }
+}
+
+run "scoped_firewall_policy" {
+  command = plan
+  variables {
+    phase               = "configured"
+    device_mapping_file = "tests/mapping-valid.json"
+    firewall_action     = "deny"
+  }
+  assert {
+    condition     = xcsh_enhanced_firewall_policy.traffic[0].rule_list.rules[0].source_prefix_list.prefixes[0] == aws_subnet.client.cidr_block
+    error_message = "Firewall rule must be scoped to the private client subnet."
+  }
+  assert {
+    condition     = xcsh_enhanced_firewall_policy.traffic[0].rule_list.rules[0].protocol_port_range.port_ranges[0] == "80"
+    error_message = "Firewall rule must target only HTTP port 80."
   }
 }
