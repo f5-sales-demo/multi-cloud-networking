@@ -361,3 +361,9 @@ jobs:
         run: |
           bash tests/test-fixture-mapping.sh
           python3 tests/test_azure_fixture_mapping.py
+
+      - name: Reject contradictory policy selections
+        working-directory: coverage/smsv2-runtime/contracts
+        run: |
+          terraform init -backend=false -input=false -lockfile=readonly
+          terraform test -no-color

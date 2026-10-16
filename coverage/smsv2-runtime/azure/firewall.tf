@@ -60,24 +60,28 @@ resource "xcsh_enhanced_firewall_policy" "companion" {
   name      = "${var.task_id}-efw-companion"
   namespace = "system"
   labels    = local.tags
-  rule_list {
-    rules {
-      metadata { name = "scoped-http" }
-      source_prefix_list { prefixes = [azurerm_subnet.client.address_prefixes[0]] }
-      destination_prefix_list { prefixes = ["${azurerm_public_ip.origin.ip_address}/32"] }
-      protocol_port_range {
-        protocol    = "TCP"
-        port_ranges = ["80"]
+  allow_all = var.firewall_companion_mode == "explicit_default" ? {} : null
+  dynamic "rule_list" {
+    for_each = var.firewall_companion_mode == "scoped" ? [1] : []
+    content {
+      rules {
+        metadata { name = "scoped-http" }
+        source_prefix_list { prefixes = [azurerm_subnet.client.address_prefixes[0]] }
+        destination_prefix_list { prefixes = ["${azurerm_public_ip.origin.ip_address}/32"] }
+        protocol_port_range {
+          protocol    = "TCP"
+          port_ranges = ["80"]
+        }
+        allow = var.firewall_companion_action == "allow" ? {} : null
+        deny  = var.firewall_companion_action == "deny" ? {} : null
       }
-      allow = var.firewall_companion_action == "allow" ? {} : null
-      deny  = var.firewall_companion_action == "deny" ? {} : null
-    }
-    rules {
-      metadata { name = "allow-unrelated" }
-      all_sources      = {}
-      all_destinations = {}
-      all_traffic      = {}
-      allow            = {}
+      rules {
+        metadata { name = "allow-unrelated" }
+        all_sources      = {}
+        all_destinations = {}
+        all_traffic      = {}
+        allow            = {}
+      }
     }
   }
 }
@@ -97,5 +101,14 @@ output "firewall_readback" {
   value = {
     traffic   = try(data.xcsh_enhanced_firewall_policy.traffic[0].rule_list == xcsh_enhanced_firewall_policy.traffic[0].rule_list, null)
     companion = try(data.xcsh_enhanced_firewall_policy.companion[0].rule_list == xcsh_enhanced_firewall_policy.companion[0].rule_list, null)
+  }
+}
+
+variable "firewall_companion_mode" {
+  type    = string
+  default = "scoped"
+  validation {
+    condition     = contains(["scoped", "omitted_default", "explicit_default"], var.firewall_companion_mode)
+    error_message = "Use scoped, omitted_default or explicit_default for the companion policy."
   }
 }
