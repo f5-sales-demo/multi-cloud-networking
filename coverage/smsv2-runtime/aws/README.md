@@ -102,3 +102,12 @@ requires an unaffected positive control. TLS/SNI denial and TLS decryption need 
 Run `bash ../../../tests/test-fixture-mapping.sh` for mapping and traffic acceptance regressions.
 The dedicated CI job installs Terraform 1.16.5, initializes the locked providers without a
 backend, validates the fixture and runs mocked lifecycle tests without cloud credentials.
+
+The lab topology intentionally uses a controlled public origin/jump guest and unrestricted
+qualification egress. Resource-specific Checkov comments document the approved exceptions:
+public origin reachability; CE/origin lab egress; traffic guests without AWS API permissions;
+unused default security group; production flow-log infrastructure; and the EIP graph's failure
+to model the retained SLO ENI retirement/reuse. These exceptions preserve the test topology and
+are not production security recommendations. Rule descriptions, detailed EC2 monitoring and
+EBS optimization are explicit. Capability tests, private-client routing, origin observations,
+first failures and cleanup gates remain mandatory.
