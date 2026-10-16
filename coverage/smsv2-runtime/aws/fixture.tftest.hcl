@@ -151,3 +151,27 @@ run "invalid_firewall_action" {
   variables { firewall_action = "NEXT_POLICY" }
   expect_failures = [var.firewall_action]
 }
+
+run "forward_proxy_url_and_sni_rules" {
+  command = plan
+  variables {
+    phase                  = "configured"
+    device_mapping_file    = "tests/mapping-valid.json"
+    proxy_http_action      = "DENY"
+    proxy_tls_action       = "DENY"
+    proxy_fallback_action  = "NEXT_POLICY"
+    proxy_companion_action = "ALLOW"
+  }
+  assert {
+    condition     = xcsh_forward_proxy_policy.traffic[0].rule_list.rules[0].http_list.http_list[0].path_prefix_value == "/deny"
+    error_message = "HTTP rule must retain the configured URL path matcher."
+  }
+  assert {
+    condition     = xcsh_forward_proxy_policy.traffic[0].rule_list.rules[1].tls_list.tls_list[0].exact_value == "origin.qualification.test"
+    error_message = "TLS rule must retain the controlled SNI domain."
+  }
+  assert {
+    condition     = xcsh_forward_proxy_policy.traffic[0].rule_list.rules[2].action == "NEXT_POLICY"
+    error_message = "Fallback must explicitly continue to the next policy."
+  }
+}
