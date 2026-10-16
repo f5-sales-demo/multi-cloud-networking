@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "task_id": "qualification-test",
+  "bootstrap_site": "qualification-test-bootstrap",
+  "entries": [
+    {
+      "role": "slo",
+      "mac": "00:00:5e:00:53:01",
+      "device": "ens7"
+    },
+    {
+      "role": "sli",
+      "mac": "00:00:5e:00:53:02",
+      "device": "ens8"
+    }
+  ],
+  "checksum": "f353a8ade9c38c1343b674fb563e69dc40900fe3bd7ebb6abbe066f2ceefe7be"
+}
