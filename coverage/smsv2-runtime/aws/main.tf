@@ -121,6 +121,8 @@ data "aws_ami" "client" {
 }
 
 resource "aws_vpc" "fixture" {
+  # checkov:skip=CKV2_AWS_11: Disposable traffic fixture retains origin observations and private receipts; production flow-log infrastructure is outside this cycle.
+  # checkov:skip=CKV2_AWS_12: The task default security group is unused; every task ENI and guest receives an explicit task security group and the VPC is destroyed.
 
   cidr_block           = "10.252.0.0/16"
   enable_dns_hostnames = true
@@ -186,23 +188,27 @@ resource "aws_route_table_association" "client" {
 }
 
 resource "aws_security_group" "fixture" {
+  # checkov:skip=CKV_AWS_382: This temporary CE transit fixture intentionally permits egress so cloud filtering cannot masquerade as XC enforcement; it is not a production egress policy.
 
   name        = var.task_id
   vpc_id      = aws_vpc.fixture.id
   description = "Task-owned CE and traffic lab; permit VPC test flows."
   ingress {
+    description = "Task VPC traffic between CE and private guests"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = [aws_vpc.fixture.cidr_block]
   }
   ingress {
+    description = "Operator SSH from the explicitly supplied CIDR"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = [var.operator_cidr]
   }
   egress {
+    description = "Temporary qualification egress; XC enforcement is tested separately"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -237,6 +243,7 @@ resource "aws_network_interface" "sli" {
 
 }
 resource "aws_eip" "ce" {
+  # checkov:skip=CKV2_AWS_19: Bound to the owned SLO ENI, including its reviewed retirement/reuse phase; actual CE attachment and final absence are verified in the receipt.
   domain            = "vpc"
   network_interface = aws_network_interface.slo.id
   tags              = local.tags
@@ -413,6 +420,8 @@ data "xcsh_site_cloud_init" "ce" {
 
 }
 resource "aws_instance" "ce" {
+  monitoring    = true
+  ebs_optimized = true
   lifecycle {
     ignore_changes = [user_data]
   }
@@ -457,6 +466,10 @@ resource "aws_instance" "ce" {
 
 }
 resource "aws_instance" "origin" {
+  monitoring    = true
+  ebs_optimized = true
+  # checkov:skip=CKV_AWS_88: Task-owned public HTTP/HTTPS destination and SSH jump; ingress permits only the CE EIP and operator CIDR, with fresh origin-side observations and verified cleanup.
+  # checkov:skip=CKV2_AWS_41: The controlled traffic guest makes no AWS API calls; no workload role or instance credentials are granted.
 
   ami                         = data.aws_ami.client.id
   instance_type               = "t3.micro"
@@ -480,6 +493,9 @@ resource "aws_instance" "origin" {
 
 }
 resource "aws_instance" "client" {
+  monitoring    = true
+  ebs_optimized = true
+  # checkov:skip=CKV2_AWS_41: The private traffic guest makes no AWS API calls; no workload role or instance credentials are granted.
 
   ami                         = data.aws_ami.client.id
   instance_type               = "t3.micro"
