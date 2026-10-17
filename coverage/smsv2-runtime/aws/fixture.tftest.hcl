@@ -241,3 +241,16 @@ run "native_allowlist_next_choice" {
     error_message = "Native allow-list default-next is distinct from rule-list action NEXT_POLICY."
   }
 }
+
+run "scoped_companion_keeps_tls_control" {
+  command = plan
+  variables {
+    proxy_companion_action     = "DENY"
+    proxy_companion_http_only  = true
+    proxy_http_origin_hostname = "http-origin.qualification.test"
+  }
+  assert {
+    condition     = xcsh_forward_proxy_policy.companion[0].rule_list.rules[0].http_list.http_list[0].exact_value == "http-origin.qualification.test" && xcsh_forward_proxy_policy.companion[0].rule_list.rules[0].http_list.http_list[0].any_path != null && xcsh_forward_proxy_policy.companion[0].rule_list.rules[1].action == "ALLOW"
+    error_message = "The companion deny must retain an independent TLS positive control."
+  }
+}

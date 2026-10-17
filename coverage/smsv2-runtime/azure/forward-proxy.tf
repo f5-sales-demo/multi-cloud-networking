@@ -91,6 +91,10 @@ resource "xcsh_forward_proxy_policy" "traffic" {
     }
   }
 }
+variable "proxy_companion_http_only" {
+  type    = bool
+  default = false
+}
 resource "xcsh_forward_proxy_policy" "companion" {
   count     = var.proxy_companion_action == null ? 0 : 1
   name      = "${var.task_id}-fpx-next"
@@ -99,10 +103,33 @@ resource "xcsh_forward_proxy_policy" "companion" {
   rule_list {
     rules {
       metadata { name = "qualification-companion" }
-      all_sources          = {}
-      all_destinations     = {}
+      all_sources          = var.proxy_companion_http_only ? null : {}
+      all_destinations     = var.proxy_companion_http_only ? null : {}
       no_http_connect_port = {}
       action               = var.proxy_companion_action
+      dynamic "prefix_list" {
+        for_each = var.proxy_companion_http_only ? [1] : []
+        content { prefixes = [azurerm_subnet.client.address_prefixes[0]] }
+      }
+      dynamic "http_list" {
+        for_each = var.proxy_companion_http_only ? [1] : []
+        content {
+          http_list {
+            exact_value = coalesce(var.proxy_http_origin_hostname, var.proxy_origin_hostname)
+            any_path    = {}
+          }
+        }
+      }
+    }
+    dynamic "rules" {
+      for_each = var.proxy_companion_http_only ? [1] : []
+      content {
+        metadata { name = "qualification-companion-control" }
+        all_sources          = {}
+        all_destinations     = {}
+        no_http_connect_port = {}
+        action               = "ALLOW"
+      }
     }
   }
 }
@@ -119,6 +146,14 @@ variable "proxy_allowlist_next" {
   type    = bool
   default = false
 }
+variable "proxy_allowlist_default_action" {
+  type    = string
+  default = "NEXT_POLICY"
+  validation {
+    condition     = contains(["ALLOW", "DENY", "NEXT_POLICY"], var.proxy_allowlist_default_action)
+    error_message = "Use a native allow-list default ALLOW, DENY or NEXT_POLICY choice."
+  }
+}
 resource "xcsh_forward_proxy_policy" "allowlist" {
   count     = var.proxy_allowlist_next ? 1 : 0
   name      = "${var.task_id}-fpx-list"
@@ -126,7 +161,9 @@ resource "xcsh_forward_proxy_policy" "allowlist" {
   labels    = local.tags
   any_proxy = {}
   allow_list {
-    default_action_next_policy = {}
+    default_action_next_policy = var.proxy_allowlist_default_action == "NEXT_POLICY" ? {} : null
+    default_action_deny        = var.proxy_allowlist_default_action == "DENY" ? {} : null
+    default_action_allow       = var.proxy_allowlist_default_action == "ALLOW" ? {} : null
     http_list {
       exact_value = "unrelated.qualification.test"
       any_path    = {}
