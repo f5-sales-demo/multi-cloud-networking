@@ -242,3 +242,18 @@ run "duplicate_forward_proxy_rule_order" {
   variables { proxy_rule_order = ["http", "http", "fallback"] }
   expect_failures = [var.proxy_rule_order]
 }
+
+run "independent_http_and_tls_domains" {
+  command = plan
+  variables {
+    phase                      = "configured"
+    device_mapping_file        = "tests/mapping-valid.json"
+    proxy_http_action          = "DENY"
+    proxy_tls_action           = "DENY"
+    proxy_http_origin_hostname = "http-origin.qualification.test"
+  }
+  assert {
+    condition     = xcsh_forward_proxy_policy.traffic[0].rule_list.rules[0].http_list.http_list[0].exact_value == "http-origin.qualification.test" && xcsh_forward_proxy_policy.traffic[0].rule_list.rules[1].tls_list.tls_list[0].exact_value == "origin.qualification.test"
+    error_message = "HTTP and TLS domains must support independent positive controls."
+  }
+}

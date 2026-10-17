@@ -97,3 +97,17 @@ Forward Proxy URL/SNI cases use the same controls as the AWS root: `proxy_http_a
 Use the traffic verifier's `--http-path /deny` for the scoped URL and `/allow` for the path control.
 The source and mock coverage do not establish live enforcement; preserve separate cycle-2 receipts.
 TLS/SNI filtering does not establish TLS decryption.
+
+Use `proxy_http_origin_hostname` to separate the HTTP rule's domain from the TLS/SNI domain
+selected by `proxy_origin_hostname`. The same controlled origin can serve an HTTP alias without
+changing the HTTPS certificate or destination. Pass `--http-hostname http-origin.qualification.test`
+to the verifier when using that alias. A shared target domain can couple HTTP filtering and TLS
+controls; preserve failures rather than treating two blocked protocols as acceptance.
+
+The verifier keeps timeout-based denial as its default. Forward Proxy's explicit HTTP 403 and
+TLS handshake rejection can be selected with `--http-denial http-403` or
+`--https-denial tls-reject`. These modes require `--baseline-receipt` naming an all-allow receipt
+from the same site, instance, CE route, origin, hostnames, trusted certificate and denied path.
+They still require an unaffected fresh positive control and no origin observation for the denied
+request. An unrelated endpoint, wrong path, invalid baseline, origin response, HTTP 500 or SSH
+failure cannot pass these modes. TLS rejection alone does not establish TLS decryption.

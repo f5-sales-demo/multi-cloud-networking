@@ -34,6 +34,10 @@ variable "proxy_origin_hostname" {
   type    = string
   default = "origin.qualification.test"
 }
+variable "proxy_http_origin_hostname" {
+  type    = string
+  default = null
+}
 variable "proxy_http_path_prefix" {
   type    = string
   default = "/deny"
@@ -72,7 +76,7 @@ resource "xcsh_forward_proxy_policy" "traffic" {
           for_each = rules.value == "http" ? [1] : []
           content {
             http_list {
-              exact_value       = var.proxy_origin_hostname
+              exact_value       = coalesce(var.proxy_http_origin_hostname, var.proxy_origin_hostname)
               path_prefix_value = var.proxy_http_path_prefix
             }
           }
