@@ -257,3 +257,12 @@ run "independent_http_and_tls_domains" {
     error_message = "HTTP and TLS domains must support independent positive controls."
   }
 }
+
+run "native_allowlist_next_choice" {
+  command = plan
+  variables { proxy_allowlist_next = true }
+  assert {
+    condition     = xcsh_forward_proxy_policy.allowlist[0].allow_list.default_action_next_policy != null && xcsh_forward_proxy_policy.allowlist[0].rule_list == null && xcsh_forward_proxy_policy.allowlist[0].any_proxy != null
+    error_message = "Native allow-list default-next is distinct from rule-list action NEXT_POLICY."
+  }
+}

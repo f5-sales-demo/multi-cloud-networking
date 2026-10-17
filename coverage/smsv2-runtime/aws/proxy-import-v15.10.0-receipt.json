@@ -3,16 +3,12 @@
   "classification": "unqualified; authoritative default semantics and owning repair required",
   "cloud": "aws",
   "cycle": 2,
-  "different_attributes": [
-    "any_proxy"
-  ],
+  "different_attributes": ["any_proxy"],
   "excluded_attributes": [],
   "fixture_commit": "9e6f3b0d9c99c57449f71ce647263276bfdfd9b0",
   "import_all_attributes_equal": false,
   "import_plan_managed_changes": {
-    "xcsh_forward_proxy_policy.traffic": [
-      "update"
-    ]
+    "xcsh_forward_proxy_policy.traffic": ["update"]
   },
   "import_plan_sha256": "9031a958ddd18b0f22d14624717f4fe521513522c6ce47b7194809c44ad20194",
   "import_xc_mutations": 0,

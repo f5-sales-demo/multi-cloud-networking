@@ -114,3 +114,31 @@ data "xcsh_forward_proxy_policy" "traffic" {
 output "proxy_readback" {
   value = try(data.xcsh_forward_proxy_policy.traffic[0].rule_list == xcsh_forward_proxy_policy.traffic[0].rule_list, null)
 }
+
+variable "proxy_allowlist_next" {
+  type    = bool
+  default = false
+}
+resource "xcsh_forward_proxy_policy" "allowlist" {
+  count     = var.proxy_allowlist_next ? 1 : 0
+  name      = "${var.task_id}-fpx-list"
+  namespace = "system"
+  labels    = local.tags
+  any_proxy = {}
+  allow_list {
+    default_action_next_policy = {}
+    http_list {
+      exact_value = "unrelated.qualification.test"
+      any_path    = {}
+    }
+    tls_list { exact_value = "origin.qualification.test" }
+  }
+}
+data "xcsh_forward_proxy_policy" "allowlist" {
+  count     = var.proxy_allowlist_next ? 1 : 0
+  name      = xcsh_forward_proxy_policy.allowlist[0].name
+  namespace = "system"
+}
+output "proxy_allowlist_readback" {
+  value = try(data.xcsh_forward_proxy_policy.allowlist[0].allow_list == xcsh_forward_proxy_policy.allowlist[0].allow_list, null)
+}
