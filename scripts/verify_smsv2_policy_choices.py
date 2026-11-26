@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 def main() -> None:
-    """Check both contradictory selections without suppressing unexpected failures."""
+    """Check firewall and proxy contradictory selections without suppressing unexpected failures."""
     fixture = Path(__file__).resolve().parents[1] / "coverage/smsv2-runtime/contracts"
     terraform = shutil.which("terraform")
     if terraform is None:
@@ -22,6 +22,14 @@ def main() -> None:
         "nested": (
             "xcsh_enhanced_firewall_policy.action_conflict[0]",
             '"allow" and "deny" are mutually exclusive.',
+        ),
+        "proxy-root": (
+            "xcsh_forward_proxy_policy.proxy_root_conflict[0]",
+            "any_proxy and drp_http_connect are mutually exclusive.",
+        ),
+        "proxy-path": (
+            "xcsh_forward_proxy_policy.proxy_path_conflict[0]",
+            '"any_path" and "path_prefix_value" are mutually exclusive.',
         ),
     }
     for label, (address, detail) in probes.items():

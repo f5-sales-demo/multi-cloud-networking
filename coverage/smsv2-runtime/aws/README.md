@@ -7,7 +7,7 @@ It uses no existing showcase state or resource address. The versioned receipt re
 registration, dataplane readiness, MAC identity, routing and fresh origin-observed traffic.
 This fixture delivery does not establish completion of the SMSv2 capability families or Azure.
 
-The fixture pins Terraform 1.16.5, AWS provider 5.100.0 and XC provider 15.9.0. Supply exact approved
+The fixture pins Terraform 1.16.5, AWS provider 5.100.0 and XC provider 15.10.0. Supply exact approved
 CE and Amazon Linux 2023 image IDs and matching CE software/OS versions. Origin initialization uses
 Amazon Linux `dnf`. Credentials stay in session environment; do not put them in variables or source.
 
@@ -111,3 +111,32 @@ to model the retained SLO ENI retirement/reuse. These exceptions preserve the te
 are not production security recommendations. Rule descriptions, detailed EC2 monitoring and
 EBS optimization are explicit. Capability tests, private-client routing, origin observations,
 first failures and cleanup gates remain mandatory.
+
+The Forward Proxy controls are qualified separately in cycle 2. `proxy_http_action` and
+`proxy_tls_action` select scoped URL and SNI rules; `proxy_fallback_action` and
+`proxy_companion_action` support ordered rules and `NEXT_POLICY`. Create policies unattached
+first, then supply the ordered `proxy_policies` parent references. The HTTP matcher defaults
+to `/deny`; pass `--http-path /deny` to the traffic verifier and use `/allow` as an independent
+path control. TLS filtering uses the same owned origin and certificate-validated connections.
+HTTPS filtering does not establish TLS decryption.
+
+The cycle-2 [omitted-default import receipt](proxy-import-v15.10.0-receipt.json) preserves a
+failed acceptance gate on v15.10.0: managed creation retains `any_proxy = null`, while import
+hydrates `{}` and proposes an update. No imported plan was applied and no attributes were
+excluded. [Provider #2626](https://github.com/f5-sales-demo/terraform-provider-xcsh/issues/2626)
+tracks authoritative default semantics and owning repair. Original managed no-op plans and
+ordered policy data-source equality pass; they do not erase the import failure.
+
+Use `proxy_http_origin_hostname` to separate the HTTP rule's domain from the TLS/SNI domain
+selected by `proxy_origin_hostname`. The same controlled origin can serve an HTTP alias without
+changing the HTTPS certificate or destination. Pass `--http-hostname http-origin.qualification.test`
+to the verifier when using that alias. A shared target domain can couple HTTP filtering and TLS
+controls; preserve failures rather than treating two blocked protocols as acceptance.
+
+The verifier keeps timeout-based denial as its default. Forward Proxy's explicit HTTP 403 and
+TLS handshake rejection can be selected with `--http-denial http-403` or
+`--https-denial tls-reject`. These modes require `--baseline-receipt` naming an all-allow receipt
+from the same site, instance, CE route, origin, hostnames, trusted certificate and denied path.
+They still require an unaffected fresh positive control and no origin observation for the denied
+request. An unrelated endpoint, wrong path, invalid baseline, origin response, HTTP 500 or SSH
+failure cannot pass these modes. TLS rejection alone does not establish TLS decryption.
